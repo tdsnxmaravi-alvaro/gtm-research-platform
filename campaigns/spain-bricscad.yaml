@@ -1,0 +1,45 @@
+# Spain pilot — qualify TD SYNNEX (non-Datech) resellers for BricsCAD.
+# Mode: provided (we already have the reseller list). No verticals.
+name: spain-bricscad-resellers
+target_type: resellers
+mode: provided
+country: Spain            # derives language: es
+provided_list_path: campaigns/data/spain_resellers.csv
+
+products:
+  - name: BricsCAD
+    value_prop: >-
+      DWG-native CAD alternative to AutoCAD with perpetual and network licensing.
+    fit_criteria:
+      - Sells or services CAD/design software to end customers
+      - Has customers on AutoCAD/DWG workflows
+      - AEC, manufacturing, engineering, or GIS focus
+    evidence_required: true
+
+scoring:
+  dimensions:
+    - name: CAD / channel capability
+      max_points: 40
+    - name: Customer base fit (DWG/AutoCAD usage)
+      max_points: 35
+    - name: Momentum & timing
+      max_points: 25
+  tier_thresholds: { A: 85, B: 70, C: 50, D: 0 }
+  unverified_tier_cap: C     # no verified source URL -> cannot exceed C
+
+enrichment:
+  apollo: true
+  want: emails+phones
+  max_contacts: 3
+  provider: apollo
+
+llm_providers:
+  - name: lara-research
+    type: lara
+    web_search: true
+    assistant_id_env: LARA_RESEARCH_ASSISTANT_ID
+research_provider: lara-research
+
+outreach:
+  enabled: true
+  language: es

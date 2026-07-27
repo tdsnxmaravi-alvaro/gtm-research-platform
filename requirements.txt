@@ -1,0 +1,9 @@
+# GTM Research Platform — core dependencies
+pydantic>=2.6
+pyyaml>=6.0
+requests>=2.31
+python-dotenv>=1.0
+openpyxl>=3.1
+
+# Dev / test
+pytest>=8.0
