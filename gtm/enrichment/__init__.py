@@ -16,6 +16,7 @@ from .apollo import (
     PhoneRevealStore, fire_reveals, poll_reveals, merge_phones,
 )
 from .lara_agent import build_lara_enrichment_provider, enrich_company_lara
+from .apollo.webhook import run_webhook_server
 
 __all__ = [
     "run_enrichment",
@@ -28,6 +29,7 @@ __all__ = [
     "fire_reveals",
     "poll_reveals",
     "merge_phones",
+    "run_webhook_server",
     "build_lara_enrichment_provider",
     "enrich_company_lara",
 ]

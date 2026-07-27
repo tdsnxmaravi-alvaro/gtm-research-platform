@@ -137,3 +137,32 @@ def test_enrich_company_lara():
 def test_run_enrichment_want_none():
     c = _cfg(enrichment={"want": "none"})
     assert run_enrichment(c, rows=[{"company": "Acme"}]) == []
+
+
+# --- webhook callback -> store -------------------------------------------- #
+def test_webhook_apply_callback(tmp_path):
+    from gtm.enrichment.apollo.webhook import apply_callback
+
+    store = PhoneRevealStore(tmp_path / "ph.json")
+    store.data["p1"] = {"status": "pending", "request_id": "r1", "phones": []}
+    store.save()
+
+    payload = {"people": [{"id": "p1", "phone_numbers": [
+        {"sanitized_number": "+34999888777"}]}], "credits_consumed": 8}
+    results = apply_callback(store, payload)
+
+    assert results[0]["person_id"] == "p1"
+    assert store.status_for("p1") == "done"
+    assert store.phones_for("p1") == ["+34999888777"]
+
+    contacts = [EnrichedContact(company="Acme", apollo_id="p1")]
+    assert merge_phones(contacts, store) == 1
+    assert contacts[0].direct_phone == "+34999888777"
+
+
+def test_webhook_no_number(tmp_path):
+    from gtm.enrichment.apollo.webhook import apply_callback
+
+    store = PhoneRevealStore(tmp_path / "ph.json")
+    apply_callback(store, {"people": [{"id": "p2", "phone_numbers": []}]})
+    assert store.status_for("p2") == "no_number"

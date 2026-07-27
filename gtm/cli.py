@@ -5,6 +5,7 @@
     python -m gtm estimate  campaigns/spain-bricscad.yaml
     python -m gtm run       campaigns/spain-bricscad.yaml --batch-size 3 --limit 6
     python -m gtm enrich    campaigns/spain-bricscad.yaml --limit 6
+    python -m gtm webhook   campaigns/spain-bricscad.yaml            # phone-reveal receiver
     python -m gtm ingest-manual campaigns/spain-bricscad.yaml out1.md out2.md
 """
 
@@ -17,7 +18,7 @@ from .config import load_campaign
 from .prompts import build_prompt, format_companies
 from .ingest import load_provided_list
 from .research import run_campaign, ingest_manual
-from .enrichment import run_enrichment
+from .enrichment import run_enrichment, run_webhook_server
 
 
 def _provided_count(cfg) -> int:
@@ -63,7 +64,14 @@ def cmd_enrich(args):
     c = load_campaign(args.config)
     run_enrichment(c, limit=args.limit, delay=args.delay,
                    resume=not args.no_resume,
-                   poll_wait=args.poll_wait, poll_interval=args.poll_interval)
+                   poll_wait=args.poll_wait, poll_interval=args.poll_interval,
+                   use_webhook=args.webhook)
+
+
+def cmd_webhook(args):
+    c = load_campaign(args.config)
+    store_path = Path("campaigns") / c.name / "phone_reveals.json"
+    run_webhook_server(store_path, port=args.port, path=args.path)
 
 
 def cmd_ingest_manual(args):
@@ -107,7 +115,16 @@ def build_parser() -> argparse.ArgumentParser:
     en.add_argument("--poll-wait", type=int, default=0,
                     help="Max seconds to keep polling Apollo phone reveals")
     en.add_argument("--poll-interval", type=int, default=600)
+    en.add_argument("--webhook", action="store_true",
+                    help="Use a live webhook (run `gtm webhook` + cloudflared) "
+                         "instead of polling for phone reveals")
     en.set_defaults(func=cmd_enrich)
+
+    wh = sub.add_parser("webhook", help="Run the Apollo phone-reveal webhook receiver")
+    wh.add_argument("config")
+    wh.add_argument("--port", type=int, default=8000)
+    wh.add_argument("--path", default="/apollo-webhook")
+    wh.set_defaults(func=cmd_webhook)
 
     im = sub.add_parser("ingest-manual", help="Parse pasted LLM outputs")
     im.add_argument("config")

@@ -33,12 +33,36 @@ class PhoneRevealStore:
             except (json.JSONDecodeError, OSError):
                 self.data = {}
 
+    def reload(self) -> None:
+        """Re-read the store from disk (used while a webhook writes to it)."""
+        if self.path.exists():
+            try:
+                self.data = json.loads(self.path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                pass
+
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".json.tmp")
+        tmp = self.path.with_suffix(f".{time.time_ns()}.tmp")
         tmp.write_text(json.dumps(self.data, indent=2, ensure_ascii=False),
                        encoding="utf-8")
-        tmp.replace(self.path)
+        # os.replace can transiently fail on Windows if another process/AV holds
+        # the target; retry a few times before a best-effort direct write.
+        for attempt in range(5):
+            try:
+                tmp.replace(self.path)
+                return
+            except PermissionError:
+                time.sleep(0.1 * (attempt + 1))
+        try:
+            self.path.write_text(json.dumps(self.data, indent=2, ensure_ascii=False),
+                                 encoding="utf-8")
+        finally:
+            if tmp.exists():
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
 
     def is_attempted(self, apollo_id: str) -> bool:
         return apollo_id in self.data
@@ -48,6 +72,10 @@ class PhoneRevealStore:
 
     def status_for(self, apollo_id: str) -> str:
         return (self.data.get(apollo_id) or {}).get("status", "")
+
+    def pending_count(self) -> int:
+        return sum(1 for r in self.data.values()
+                   if r.get("status") not in ("done", "no_number"))
 
 
 def _now() -> str:

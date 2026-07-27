@@ -3,6 +3,7 @@
 from .client import ApolloClient, title_priority
 from .enrich import enrich_company
 from .phones import PhoneRevealStore, fire_reveals, poll_reveals, merge_phones
+from .webhook import run_webhook_server, apply_callback
 
 __all__ = [
     "ApolloClient",
@@ -12,4 +13,6 @@ __all__ = [
     "fire_reveals",
     "poll_reveals",
     "merge_phones",
+    "run_webhook_server",
+    "apply_callback",
 ]

@@ -63,6 +63,7 @@ def run_enrichment(
     resume: bool = True,
     poll_wait: int = 0,
     poll_interval: int = 600,
+    use_webhook: bool = False,
     out_dir: str | Path | None = None,
 ) -> list[EnrichedContact]:
     """Enrich qualified companies. Returns the enriched contacts."""
@@ -127,12 +128,25 @@ def run_enrichment(
         fired = fire_reveals(apollo_client, all_contacts, store)
         print(f"Phone reveals fired: {fired} (numbers arrive async ~40 min).")
         start = time.time()
-        while True:
-            resolved, no_num, still = poll_reveals(apollo_client, store)
-            print(f"  poll: +{resolved} resolved, +{no_num} no_number, {still} pending")
-            if still == 0 or not poll_wait or (time.time() - start) >= poll_wait:
-                break
-            time.sleep(poll_interval)
+        if use_webhook:
+            # A separate `gtm webhook` process owns store writes; we only read
+            # here to avoid a cross-process read-modify-write race.
+            print("Waiting for webhook callbacks (run `gtm webhook` + cloudflared).")
+            while True:
+                store.reload()
+                pending = store.pending_count()
+                done = len(store.data) - pending
+                print(f"  monitor: {done} resolved, {pending} pending")
+                if pending == 0 or not poll_wait or (time.time() - start) >= poll_wait:
+                    break
+                time.sleep(poll_interval)
+        else:
+            while True:
+                resolved, no_num, still = poll_reveals(apollo_client, store)
+                print(f"  poll: +{resolved} resolved, +{no_num} no_number, {still} pending")
+                if still == 0 or not poll_wait or (time.time() - start) >= poll_wait:
+                    break
+                time.sleep(poll_interval)
         merged = merge_phones(all_contacts, store)
         print(f"Merged {merged} phone numbers.")
         write_rows_csv([c.to_row() for c in all_contacts], contacts_path,

@@ -64,6 +64,23 @@ Enrichment is driven by the config's `enrichment` block: `provider` (`apollo` |
 async phone reveals (resumable, no double-charge); the LARA path resolves
 contacts via web search with no Apollo credits.
 
+### Phone reveals via webhook (cloudflared)
+
+Apollo delivers phone numbers asynchronously. For the live callback path:
+
+```powershell
+# terminal 1 — receiver (writes campaigns/<name>/phone_reveals.json)
+python -m gtm webhook campaigns/spain-bricscad.yaml
+# terminal 2 — tunnel (no signup)
+cloudflared tunnel --url http://localhost:8000
+# .env  ->  APOLLO_WEBHOOK_URL=https://<tunnel-host>/apollo-webhook
+# terminal 3 — run enrichment against the live webhook
+python -m gtm enrich campaigns/spain-bricscad.yaml --webhook --poll-wait 3600
+```
+
+Without `--webhook`, enrichment recovers numbers by polling `webhook_result`
+(no tunnel required).
+
 ## Setup
 
 ```powershell
