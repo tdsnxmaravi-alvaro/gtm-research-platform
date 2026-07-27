@@ -73,6 +73,32 @@ COUNTRY_LANGUAGE = {
     "portugal": "pt",
 }
 
+# Country -> Apollo `organization_locations` / `person_locations` label(s).
+# Used by the Apollo enrichment path so location is derived from the campaign
+# country instead of being hard-coded. Falls back to the raw country string.
+COUNTRY_APOLLO_LOCATIONS = {
+    "spain": ["Spain"],
+    "españa": ["Spain"],
+    "mexico": ["Mexico"],
+    "méxico": ["Mexico"],
+    "usa": ["United States"],
+    "united states": ["United States"],
+    "canada": ["Canada"],
+    "uk": ["United Kingdom"],
+    "united kingdom": ["United Kingdom"],
+    "france": ["France"],
+    "germany": ["Germany"],
+    "italy": ["Italy"],
+    "brazil": ["Brazil"],
+    "portugal": ["Portugal"],
+}
+
+
+def apollo_locations_for(country: str) -> list[str]:
+    """Return Apollo location labels for a campaign country (best-effort)."""
+    key = (country or "").strip().lower()
+    return COUNTRY_APOLLO_LOCATIONS.get(key, [country.strip()] if country else [])
+
 
 # --------------------------------------------------------------------------- #
 # Sub-models
@@ -118,6 +144,15 @@ class Enrichment(BaseModel):
     # Credit-estimate inputs (Apollo). Observed ~8 credits per phone reveal.
     credits_per_email: int = 1
     credits_per_phone: int = 8
+    # Apollo people-search targeting (country-agnostic; locations derived from the
+    # campaign country when left empty). Seniorities/titles pick decision-makers.
+    seniorities: list[str] = Field(
+        default_factory=lambda: [
+            "owner", "founder", "c_suite", "vp", "head", "director", "manager",
+        ]
+    )
+    titles: list[str] = Field(default_factory=list)
+    locations: list[str] = Field(default_factory=list)
 
     def estimate_credits(self, num_companies: int) -> int:
         """Rough upfront Apollo credit estimate for a run."""

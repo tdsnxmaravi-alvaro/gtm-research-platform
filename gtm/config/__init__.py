@@ -14,6 +14,7 @@ from .schema import (
     Enrichment,
     LLMProvider,
     Outreach,
+    apollo_locations_for,
 )
 from .loader import load_campaign
 
@@ -31,5 +32,6 @@ __all__ = [
     "Enrichment",
     "LLMProvider",
     "Outreach",
+    "apollo_locations_for",
     "load_campaign",
 ]

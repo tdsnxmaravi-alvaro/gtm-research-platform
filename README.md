@@ -40,10 +40,29 @@ this platform is the bulk / campaign engine (qualify → enrich → consolidate 
 gtm/                     # core Python package (CLI-runnable)
   config/schema.py       # campaign config models + conditional validation
   providers/             # LLM provider abstraction (LARA, Azure OpenAI, Manual)
+  prompts/               # prompt builder (5 template families)
+  ingest/                # parse LLM output + provided lists -> rows
+  scoring/               # tiering + hard URL evidence gate
+  research/              # research runner (discover / provided, resumable)
+  enrichment/            # contact resolution: Apollo + LARA agent paths
 campaigns/               # per-campaign yaml configs (+ runtime data, gitignored)
 backend/                 # Django + DRF API (added after the core is validated)
 frontend/                # React + Vite web app / wizard (later phase)
 ```
+
+## CLI
+
+```powershell
+python -m gtm validate  campaigns/spain-bricscad.yaml
+python -m gtm estimate  campaigns/spain-bricscad.yaml
+python -m gtm run       campaigns/spain-bricscad.yaml --limit 6
+python -m gtm enrich    campaigns/spain-bricscad.yaml --limit 6
+```
+
+Enrichment is driven by the config's `enrichment` block: `provider` (`apollo` |
+`lara`) and `want` (`none` | `emails` | `emails+phones`). The Apollo path adds
+async phone reveals (resumable, no double-charge); the LARA path resolves
+contacts via web search with no Apollo credits.
 
 ## Setup
 
@@ -57,4 +76,6 @@ pytest -q
 
 ## Status
 
-Phase 0 (scaffold + config schema + provider interface). CLI core first; Django/React later.
+Phase 0 (scaffold + config schema + provider interface) and Phase 1 (prompts +
+ingest + scoring + research runner + CLI) done. Phase 2 (enrichment: Apollo +
+LARA agent) in place. Django/React later.

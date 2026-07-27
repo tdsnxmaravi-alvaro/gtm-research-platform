@@ -4,6 +4,7 @@
     python -m gtm prompt    campaigns/spain-bricscad.yaml --company "Acme CAD"
     python -m gtm estimate  campaigns/spain-bricscad.yaml
     python -m gtm run       campaigns/spain-bricscad.yaml --batch-size 3 --limit 6
+    python -m gtm enrich    campaigns/spain-bricscad.yaml --limit 6
     python -m gtm ingest-manual campaigns/spain-bricscad.yaml out1.md out2.md
 """
 
@@ -16,6 +17,7 @@ from .config import load_campaign
 from .prompts import build_prompt, format_companies
 from .ingest import load_provided_list
 from .research import run_campaign, ingest_manual
+from .enrichment import run_enrichment
 
 
 def _provided_count(cfg) -> int:
@@ -57,6 +59,13 @@ def cmd_run(args):
                  delay=args.delay, resume=not args.no_resume)
 
 
+def cmd_enrich(args):
+    c = load_campaign(args.config)
+    run_enrichment(c, limit=args.limit, delay=args.delay,
+                   resume=not args.no_resume,
+                   poll_wait=args.poll_wait, poll_interval=args.poll_interval)
+
+
 def cmd_ingest_manual(args):
     c = load_campaign(args.config)
     texts = [Path(f).read_text(encoding="utf-8") for f in args.files]
@@ -89,6 +98,16 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--delay", type=int, default=2)
     r.add_argument("--no-resume", action="store_true")
     r.set_defaults(func=cmd_run)
+
+    en = sub.add_parser("enrich", help="Resolve contacts for qualified companies")
+    en.add_argument("config")
+    en.add_argument("--limit", type=int, default=0)
+    en.add_argument("--delay", type=float, default=0.5)
+    en.add_argument("--no-resume", action="store_true")
+    en.add_argument("--poll-wait", type=int, default=0,
+                    help="Max seconds to keep polling Apollo phone reveals")
+    en.add_argument("--poll-interval", type=int, default=600)
+    en.set_defaults(func=cmd_enrich)
 
     im = sub.add_parser("ingest-manual", help="Parse pasted LLM outputs")
     im.add_argument("config")
