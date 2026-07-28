@@ -139,6 +139,20 @@ def test_run_enrichment_want_none():
     assert run_enrichment(c, rows=[{"company": "Acme"}]) == []
 
 
+def test_contact_cache_roundtrip(tmp_path):
+    from gtm.enrichment import ContactCache
+
+    cache = ContactCache(tmp_path / "c.json")
+    assert cache.get("acme.com") is None
+    cache.put("www.Acme.com", [EnrichedContact(company="Acme", domain="acme.com",
+                                               email="a@acme.com", apollo_id="p1")])
+    hit = cache.get("acme.com")  # normalized (www + case-insensitive)
+    assert hit is not None and len(hit) == 1
+    assert hit[0].email == "a@acme.com"
+    assert "a@acme.com" in cache.known_emails()
+    assert ContactCache(tmp_path / "c.json", enabled=False).get("acme.com") is None
+
+
 # --- webhook callback -> store -------------------------------------------- #
 def test_webhook_apply_callback(tmp_path):
     from gtm.enrichment.apollo.webhook import apply_callback

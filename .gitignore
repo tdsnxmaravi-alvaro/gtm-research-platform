@@ -11,6 +11,7 @@ venv/
 # Env & secrets
 .env
 *.local
+.gtm_cache/
 
 # Data & outputs (per-campaign runtime artifacts)
 campaigns/*/data/

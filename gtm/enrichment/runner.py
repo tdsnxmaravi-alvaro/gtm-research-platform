@@ -64,9 +64,15 @@ def run_enrichment(
     poll_wait: int = 0,
     poll_interval: int = 600,
     use_webhook: bool = False,
+    use_cache: bool = True,
     out_dir: str | Path | None = None,
 ) -> list[EnrichedContact]:
-    """Enrich qualified companies. Returns the enriched contacts."""
+    """Enrich qualified companies. Returns the enriched contacts.
+
+    A shared domain cache (`.gtm_cache/contacts.json`) reuses contacts already
+    fetched in previous runs/campaigns, so we never re-charge Apollo for a
+    company (or contact) already enriched.
+    """
     enr = config.enrichment
     if enr.want == EnrichWant.none:
         print("Enrichment want=none — nothing to do.")
@@ -92,19 +98,41 @@ def run_enrichment(
 
     all_contacts: list[EnrichedContact] = []
 
-    # Build the provider once.
+    from .cache import ContactCache
+    from .domains import extract_domain
+    cache = ContactCache(enabled=use_cache)
+    cache_hits = 0
+
+    # Build the provider once (lazily — skip if everything is cached).
     apollo_client = None
     lara_provider = None
-    if enr.provider == EnrichProvider.apollo:
-        locations = enr.locations or apollo_locations_for(config.country)
-        apollo_client = ApolloClient(seniorities=enr.seniorities, locations=locations)
-    else:
-        lara_provider = build_lara_enrichment_provider()
+
+    def _ensure_provider():
+        nonlocal apollo_client, lara_provider
+        if enr.provider == EnrichProvider.apollo:
+            if apollo_client is None:
+                locations = enr.locations or apollo_locations_for(config.country)
+                apollo_client = ApolloClient(seniorities=enr.seniorities, locations=locations)
+            return
+        if lara_provider is None:
+            lara_provider = build_lara_enrichment_provider()
 
     for r in pending:
         company = r.get("company")
+        domain = extract_domain(r.get("website") or "")
+        cached = cache.get(domain) if domain else None
+        if cached is not None:
+            all_contacts.extend(cached)
+            done.add(company)
+            _save_done(state_path, done)
+            write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
+                           columns=CONTACT_COLS)
+            cache_hits += 1
+            print(f"  {company}: {len(cached)} contacts (cache)")
+            continue
         try:
-            if apollo_client is not None:
+            _ensure_provider()
+            if enr.provider == EnrichProvider.apollo:
                 got = enrich_company(apollo_client, r,
                                      max_contacts=enr.max_contacts, delay=delay)
             else:
@@ -115,6 +143,8 @@ def run_enrichment(
             print(f"  !! enrich error for {company}: {exc}")
             continue
         all_contacts.extend(got)
+        if domain:
+            cache.put(domain, got)
         done.add(company)
         _save_done(state_path, done)
         write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
@@ -152,5 +182,6 @@ def run_enrichment(
         write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
                        columns=CONTACT_COLS)
 
-    print(f"Done. {len(all_contacts)} contacts -> {contacts_path}")
+    print(f"Done. {len(all_contacts)} contacts -> {contacts_path}"
+          + (f" ({cache_hits} companies from cache)" if cache_hits else ""))
     return all_contacts

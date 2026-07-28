@@ -45,7 +45,8 @@ the lowest band."""
 RESELLER_PROVIDED_FIT = """\
 You are a senior channel-development research analyst for TD SYNNEX.
 Qualify whether each company below is a strong RESELLER partner for {product_name}
-in {country} — i.e., could they SELL/service this product to their customers?
+in its own country (shown per company; campaign scope: {country}) — i.e., could they
+SELL/service this product to their customers?
 
 PRODUCT: {product_name} — {value_prop}
 
@@ -65,7 +66,8 @@ COMPANIES TO QUALIFY:
 ACCOUNT_PROVIDED_FIT = """\
 You are a senior demand-generation research analyst for TD SYNNEX.
 Qualify whether each ACCOUNT / end-user company below is a strong prospect to BUY/USE
-{product_name} in {country} — based on active demand signals, not channel capability.
+{product_name} in its own country (shown per company; campaign scope: {country}) —
+based on active demand signals, not channel capability.
 
 PRODUCT: {product_name} — {value_prop}
 

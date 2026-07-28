@@ -47,13 +47,13 @@ def _evidence_block(config: CampaignConfig) -> str:
 def format_companies(
     rows: list[dict],
     fields: tuple[str, ...] = ("company", "website"),
-    context_fields: tuple[str, ...] = ("other software in use", "company size"),
+    context_fields: tuple[str, ...] = ("country", "other software in use", "company size"),
 ) -> str:
     """Render a list of company dicts into a numbered block for `provided` prompts.
 
     `fields` are shown plainly (company | website). `context_fields` are appended
-    as labeled hints when present (e.g. the current software portfolio), giving
-    the model qualification signals from the provided list itself.
+    as labeled hints when present (e.g. the reseller's own country and current
+    software portfolio), so the model qualifies each company in its own country.
     """
     out = []
     for i, r in enumerate(rows, 1):

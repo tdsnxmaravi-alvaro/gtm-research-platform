@@ -73,7 +73,7 @@ def cmd_enrich(args):
     run_enrichment(c, limit=args.limit, delay=args.delay,
                    resume=not args.no_resume,
                    poll_wait=args.poll_wait, poll_interval=args.poll_interval,
-                   use_webhook=args.webhook)
+                   use_webhook=args.webhook, use_cache=not args.no_cache)
 
 
 def cmd_webhook(args):
@@ -182,6 +182,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="Override enrichment.want for this run")
     en.add_argument("--provider", choices=["apollo", "lara"],
                     help="Override enrichment.provider for this run")
+    en.add_argument("--no-cache", action="store_true",
+                    help="Ignore the shared contact cache (force fresh enrichment)")
     en.add_argument("--webhook", action="store_true",
                     help="Use a live webhook (run `gtm webhook` + cloudflared) "
                          "instead of polling for phone reveals")

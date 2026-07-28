@@ -17,12 +17,14 @@ from .apollo import (
 )
 from .lara_agent import build_lara_enrichment_provider, enrich_company_lara
 from .apollo.webhook import run_webhook_server
+from .cache import ContactCache
 
 __all__ = [
     "run_enrichment",
     "EnrichedContact",
     "CONTACT_COLS",
     "extract_domain",
+    "ContactCache",
     "ApolloClient",
     "enrich_company",
     "PhoneRevealStore",
