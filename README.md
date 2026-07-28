@@ -1,7 +1,7 @@
 # GTM Research Platform
 
 [![CI](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-blue)
+![Python](https://img.shields.io/badge/python-3.13%20%7C%203.14-blue)
 ![License](https://img.shields.io/badge/license-internal-lightgrey)
 
 Config-driven platform to **qualify target companies for a product, enrich their

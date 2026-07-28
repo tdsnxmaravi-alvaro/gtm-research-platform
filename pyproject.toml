@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gtm-research-platform"
+version = "0.1.0"
+description = "Config-driven platform to qualify, enrich, consolidate and reach out to target companies."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "openpyxl>=3.1",
+    "truststore>=0.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+gtm = "gtm.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["gtm*"]
+
+[tool.pytest.ini_options]
+# Ensure the repo root is importable when running `pytest` directly (CI),
+# not only via `python -m pytest`.
+pythonpath = ["."]
+testpaths = ["tests"]
