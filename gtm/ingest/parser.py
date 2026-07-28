@@ -30,18 +30,28 @@ _HEADER_MAP = {
 
 
 def _extract_json(text: str) -> dict | list | None:
-    """Pull the outermost JSON object/array from a possibly-noisy LLM response."""
-    fence = re.search(r"```(?:json)?\s*(\{.*\}|\[.*\])\s*```", text or "", re.DOTALL)
-    candidate = fence.group(1) if fence else None
-    if not candidate:
-        m = re.search(r"(\{.*\}|\[.*\])", text or "", re.DOTALL)
-        candidate = m.group(1) if m else None
-    if not candidate:
-        return None
-    try:
-        return json.loads(candidate)
-    except json.JSONDecodeError:
-        return None
+    """Pull the outermost JSON object/array from a possibly-noisy LLM response.
+
+    Prefers a JSON *object* over an array so that leading bracket noise (e.g.
+    LARA `[[LARA_TOOL_ACTIVITY:...]]` markers) does not hijack the match.
+    """
+    text = text or ""
+    candidates: list[str] = []
+    fence = re.search(r"```(?:json)?\s*(\{.*\}|\[.*\])\s*```", text, re.DOTALL)
+    if fence:
+        candidates.append(fence.group(1))
+    obj = re.search(r"\{.*\}", text, re.DOTALL)
+    if obj:
+        candidates.append(obj.group(0))
+    arr = re.search(r"\[.*\]", text, re.DOTALL)
+    if arr:
+        candidates.append(arr.group(0))
+    for cand in candidates:
+        try:
+            return json.loads(cand)
+        except json.JSONDecodeError:
+            continue
+    return None
 
 
 def normalize_result(r: dict) -> dict:

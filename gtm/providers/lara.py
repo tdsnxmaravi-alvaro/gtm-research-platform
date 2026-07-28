@@ -72,4 +72,6 @@ class LaraProvider(BaseProvider):
         sources = _sources_from_tool_activity(text) + [
             u for u in extract_urls(text) if u not in _sources_from_tool_activity(text)
         ]
-        return ProviderResponse(text=text, sources=sources, raw=data)
+        # Strip LARA tool-activity markers so downstream parsing/logs see clean text.
+        clean = _TOOL_ACTIVITY_RE.sub("", text).strip()
+        return ProviderResponse(text=clean, sources=sources, raw=data)

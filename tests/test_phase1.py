@@ -60,6 +60,17 @@ def test_normalize_result_without_evidence():
     assert r["evidence_count"] == 0
 
 
+def test_parse_results_with_leading_bracket_noise():
+    # LARA prepends [[LARA_TOOL_ACTIVITY:...]] markers before the JSON object.
+    text = ('[[LARA_TOOL_ACTIVITY:eyJhIjoxfQ==]]\n\n[[LARA_TOOL_ACTIVITY:zzz]]\n'
+            '{"results": [{"company": "Acme", "website": "a.es", "score": 68, '
+            '"tier": "C", "evidence": [{"claim": "c", "url": "https://a.es"}]}]}')
+    rows = parse_results(text)
+    assert len(rows) == 1
+    assert rows[0]["company"] == "Acme"
+    assert rows[0]["has_verified_url"] is True
+
+
 def test_load_provided_list_normalizes_headers(tmp_path):
     p = tmp_path / "list.csv"
     p.write_text("Company Name,URL\nAcme,https://a.es\n,skip\n", encoding="utf-8")
