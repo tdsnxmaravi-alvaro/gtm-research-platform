@@ -195,9 +195,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     ins = sub.add_parser("inspect", help="Pre-flight a provided list (columns + data quality)")
     ins.add_argument("target", help="A list file (.csv/.xlsx) or a campaign .yaml")
-    ins.add_argument("--ai", action="store_true",
-                     help="Use the LARA schema-mapper agent for smart column mapping "
-                          "(headers + non-PII samples only)")
+    ins.add_argument("--no-ai", dest="ai", action="store_false", default=True,
+                     help="Disable the LARA schema-mapper; use rules-based mapping only")
     ins.set_defaults(func=cmd_inspect)
 
     co = sub.add_parser("consolidate", help="Build the master list (results + contacts)")
@@ -209,8 +208,8 @@ def build_parser() -> argparse.ArgumentParser:
     ou.add_argument("config")
     ou.add_argument("--min-tier", default=None, help="Only draft for tiers >= this")
     ou.add_argument("--limit", type=int, default=0)
-    ou.add_argument("--agent", action="store_true",
-                    help="Use the LARA outreach agent (LARA_OUTREACH_ASSISTANT_ID) instead of the template")
+    ou.add_argument("--no-agent", dest="agent", action="store_false", default=True,
+                    help="Use the deterministic template instead of the LARA outreach agent")
     ou.set_defaults(func=cmd_outreach)
 
     im = sub.add_parser("ingest-manual", help="Parse pasted LLM outputs")

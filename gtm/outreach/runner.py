@@ -22,10 +22,15 @@ def run_outreach(
     *,
     min_tier: str | None = None,
     limit: int = 0,
-    use_agent: bool = False,
+    use_agent: bool = True,
     out_dir: str | Path | None = None,
 ) -> list[dict]:
-    """Generate .eml drafts for master contacts with an email at/above min_tier."""
+    """Generate .eml drafts for master contacts with an email at/above min_tier.
+
+    By default personalizes each email with the LARA outreach agent
+    (LARA_OUTREACH_ASSISTANT_ID); falls back to the deterministic bilingual
+    template when the agent is not configured or a call fails.
+    """
     out = Path(out_dir or (Path("campaigns") / config.name))
     master_path = out / "master.csv"
     if not master_path.exists():
@@ -42,6 +47,13 @@ def run_outreach(
         targets = targets[:limit]
 
     eml_dir = out / "eml"
+    if use_agent:
+        from .email_gen import _lara_agent
+        mode = "LARA agent (personalized)" if _lara_agent() is not None else "template (agent not configured)"
+    else:
+        mode = "template (forced)"
+    print(f"Outreach generator: {mode}")
+
     drafts: list[dict] = []
     for r in targets:
         subject, body = generate_email(config, r, use_agent=use_agent)
