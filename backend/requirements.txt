@@ -1,0 +1,8 @@
+# Backend API (Django + DRF) dependencies. Installed on top of the gtm engine
+# (pip install -e .. from repo root) inside the container / venv.
+Django>=5.0
+djangorestframework>=3.15
+django-cors-headers>=4.3
+dj-database-url>=2.1
+gunicorn>=22.0
+psycopg[binary]>=3.1

@@ -108,6 +108,27 @@ copy .env.example .env   # then fill in keys
 pytest -q
 ```
 
+## Backend API (Django + DRF)
+
+Thin HTTP wrapper over the `gtm` engine. Cloud-agnostic (12-factor): all config
+via env vars, SQLite locally / Postgres via `DATABASE_URL` in the cloud.
+
+```powershell
+pip install -e .                       # install the engine
+pip install -r backend/requirements.txt
+cd backend
+python manage.py migrate
+python manage.py runserver
+```
+
+Endpoints (`/api/`): `campaigns` (CRUD), `campaigns/{id}/validate`,
+`.../research`, `.../enrich`, `.../consolidate`, `.../outreach` (async, return a
+`Run`), `.../results`, `.../contacts`, and `runs/{id}` for status.
+
+**Deploy anywhere** with the root `Dockerfile` (gunicorn): Azure Container Apps /
+App Service, AWS ECS/Fargate / App Runner, GCP Cloud Run. Managed Postgres
+(Azure DB for PostgreSQL, AWS RDS) via `DATABASE_URL`.
+
 ## Status
 
 | Phase | Scope | Status |
@@ -116,7 +137,7 @@ pytest -q
 | 1 | Prompts + ingest + deterministic anchored scoring + research runner + CLI | ✅ Done |
 | 2 | Enrichment (Apollo emails/phones + LARA web-search agent) | ✅ Done |
 | 3 | Consolidate master list + outreach (`.eml`) | ✅ Done |
-| 4 | Django + DRF API | ⏳ Planned |
+| 4 | Django + DRF API | 🚧 In progress (API scaffold + Docker done) |
 | 5 | React wizard UI | ⏳ Planned |
 
 Roadmap is tracked in [GitHub Issues](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues).
