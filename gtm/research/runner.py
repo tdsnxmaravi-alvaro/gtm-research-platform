@@ -39,6 +39,16 @@ def _provider_for(config: CampaignConfig):
                                       web_search=True))
 
 
+def _providers_for(config: CampaignConfig) -> list:
+    """Return the research provider(s): an ensemble if research_providers is set,
+    else the single research_provider."""
+    names = config.research_providers
+    if not names:
+        return [_provider_for(config)]
+    by_name = {p.name: p for p in config.llm_providers}
+    return [build_provider(by_name[n]) for n in names if n in by_name]
+
+
 def _load_state(path: Path) -> set:
     if path.exists():
         try:
@@ -109,19 +119,27 @@ def _aggregate_passes(parsed_lists: list[list[dict]]) -> list[dict]:
     return out
 
 
-def _run_batch(config, provider, prompt: str, logs: Path, tag: str,
+def _run_batch(config, providers, prompt: str, logs: Path, tag: str,
                passes: int, delay: int) -> list[dict]:
-    """Call the provider `passes` times, aggregate, and score the batch."""
+    """Call each provider `passes` times, aggregate across the ensemble, and score.
+
+    `providers` may be a single provider or a list (ensemble): scores are averaged
+    across all provider x pass responses per company.
+    """
+    if not isinstance(providers, (list, tuple)):
+        providers = [providers]
     parsed_lists: list[list[dict]] = []
-    for p in range(max(1, passes)):
-        try:
-            resp = provider.send(prompt)
-        except Exception as exc:  # noqa: BLE001 - log and continue
-            print(f"  !! provider error ({tag}) pass {p+1}: {exc}")
-            continue
-        _log(logs, f"{tag}_pass{p+1}" if passes > 1 else tag, prompt, resp.text)
-        parsed_lists.append(parse_results(resp.text))
-        if p < passes - 1:
+    for prov in providers:
+        pname = getattr(prov, "name", "provider")
+        for p in range(max(1, passes)):
+            try:
+                resp = prov.send(prompt)
+            except Exception as exc:  # noqa: BLE001 - log and continue
+                print(f"  !! provider error ({tag}/{pname}) pass {p+1}: {exc}")
+                continue
+            multi = len(providers) > 1 or passes > 1
+            _log(logs, f"{tag}_{pname}_pass{p+1}" if multi else tag, prompt, resp.text)
+            parsed_lists.append(parse_results(resp.text))
             time.sleep(delay)
     if not parsed_lists:
         return []
@@ -146,7 +164,9 @@ def run_campaign(
     state_path = out / "state.json"
 
     if provider is None:
-        provider = _provider_for(config)
+        providers = _providers_for(config)
+    else:
+        providers = provider if isinstance(provider, (list, tuple)) else [provider]
 
     done = _load_state(state_path) if resume else set()
     all_results: list[dict] = []
@@ -164,7 +184,7 @@ def run_campaign(
                 prompt = build_prompt(config, product,
                                       company_input=format_companies(batch))
                 tag = f"{product.name}_batch{i//batch_size+1}"
-                scored = _run_batch(config, provider, prompt, logs, tag, passes, delay)
+                scored = _run_batch(config, providers, prompt, logs, tag, passes, delay)
                 for r in scored:
                     r["product"] = product.name
                     r["vertical"] = ""
@@ -187,7 +207,7 @@ def run_campaign(
                 if key in done:
                     continue
                 prompt = build_prompt(config, product, vertical=vert)
-                scored = _run_batch(config, provider, prompt, logs,
+                scored = _run_batch(config, providers, prompt, logs,
                                     key.replace("|", "_"), passes, delay)
                 for r in scored:
                     r["product"] = product.name

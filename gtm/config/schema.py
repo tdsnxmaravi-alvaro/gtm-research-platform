@@ -214,6 +214,10 @@ class CampaignConfig(BaseModel):
     enrichment: Enrichment = Field(default_factory=Enrichment)
     llm_providers: list[LLMProvider] = Field(default_factory=list)
     research_provider: str = "lara"       # provider `name` used for research
+    # Optional ensemble: run research across MULTIPLE providers and average the
+    # per-dimension scores (diversifies models + reduces variance). When set, it
+    # takes precedence over `research_provider`.
+    research_providers: list[str] = Field(default_factory=list)
     outreach: Outreach = Field(default_factory=Outreach)
 
     # ----------------------------------------------------------------------- #
@@ -242,6 +246,11 @@ class CampaignConfig(BaseModel):
             if self.research_provider not in names:
                 raise ValueError(
                     f"research_provider '{self.research_provider}' is not in llm_providers {sorted(names)}."
+                )
+            missing = [n for n in self.research_providers if n not in names]
+            if missing:
+                raise ValueError(
+                    f"research_providers {missing} not in llm_providers {sorted(names)}."
                 )
 
         # Derive language defaults from country

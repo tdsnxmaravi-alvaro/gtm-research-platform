@@ -250,3 +250,28 @@ def test_aggregate_passes_averages_scores():
     assert out[0]["evidence_count"] == 2
     assert out[0]["has_verified_url"] is True
 
+
+def test_ensemble_run_batch_averages_across_providers(tmp_path):
+    from gtm.research.runner import _run_batch
+
+    def _resp(score):
+        class R:
+            text = ('{"results":[{"company":"Acme","website":"a.es","score":%d,'
+                    '"tier":"B","evidence":[{"claim":"x","url":"https://a.es"}]}]}' % score)
+        return R()
+
+    class _Prov:
+        def __init__(self, name, score):
+            self.name = name
+            self._s = score
+
+        def send(self, prompt, web_search=None):
+            return _resp(self._s)
+
+    c = _cfg()
+    providers = [_Prov("lara", 80), _Prov("azure-sol", 60)]
+    out = _run_batch(c, providers, "prompt", tmp_path, "batch1", passes=1, delay=0)
+    assert len(out) == 1
+    assert out[0]["score"] == 70  # mean(80, 60)
+    assert out[0]["passes"] == 2
+
