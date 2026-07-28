@@ -1,5 +1,9 @@
 # GTM Research Platform
 
+[![CI](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-blue)
+![License](https://img.shields.io/badge/license-internal-lightgrey)
+
 Config-driven platform to **qualify target companies for a product, enrich their
 contacts, and generate ready-to-send outreach** — for two audiences:
 
@@ -106,6 +110,14 @@ pytest -q
 
 ## Status
 
-Phase 0 (scaffold + config schema + provider interface) and Phase 1 (prompts +
-ingest + scoring + research runner + CLI) done. Phase 2 (enrichment: Apollo +
-LARA agent) in place. Django/React later.
+| Phase | Scope | Status |
+|---|---|---|
+| 0 | Scaffold + config schema + provider interface | ✅ Done |
+| 1 | Prompts + ingest + deterministic anchored scoring + research runner + CLI | ✅ Done |
+| 2 | Enrichment (Apollo emails/phones + LARA web-search agent) | ✅ Done |
+| 3 | Consolidate master list + outreach (`.eml`) | 🚧 In progress |
+| 4 | Django + DRF API | ⏳ Planned |
+| 5 | React wizard UI | ⏳ Planned |
+
+Roadmap is tracked in [GitHub Issues](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues).
+CI runs the test suite on every push/PR (badge above).
