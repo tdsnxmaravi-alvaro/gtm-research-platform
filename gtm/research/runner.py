@@ -26,7 +26,7 @@ from ..providers import build_provider
 OUT_COLS = [
     "product", "vertical", "company", "website", "final_tier", "tier", "score",
     "tier_capped", "tier_cap_reason", "fit_summary", "recommended_products",
-    "evidence_count", "has_verified_url", "evidence_urls", "notes", "evidence",
+    "evidence_count", "has_verified_url", "evidence_urls", "notes", "passes", "evidence",
 ]
 
 
@@ -65,6 +65,70 @@ def _log(logs: Path, tag: str, prompt: str, response: str) -> None:
     )
 
 
+def _aggregate_passes(parsed_lists: list[list[dict]]) -> list[dict]:
+    """Average scores across N passes per company to reduce run-to-run variance.
+
+    Groups parsed rows by company, averages the (deterministic) score, unions the
+    evidence URLs, and keeps the pass whose score is closest to the mean as the
+    representative row (fit_summary/notes/recommended_products).
+    """
+    from statistics import mean
+
+    groups: dict[str, list[dict]] = {}
+    order: list[str] = []
+    for rows in parsed_lists:
+        for r in rows:
+            key = (r.get("company") or "").strip().lower()
+            if not key:
+                continue
+            if key not in groups:
+                groups[key] = []
+                order.append(key)
+            groups[key].append(r)
+
+    out: list[dict] = []
+    for key in order:
+        rs = groups[key]
+        scores = [float(r["score"]) for r in rs
+                  if str(r.get("score")).strip() not in ("", "None")]
+        avg = round(mean(scores)) if scores else 0
+        urls: list[str] = []
+        for r in rs:
+            for u in (r.get("evidence_urls") or "").split(";"):
+                u = u.strip()
+                if u and u not in urls:
+                    urls.append(u)
+        rep = min(rs, key=lambda r: abs(float(r.get("score") or 0) - avg))
+        merged = dict(rep)
+        merged["score"] = avg
+        merged["evidence_urls"] = "; ".join(urls)
+        merged["evidence_count"] = len(urls)
+        merged["has_verified_url"] = bool(urls)
+        merged["passes"] = len(rs)
+        out.append(merged)
+    return out
+
+
+def _run_batch(config, provider, prompt: str, logs: Path, tag: str,
+               passes: int, delay: int) -> list[dict]:
+    """Call the provider `passes` times, aggregate, and score the batch."""
+    parsed_lists: list[list[dict]] = []
+    for p in range(max(1, passes)):
+        try:
+            resp = provider.send(prompt)
+        except Exception as exc:  # noqa: BLE001 - log and continue
+            print(f"  !! provider error ({tag}) pass {p+1}: {exc}")
+            continue
+        _log(logs, f"{tag}_pass{p+1}" if passes > 1 else tag, prompt, resp.text)
+        parsed_lists.append(parse_results(resp.text))
+        if p < passes - 1:
+            time.sleep(delay)
+    if not parsed_lists:
+        return []
+    parsed = _aggregate_passes(parsed_lists) if len(parsed_lists) > 1 else parsed_lists[0]
+    return score_results(config, parsed)
+
+
 def run_campaign(
     config: CampaignConfig,
     provider=None,
@@ -73,6 +137,7 @@ def run_campaign(
     limit: int = 0,
     delay: int = 2,
     resume: bool = True,
+    passes: int = 1,
     out_dir: str | Path | None = None,
 ) -> list[dict]:
     out = Path(out_dir or (Path("campaigns") / config.name))
@@ -98,13 +163,8 @@ def run_campaign(
                 batch = pending[i:i + batch_size]
                 prompt = build_prompt(config, product,
                                       company_input=format_companies(batch))
-                try:
-                    resp = provider.send(prompt)
-                except Exception as exc:  # noqa: BLE001 - log and continue
-                    print(f"  !! provider error on batch {i//batch_size+1}: {exc}")
-                    continue
-                _log(logs, f"{product.name}_batch{i//batch_size+1}", prompt, resp.text)
-                scored = score_results(config, parse_results(resp.text))
+                tag = f"{product.name}_batch{i//batch_size+1}"
+                scored = _run_batch(config, provider, prompt, logs, tag, passes, delay)
                 for r in scored:
                     r["product"] = product.name
                     r["vertical"] = ""
@@ -124,13 +184,8 @@ def run_campaign(
                 if key in done:
                     continue
                 prompt = build_prompt(config, product, vertical=vert)
-                try:
-                    resp = provider.send(prompt)
-                except Exception as exc:  # noqa: BLE001
-                    print(f"  !! provider error on {key}: {exc}")
-                    continue
-                _log(logs, key.replace("|", "_"), prompt, resp.text)
-                scored = score_results(config, parse_results(resp.text))
+                scored = _run_batch(config, provider, prompt, logs,
+                                    key.replace("|", "_"), passes, delay)
                 for r in scored:
                     r["product"] = product.name
                     r["vertical"] = vert.name if vert else ""

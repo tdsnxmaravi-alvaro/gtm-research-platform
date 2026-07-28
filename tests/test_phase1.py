@@ -234,3 +234,19 @@ def test_score_results_batch():
     ])
     assert out[0]["final_tier"] == "A"
     assert out[1]["final_tier"] == "C"  # capped
+
+
+def test_aggregate_passes_averages_scores():
+    from gtm.research.runner import _aggregate_passes
+
+    passA = [{"company": "Acme", "score": 80, "evidence_urls": "https://a.es/1"}]
+    passB = [{"company": "Acme", "score": 70, "evidence_urls": "https://a.es/2"}]
+    passC = [{"company": "Acme", "score": 72, "evidence_urls": "https://a.es/1"}]
+    out = _aggregate_passes([passA, passB, passC])
+    assert len(out) == 1
+    assert out[0]["score"] == 74  # round(mean(80,70,72))
+    assert out[0]["passes"] == 3
+    # evidence URLs unioned across passes
+    assert out[0]["evidence_count"] == 2
+    assert out[0]["has_verified_url"] is True
+

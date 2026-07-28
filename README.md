@@ -59,6 +59,19 @@ python -m gtm run       campaigns/spain-bricscad.yaml --limit 6
 python -m gtm enrich    campaigns/spain-bricscad.yaml --limit 6
 ```
 
+### Deterministic scoring & run-to-run stability
+
+Scoring is **anchored + deterministic**: the LLM scores each dimension against
+explicit point-band anchors and returns per-dimension points; the total is summed
+in Python (never a holistic LLM number). Dimensions are **universal** (reusable
+across any vendor/vertical) plus **campaign-specific** ones, defined in the config.
+For borderline companies that can swing between adjacent tiers, average multiple
+research passes to cut variance (~1/√N):
+
+```powershell
+python -m gtm run campaigns/spain-bricscad.yaml --limit 20 --passes 3
+```
+
 Enrichment is driven by the config's `enrichment` block: `provider` (`apollo` |
 `lara`) and `want` (`none` | `emails` | `emails+phones`). The Apollo path adds
 async phone reveals (resumable, no double-charge); the LARA path resolves

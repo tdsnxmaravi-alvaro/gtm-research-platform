@@ -57,7 +57,7 @@ def cmd_estimate(args):
 def cmd_run(args):
     c = load_campaign(args.config)
     run_campaign(c, batch_size=args.batch_size, limit=args.limit,
-                 delay=args.delay, resume=not args.no_resume)
+                 delay=args.delay, resume=not args.no_resume, passes=args.passes)
 
 
 def cmd_enrich(args):
@@ -147,6 +147,8 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--batch-size", type=int, default=3)
     r.add_argument("--limit", type=int, default=0)
     r.add_argument("--delay", type=int, default=2)
+    r.add_argument("--passes", type=int, default=1,
+                   help="Average N research passes per batch to reduce variance (score var drops ~1/sqrt(N))")
     r.add_argument("--no-resume", action="store_true")
     r.set_defaults(func=cmd_run)
 
