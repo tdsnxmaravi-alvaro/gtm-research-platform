@@ -156,6 +156,25 @@ def test_schema_ai_map_and_overrides(monkeypatch):
     assert ov["sitio web"] == "website"
 
 
+def test_schema_ai_parses_single_quoted_output(monkeypatch):
+    # Some models return a Python-style dict (single quotes) instead of JSON.
+    from gtm.ingest import schema_ai
+
+    class _FakeSchemaProvider:
+        def send(self, prompt, web_search=None):
+            class R:
+                text = ("{'company_column': 'Reseller Name', 'website_column': 'Website', "
+                        "'country_column': 'End Customer Country', 'context_columns': ['Size'], "
+                        "'warnings': [\"contains misspelled 'Lagre'\"]}")
+            return R()
+
+    monkeypatch.setattr(schema_ai, "_build_provider", lambda: _FakeSchemaProvider())
+    mapping = schema_ai.ai_map_columns(["Reseller Name", "Website"], [])
+    assert mapping is not None
+    assert mapping["company_column"] == "Reseller Name"
+    assert mapping["website_column"] == "Website"
+
+
 def test_load_provided_list_with_ai_overrides(tmp_path):
     p = tmp_path / "weird.csv"
     p.write_text("Razon Social,Sitio Web\nAcme,https://a.es\n", encoding="utf-8")

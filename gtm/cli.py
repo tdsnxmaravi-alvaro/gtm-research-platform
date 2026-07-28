@@ -102,6 +102,12 @@ def cmd_inspect(args):
         print(f"  {h!r} -> {m}{tag}")
     if rep.get("ai_mapping"):
         print(f"AI mapping: {rep['ai_mapping']}")
+    elif args.ai:
+        from .ingest import ai_available
+        if ai_available():
+            print("AI mapping: no usable response this run — using rules-based mapping.")
+        else:
+            print("AI mapping: schema-mapper agent not configured (set LARA_SCHEMA_ASSISTANT_ID).")
     print(f"Rows   : {rep['raw_rows']} total | {rep['with_company']} with company | "
           f"{rep['with_website']} with website | {rep['missing_website']} missing website")
     if rep["duplicates"]:
@@ -180,7 +186,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
+    _load_env()
     args.func(args)
+
+
+def _load_env() -> None:
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
 
 
 if __name__ == "__main__":

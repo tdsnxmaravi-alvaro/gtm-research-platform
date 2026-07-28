@@ -16,6 +16,7 @@ Configure (optional) in .env — falls back to the rules-based mapper if absent:
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -46,7 +47,9 @@ Rules:
 - Use the EXACT header strings as given.
 - If there is no website/URL column, set "website_column" to "".
 - Do not invent columns that are not in the input.
-- Keep warnings short and factual."""
+- Keep warnings short and factual.
+- Output MUST be valid JSON: use double quotes for every key and string value
+  (not Python-style single quotes), and return the object only."""
 
 
 def _build_provider() -> LaraProvider | None:
@@ -81,13 +84,34 @@ def _safe_samples(headers: list[str], rows: list[dict], per_col: int = 3) -> dic
     return out
 
 
+def _parse_mapping(text: str) -> dict | None:
+    """Parse the agent's mapping object, tolerating single-quoted (Python-style)
+    output as well as strict JSON."""
+    from .parser import _extract_json
+
+    data = _extract_json(text)
+    if isinstance(data, dict):
+        return data
+    m = re.search(r"\{.*\}", text or "", re.DOTALL)
+    if m:
+        try:
+            obj = ast.literal_eval(m.group(0))
+            if isinstance(obj, dict):
+                return obj
+        except (ValueError, SyntaxError):
+            return None
+    return None
+
+
 def ai_map_columns(headers: list[str], rows: list[dict],
-                   provider: LaraProvider | None = None) -> dict | None:
+                   provider: LaraProvider | None = None,
+                   retries: int = 2) -> dict | None:
     """Ask the schema-mapper agent to map columns. Returns a dict or None.
 
     Result keys: company_column, website_column, country_column,
     context_columns[], warnings[]. Returns None if the agent is unconfigured or
-    the response can't be parsed.
+    no attempt yields a parseable object. Retries a few times because models are
+    occasionally non-deterministic about output format.
     """
     provider = provider or _build_provider()
     if provider is None:
@@ -97,14 +121,15 @@ def ai_map_columns(headers: list[str], rows: list[dict],
         "samples": _safe_samples(headers, rows),
     }
     prompt = _SCHEMA_PROMPT + "\n\nINPUT:\n" + json.dumps(payload, ensure_ascii=False)
-    try:
-        resp = provider.send(prompt)
-    except Exception:  # noqa: BLE001 - never block inspection on the AI call
-        return None
-    from .parser import _extract_json
-
-    data = _extract_json(resp.text)
-    return data if isinstance(data, dict) else None
+    for _ in range(max(1, retries)):
+        try:
+            resp = provider.send(prompt)
+        except Exception:  # noqa: BLE001 - never block inspection on the AI call
+            continue
+        mapping = _parse_mapping(resp.text)
+        if mapping is not None:
+            return mapping
+    return None
 
 
 def overrides_from_ai(mapping: dict) -> dict[str, str]:
