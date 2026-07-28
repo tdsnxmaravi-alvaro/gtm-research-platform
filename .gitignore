@@ -16,6 +16,9 @@ venv/
 campaigns/*/data/
 campaigns/*/runs/
 campaigns/*/*.state.json
+campaigns/*/*.json
+campaigns/*/results.csv
+campaigns/*/contacts.csv
 logs/
 *.xlsx
 *.eml

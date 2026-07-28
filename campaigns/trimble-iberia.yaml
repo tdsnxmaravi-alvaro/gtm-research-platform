@@ -1,12 +1,19 @@
-# Iberia (Spain + Portugal) — qualify Datech's Autodesk resellers as candidates to
-# carry Trimble as a NEW VENDOR. Source: stakeholder Excel
-# "Dashboard_Datech_New_Vendor_Resellers_with_Websites.xlsx" (568 partners, with a
-# "Other Software in Use" column used as a fit signal).
+# Iberia (Spain + Portugal) — recruit TD SYNNEX resellers for a NEW VENDOR (Trimble)
+# in the design-software channel. Source: stakeholder Excel
+# "Dashboard_Datech_New_Vendor_Resellers_with_Websites.xlsx".
 #
-# Context: Datech Solutions is TD SYNNEX's specialist Autodesk value-added
-# distributor in Europe — a SOFTWARE channel. So fit is weighted toward Trimble's
-# AEC SOFTWARE (Tekla, SketchUp, Trimble Connect, Viewpoint/ProjectSight,
-# Quadri/Novapoint) and Autodesk adjacency, NOT geospatial hardware.
+# Context (important):
+#   - Datech Solutions is TD SYNNEX's value-added distributor of DESIGN SOFTWARE
+#     across multiple industries (AEC, manufacturing, media, etc.). Autodesk is
+#     ONE vendor among many — not the whole picture.
+#   - The companies in this list are TD SYNNEX resellers from OTHER business areas
+#     (general IT, infrastructure, etc.) — they are NOT (yet) design-software /
+#     Datech resellers. This is a RECRUITMENT exercise: which of them have the
+#     capability and customer base to add Trimble design software to their offer?
+#   - So fit is about POTENTIAL to sell design software, not about already selling
+#     Autodesk. Existing design-software adjacency is a strong plus, not a gate.
+#   - The "Other Software in Use" column is an optional signal and may be absent in
+#     other stakeholder files; the pipeline works from name + website alone.
 name: datech-trimble-iberia
 target_type: resellers
 mode: provided
@@ -15,71 +22,74 @@ language: es                          # primary; Portuguese partners handled cas
 provided_list_path: campaigns/data/Dashboard_Datech_New_Vendor_Resellers_with_Websites.xlsx
 
 products:
-  - name: Trimble AEC software portfolio
+  - name: Trimble AEC & design software portfolio
     value_prop: >-
-      Trimble's channel software for the built environment, distributed alongside
-      Autodesk: Tekla Structures / Structural Designer / Tedds (structural BIM,
-      analysis, steel & concrete detailing), SketchUp (3D modeling), Trimble
-      Connect (cloud collaboration / common data environment), Viewpoint &
-      ProjectSight (construction / project management), and Quadri & Novapoint
-      (civil infrastructure design). Field & geospatial hardware (GNSS, total
-      stations, scanners, machine control) is secondary for this SOFTWARE channel.
-      A reseller "fits" if it can sell and service Trimble AEC software to
-      architecture, engineering and construction customers in Iberia.
+      Trimble's channel software for design and the built environment, sold through
+      TD SYNNEX / Datech alongside other design vendors: Tekla Structures /
+      Structural Designer / Tedds (structural BIM, analysis, steel & concrete
+      detailing), SketchUp (3D modeling), Trimble Connect (cloud collaboration /
+      common data environment), Viewpoint & ProjectSight (construction / project
+      management), and Quadri & Novapoint (civil infrastructure design). We are
+      recruiting TD SYNNEX resellers who could ADD this design software to their
+      portfolio — they need not sell design software today; the question is whether
+      they have the capability, services and customer base to do so successfully.
     fit_criteria:
-      - Already resells or services Autodesk or other AEC / BIM / design software
-        (AutoCAD, Revit, Civil 3D, Archicad, Allplan, BricsCAD) — strongest signal
-      - The "Other Software in Use" hint lists design / AEC / engineering software
-        (vs. generic IT only such as Microsoft, Cisco, Dell)
-      - Serves architects, structural or civil engineers, construction firms,
-        fabricators, or surveyors as a meaningful part of its customer base
+      - Is a software-selling VAR (licensing, renewals, services) rather than a pure
+        hardware / box-mover — capacity to onboard and sell a new software vendor
+      - "Has (or plausibly serves) customers in design-intensive sectors:
+        architecture, engineering, construction, manufacturing, industrial, or
+        creative / media"
+      - Shows any adjacency to design / CAD / BIM / engineering / creative software
+        (e.g. Autodesk, Adobe, Bentley, Nemetschek, PTC, Dassault) — a plus, not a gate
       - Provides value-added services (training, technical support, implementation,
-        certified staff) rather than being a pure IT box-mover / e-tailer
+        certified staff) that a design-software line requires
       - Has an established commercial presence and delivery capability in Spain
         and/or Portugal
-      - "Bonus signal: any surveying / geospatial / civil-field footprint
-        (Trimble Field Systems adjacency)"
+      - "Bonus signal: existing surveying / geospatial / civil-field or
+        vertical-industry footprint (Trimble Field Systems adjacency)"
     evidence_required: true
 
 scoring:
   dimensions:
-    - name: AEC design-software channel & Autodesk adjacency
-      max_points: 28
-      description: >-
-        Does it already resell/implement Autodesk or other AEC/BIM/design software?
-        Use the provided "Other Software in Use" hint plus web evidence. This is
-        the primary signal for a Datech software reseller — generic IT-only
-        resellers (Microsoft/Cisco/Dell) score low here.
-    - name: Target customer-base fit (AEC / engineering / construction)
+    - name: Software VAR capability & services
       max_points: 22
       description: >-
-        How well its actual customers match Trimble software end-users: architects,
-        structural / civil engineers, construction firms, fabricators, surveyors.
-        Evidence from case studies, references, or clear sector focus.
-    - name: Technical services & implementation capacity
-      max_points: 16
+        Is it a genuine software reseller/VAR (licensing, renewals, training,
+        implementation, support) able to take on a new software vendor? Pure
+        hardware/box resellers or e-tailers score low. This is the core
+        recruitment signal regardless of what they sell today.
+    - name: Customer-base fit for design software
+      max_points: 22
       description: >-
-        Ability to deliver training, deployment, support and consulting for design
-        software — certified technicians, support desk, professional services.
-        Signals a value-added reseller able to onboard Trimble software.
-    - name: Software-portfolio breadth & cross-sell capability
+        How design-intensive is its customer base — architecture, engineering,
+        construction, manufacturing, industrial, or creative/media firms that
+        use or would use CAD/BIM/3D design tools. Evidence from case studies,
+        sector focus, references.
+    - name: Design-software adjacency (any vendor)
+      max_points: 18
+      description: >-
+        Existing footprint in design / CAD / BIM / engineering / creative software
+        from ANY vendor (Autodesk, Adobe, Bentley, Nemetschek, PTC, Dassault, etc.).
+        Use the "Other Software in Use" hint when present, plus web evidence. A
+        strong plus that lowers ramp-up risk — not a hard requirement.
+    - name: Portfolio breadth & vendor-onboarding capacity
       max_points: 14
       description: >-
-        Breadth of software vendors carried and VAR maturity (multiple design /
-        engineering / productivity lines), indicating capacity to add and cross-sell
-        a new software vendor.
+        Diversity of vendors/lines carried and VAR maturity (structured
+        onboarding, marketing, multi-vendor management) — capacity to add and
+        actively grow a new software line rather than let it sit idle.
     - name: Market presence & momentum in Iberia
-      max_points: 12
+      max_points: 14
       description: >-
         Established Spanish/Portuguese operation, regional coverage, growth or
-        hiring, events, vendor certifications, recent expansion. Recency matters
+        hiring, events, certifications, recent expansion. Recency matters
         (2024-2026 signals score higher).
-    - name: Geospatial / field adjacency (bonus)
-      max_points: 8
+    - name: Design / geospatial vertical adjacency (bonus)
+      max_points: 10
       description: >-
-        Optional plus: also sells or services surveying / geospatial instruments,
-        machine control, or civil positioning — Trimble Field Systems adjacency.
-        Zero if purely software; do not penalize, it is upside only.
+        Optional plus: touches surveying / geospatial / civil, manufacturing/CAM,
+        or other verticals where Trimble is strong — eases a natural cross-sell.
+        Upside only; do not penalize its absence.
   tier_thresholds: { A: 85, B: 70, C: 50, D: 0 }
   unverified_tier_cap: C             # no verified source URL -> cannot exceed C
 

@@ -128,6 +128,93 @@ def _read_xlsx(path: Path) -> list[dict]:
     return out
 
 
+# Non-key columns commonly useful as qualification context (optional, may be absent).
+_CONTEXT_HINT_FIELDS = {
+    "other software in use", "company size", "number of employees",
+    "end customer country", "country", "industry", "sector",
+}
+
+
+def _raw_headers(path: Path) -> list[str]:
+    """Return the header row of a CSV/XLSX provided list, in order."""
+    path = Path(path)
+    if path.suffix.lower() in (".xlsx", ".xlsm"):
+        from openpyxl import load_workbook
+
+        wb = load_workbook(path, read_only=True, data_only=True)
+        ws = wb.active
+        try:
+            row = next(ws.iter_rows(values_only=True))
+        except StopIteration:
+            row = ()
+        wb.close()
+        return [str(c).strip() if c is not None else "" for c in row]
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        return next(csv.reader(f), [])
+
+
+def inspect_provided_list(path: str | Path) -> dict:
+    """Pre-flight a provided list: detect columns, header mapping, and data quality.
+
+    Returns a report dict (headers, mapping, counts, context fields, warnings, ok).
+    Use this before a run to confirm the minimum required fields (company + website).
+    """
+    path = Path(path)
+    fmt = "xlsx" if path.suffix.lower() in (".xlsx", ".xlsm") else "csv"
+    headers = _raw_headers(path)
+    mapped = {h: _HEADER_MAP.get(h.strip().lower(), h.strip().lower())
+              for h in headers if h}
+    raw = _read_xlsx(path) if fmt == "xlsx" else _read_csv(path)
+    raw_total = len(raw)
+
+    rows = load_provided_list(path)  # normalized; only rows with a company
+    with_company = len(rows)
+    with_website = sum(1 for r in rows if r.get("website"))
+
+    seen: dict[str, int] = {}
+    for r in rows:
+        key = r["company"].strip().lower()
+        seen[key] = seen.get(key, 0) + 1
+    duplicates = sum(1 for v in seen.values() if v > 1)
+
+    has_company_col = "company" in mapped.values()
+    has_website_col = "website" in mapped.values()
+    context_present = [h.strip().lower() for h in headers
+                       if h.strip().lower() in _CONTEXT_HINT_FIELDS]
+
+    warnings: list[str] = []
+    if not has_company_col:
+        warnings.append("No company/name column detected — this is REQUIRED.")
+    if not has_website_col:
+        warnings.append("No website/URL column detected — minimum recommended is name + website.")
+    if raw_total and with_company < raw_total:
+        warnings.append(f"{raw_total - with_company} row(s) have no company name and will be skipped.")
+    if with_company and with_website / with_company < 0.5:
+        warnings.append(
+            f"Only {with_website}/{with_company} rows have a website — "
+            "research/enrichment quality will drop without domains."
+        )
+    if duplicates:
+        warnings.append(f"{duplicates} duplicate company name(s) detected.")
+
+    return {
+        "path": str(path),
+        "format": fmt,
+        "raw_headers": headers,
+        "mapping": mapped,
+        "raw_rows": raw_total,
+        "with_company": with_company,
+        "with_website": with_website,
+        "missing_website": with_company - with_website,
+        "duplicates": duplicates,
+        "context_fields_present": context_present,
+        "has_company_col": has_company_col,
+        "has_website_col": has_website_col,
+        "warnings": warnings,
+        "ok": has_company_col and with_company > 0,
+    }
+
+
 def write_rows_csv(rows: list[dict], path: str | Path, columns: list[str] | None = None) -> None:
     """Write normalized rows to CSV (utf-8-sig for Excel)."""
     if not rows:

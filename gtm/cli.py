@@ -16,7 +16,7 @@ from pathlib import Path
 
 from .config import load_campaign
 from .prompts import build_prompt, format_companies
-from .ingest import load_provided_list
+from .ingest import load_provided_list, inspect_provided_list
 from .research import run_campaign, ingest_manual
 from .enrichment import run_enrichment, run_webhook_server
 
@@ -81,6 +81,41 @@ def cmd_ingest_manual(args):
     print(f"parsed {len(res)} results -> campaigns/{c.name}/results.csv")
 
 
+def cmd_inspect(args):
+    """Pre-flight a provided list (or a campaign's list): columns + data quality."""
+    target = args.target
+    if target.lower().endswith((".yaml", ".yml")):
+        c = load_campaign(target)
+        path = c.provided_list_path
+        if not path:
+            print(f"Campaign '{c.name}' has no provided_list_path.")
+            return
+    else:
+        path = target
+
+    rep = inspect_provided_list(path)
+    print(f"File   : {rep['path']}  ({rep['format']})")
+    print(f"Headers: {rep['raw_headers']}")
+    print("Mapping (detected):")
+    for h, m in rep["mapping"].items():
+        tag = "  <-- company" if m == "company" else ("  <-- website" if m == "website" else "")
+        print(f"  {h!r} -> {m}{tag}")
+    print(f"Rows   : {rep['raw_rows']} total | {rep['with_company']} with company | "
+          f"{rep['with_website']} with website | {rep['missing_website']} missing website")
+    if rep["duplicates"]:
+        print(f"Dupes  : {rep['duplicates']} duplicate company name(s)")
+    if rep["context_fields_present"]:
+        print(f"Context: {rep['context_fields_present']}")
+    if rep["warnings"]:
+        print("Warnings:")
+        for w in rep["warnings"]:
+            print(f"  ! {w}")
+    print("Minimum (name + website): " +
+          ("OK" if rep["has_company_col"] and rep["has_website_col"]
+           else "INCOMPLETE — ask the stakeholder for at least name + website"))
+    print("Ready to run: " + ("YES" if rep["ok"] else "NO"))
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="gtm", description="GTM Research Platform CLI")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -125,6 +160,10 @@ def build_parser() -> argparse.ArgumentParser:
     wh.add_argument("--port", type=int, default=8000)
     wh.add_argument("--path", default="/apollo-webhook")
     wh.set_defaults(func=cmd_webhook)
+
+    ins = sub.add_parser("inspect", help="Pre-flight a provided list (columns + data quality)")
+    ins.add_argument("target", help="A list file (.csv/.xlsx) or a campaign .yaml")
+    ins.set_defaults(func=cmd_inspect)
 
     im = sub.add_parser("ingest-manual", help="Parse pasted LLM outputs")
     im.add_argument("config")

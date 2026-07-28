@@ -85,6 +85,34 @@ def test_load_provided_list_xlsx(tmp_path):
     assert rows[0]["website"] == "https://a.es"
 
 
+def test_inspect_provided_list(tmp_path):
+    from gtm.ingest import inspect_provided_list
+
+    p = tmp_path / "list.csv"
+    p.write_text("Reseller Name,Website,Other Software in Use\n"
+                 "Acme,https://a.es,Autodesk\n"
+                 "Beta,,\n"
+                 "Acme,https://a.es,Autodesk\n", encoding="utf-8")
+    rep = inspect_provided_list(p)
+    assert rep["has_company_col"] and rep["has_website_col"]
+    assert rep["with_company"] == 3
+    assert rep["with_website"] == 2
+    assert rep["duplicates"] == 1
+    assert "other software in use" in rep["context_fields_present"]
+    assert rep["ok"] is True
+
+
+def test_inspect_missing_website(tmp_path):
+    from gtm.ingest import inspect_provided_list
+
+    p = tmp_path / "nolist.csv"
+    p.write_text("Reseller Name\nAcme\n", encoding="utf-8")
+    rep = inspect_provided_list(p)
+    assert rep["has_company_col"] is True
+    assert rep["has_website_col"] is False
+    assert any("website" in w.lower() for w in rep["warnings"])
+
+
 # --- scoring URL gate ----------------------------------------------------- #
 def test_tier_from_score():
     c = _cfg()
