@@ -26,9 +26,10 @@ def build_lara_enrichment_provider(load_env: bool = True) -> LaraProvider:
         except ImportError:
             pass
     api_url = os.getenv("LARA_API_URL")
-    api_key = os.getenv("LARA_API_KEY")
+    api_key = os.getenv("LARA_ENRICHMENT_API_KEY") or os.getenv("LARA_API_KEY")
     assistant = os.getenv("LARA_ENRICHMENT_ASSISTANT_ID")
-    missing = [k for k, v in (("LARA_API_URL", api_url), ("LARA_API_KEY", api_key),
+    missing = [k for k, v in (("LARA_API_URL", api_url),
+                              ("LARA_ENRICHMENT_API_KEY", api_key),
                               ("LARA_ENRICHMENT_ASSISTANT_ID", assistant)) if not v]
     if missing:
         raise ValueError(f"LARA enrichment agent missing env values: {missing}")

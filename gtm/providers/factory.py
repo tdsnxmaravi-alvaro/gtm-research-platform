@@ -34,7 +34,7 @@ def build_provider(cfg: LLMProvider, load_env: bool = True) -> BaseProvider:
 
     if cfg.type == ProviderType.lara:
         api_url = _env(cfg.endpoint_env, "LARA_API_URL")
-        api_key = _env(cfg.api_key_env, "LARA_API_KEY")
+        api_key = _env(cfg.api_key_env, "LARA_RESEARCH_API_KEY") or os.getenv("LARA_API_KEY")
         assistant = _env(cfg.assistant_id_env, "LARA_RESEARCH_ASSISTANT_ID")
         missing = [k for k, v in (("api_url", api_url), ("api_key", api_key),
                                   ("assistant_id", assistant)) if not v]
