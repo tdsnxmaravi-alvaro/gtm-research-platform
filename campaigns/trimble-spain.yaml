@@ -1,0 +1,102 @@
+# Spain — qualify TD SYNNEX resellers for the Trimble AECO & Geospatial portfolio.
+# Mode: provided (stakeholder Excel list). target_type: resellers. No verticals.
+#
+# Scope note: this covers Trimble's channel-relevant AECO software (Tekla, SketchUp,
+# Trimble Connect, Viewpoint/ProjectSight, Quadri/Novapoint) and Field/Geospatial
+# systems (GNSS receivers, total stations, 3D scanners, Trimble Access, machine
+# control). Transportation & Logistics (Transporeon) and Agriculture (PTx Trimble,
+# now AGCO-majority) are largely outside the AEC/geospatial distribution channel and
+# are only scored if a reseller demonstrably operates there.
+name: spain-trimble-resellers
+target_type: resellers
+mode: provided
+country: Spain                       # derives language: es
+provided_list_path: campaigns/data/spain_trimble_resellers.csv
+
+products:
+  - name: Trimble AECO & Geospatial portfolio
+    value_prop: >-
+      Trimble's channel portfolio for the built environment. AECO software:
+      Tekla Structures / Structural Designer / Tedds (structural BIM, analysis,
+      steel & concrete detailing), SketchUp (3D modeling), Trimble Connect
+      (cloud collaboration / common data environment), Viewpoint & ProjectSight
+      (construction/project management), Quadri & Novapoint (civil infrastructure
+      design). Field & Geospatial: GNSS receivers (R-series), robotic total
+      stations (S/SX-series), 3D laser scanners (X-series), Trimble Access field
+      software, RealWorks, Siteworks and Earthworks machine control. A reseller
+      "fits" if it can sell and service these to AEC, surveying, and civil
+      construction customers in Spain.
+    fit_criteria:
+      - Sells or implements CAD / BIM / design software (e.g. AutoCAD, Revit,
+        Archicad, Allplan, BricsCAD, civil or structural tools) to AEC customers
+      - Distributes or services surveying / geospatial instruments — GNSS, total
+        stations, 3D scanners — or civil machine-control / positioning systems
+      - Serves structural engineers, steel or concrete fabricators, architects,
+        surveyors, or civil / infrastructure contractors as its customer base
+      - Provides value-added services (training, technical support, implementation,
+        certified staff) rather than being a pure e-tailer / box mover
+      - Is an existing partner or reseller of AEC or geospatial vendors (Autodesk,
+        Hexagon / Leica, Topcon, Bentley, Nemetschek / Allplan / Graphisoft),
+        indicating channel maturity and a Trimble-adjacent customer base
+      - Has an established commercial presence and delivery capability in Spain
+    evidence_required: true
+
+scoring:
+  dimensions:
+    - name: AEC / construction software & design capability
+      max_points: 25
+      description: >-
+        Depth of CAD/BIM/design-software business — resells, implements, trains or
+        supports structural, architectural or civil design tools. Higher for
+        BIM/structural focus (Trimble Tekla adjacency); lower for generic IT only.
+    - name: Geospatial / surveying / civil-field capability
+      max_points: 20
+      description: >-
+        Sells or services survey instruments (GNSS, total stations, scanners),
+        machine control or positioning for surveyors and civil contractors —
+        Trimble Field Systems adjacency. Zero if no geospatial/field footprint.
+    - name: Target customer-base fit
+      max_points: 20
+      description: >-
+        How well its actual customers match Trimble end-users: structural /
+        civil engineers, architects, steel & concrete fabricators, surveyors,
+        infrastructure and construction firms. Evidence from case studies,
+        references or sector focus.
+    - name: Technical services & implementation capacity
+      max_points: 15
+      description: >-
+        Ability to deliver training, deployment, support and consulting —
+        certified technicians, support desk, professional-services team. Signals
+        a value-added reseller able to onboard Trimble solutions.
+    - name: Market presence & momentum in Spain
+      max_points: 12
+      description: >-
+        Established Spanish operation, regional coverage, growth or hiring,
+        events/webinars, vendor certifications and recent expansion. Recency and
+        activity matter (2024-2026 signals score higher).
+    - name: Portfolio complementarity & vendor relationships
+      max_points: 8
+      description: >-
+        Existing lines that complement Trimble or prove channel strength
+        (Hexagon/Leica, Topcon, Autodesk, Bentley, Nemetschek). Reward proven
+        cross-sell capability and portfolio gaps that Trimble would fill.
+  tier_thresholds: { A: 85, B: 70, C: 50, D: 0 }
+  unverified_tier_cap: C             # no verified source URL -> cannot exceed C
+
+enrichment:
+  apollo: true
+  want: emails+phones
+  max_contacts: 3
+  provider: apollo
+
+llm_providers:
+  - name: lara-research
+    type: lara
+    web_search: true
+    api_key_env: LARA_RESEARCH_API_KEY
+    assistant_id_env: LARA_RESEARCH_ASSISTANT_ID
+research_provider: lara-research
+
+outreach:
+  enabled: true
+  language: es

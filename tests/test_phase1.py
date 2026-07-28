@@ -69,6 +69,22 @@ def test_load_provided_list_normalizes_headers(tmp_path):
     assert rows[0]["website"] == "https://a.es"
 
 
+def test_load_provided_list_xlsx(tmp_path):
+    from openpyxl import Workbook
+
+    p = tmp_path / "list.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Company Name", "Website"])
+    ws.append(["Acme", "https://a.es"])
+    ws.append([None, None])  # blank row skipped
+    wb.save(p)
+    rows = load_provided_list(p)
+    assert len(rows) == 1
+    assert rows[0]["company"] == "Acme"
+    assert rows[0]["website"] == "https://a.es"
+
+
 # --- scoring URL gate ----------------------------------------------------- #
 def test_tier_from_score():
     c = _cfg()

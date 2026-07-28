@@ -83,18 +83,48 @@ def parse_results(text: str) -> list[dict]:
 
 
 def load_provided_list(path: str | Path) -> list[dict]:
-    """Read a provided company list (CSV) and normalize its headers."""
+    """Read a provided company list and normalize its headers.
+
+    Supports CSV and Excel (.xlsx). The first row is treated as the header; the
+    first sheet is used for Excel. Header variants are mapped to `company` /
+    `website` via `_HEADER_MAP`.
+    """
+    path = Path(path)
+    raw_rows = _read_xlsx(path) if path.suffix.lower() in (".xlsx", ".xlsm") else _read_csv(path)
     rows: list[dict] = []
-    with open(path, encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        for raw in reader:
-            row: dict = {}
-            for k, v in raw.items():
-                key = _HEADER_MAP.get((k or "").strip().lower(), (k or "").strip().lower())
-                row[key] = (v or "").strip()
-            if row.get("company"):
-                rows.append(row)
+    for raw in raw_rows:
+        row: dict = {}
+        for k, v in raw.items():
+            key = _HEADER_MAP.get((k or "").strip().lower(), (k or "").strip().lower())
+            row[key] = ("" if v is None else str(v)).strip()
+        if row.get("company"):
+            rows.append(row)
     return rows
+
+
+def _read_csv(path: Path) -> list[dict]:
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def _read_xlsx(path: Path) -> list[dict]:
+    from openpyxl import load_workbook
+
+    wb = load_workbook(path, read_only=True, data_only=True)
+    ws = wb.active
+    rows_iter = ws.iter_rows(values_only=True)
+    try:
+        header = [str(c).strip() if c is not None else "" for c in next(rows_iter)]
+    except StopIteration:
+        wb.close()
+        return []
+    out: list[dict] = []
+    for values in rows_iter:
+        if values is None or all(v is None for v in values):
+            continue
+        out.append({header[i]: values[i] for i in range(min(len(header), len(values)))})
+    wb.close()
+    return out
 
 
 def write_rows_csv(rows: list[dict], path: str | Path, columns: list[str] | None = None) -> None:
