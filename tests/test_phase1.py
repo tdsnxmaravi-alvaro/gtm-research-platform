@@ -124,6 +124,48 @@ def test_inspect_missing_website(tmp_path):
     assert any("website" in w.lower() for w in rep["warnings"])
 
 
+def test_schema_ai_excludes_pii_samples():
+    from gtm.ingest.schema_ai import _safe_samples
+
+    headers = ["Razon Social", "E-Mail Address", "Contact Telephone Number", "Sitio Web"]
+    rows = [{"Razon Social": "Acme", "E-Mail Address": "a@a.es",
+             "Contact Telephone Number": "600123123", "Sitio Web": "https://a.es"}]
+    samples = _safe_samples(headers, rows)
+    assert "Razon Social" in samples and "Sitio Web" in samples
+    # PII columns must NOT be sampled
+    assert "E-Mail Address" not in samples
+    assert "Contact Telephone Number" not in samples
+
+
+def test_schema_ai_map_and_overrides(monkeypatch):
+    from gtm.ingest import schema_ai
+
+    class _FakeSchemaProvider:
+        def send(self, prompt, web_search=None):
+            class R:
+                text = ('{"company_column": "Razon Social", "website_column": "Sitio Web", '
+                        '"country_column": "", "context_columns": ["Sector"], '
+                        '"warnings": ["ok"]}')
+            return R()
+
+    monkeypatch.setattr(schema_ai, "_build_provider", lambda: _FakeSchemaProvider())
+    mapping = schema_ai.ai_map_columns(["Razon Social", "Sitio Web", "Sector"], [])
+    assert mapping["company_column"] == "Razon Social"
+    ov = schema_ai.overrides_from_ai(mapping)
+    assert ov["razon social"] == "company"
+    assert ov["sitio web"] == "website"
+
+
+def test_load_provided_list_with_ai_overrides(tmp_path):
+    p = tmp_path / "weird.csv"
+    p.write_text("Razon Social,Sitio Web\nAcme,https://a.es\n", encoding="utf-8")
+    rows = load_provided_list(p, column_overrides={"razon social": "company",
+                                                   "sitio web": "website"})
+    assert len(rows) == 1
+    assert rows[0]["company"] == "Acme"
+    assert rows[0]["website"] == "https://a.es"
+
+
 # --- scoring URL gate ----------------------------------------------------- #
 def test_tier_from_score():
     c = _cfg()

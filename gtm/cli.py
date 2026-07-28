@@ -93,13 +93,15 @@ def cmd_inspect(args):
     else:
         path = target
 
-    rep = inspect_provided_list(path)
+    rep = inspect_provided_list(path, use_ai=args.ai)
     print(f"File   : {rep['path']}  ({rep['format']})")
     print(f"Headers: {rep['raw_headers']}")
     print("Mapping (detected):")
     for h, m in rep["mapping"].items():
         tag = "  <-- company" if m == "company" else ("  <-- website" if m == "website" else "")
         print(f"  {h!r} -> {m}{tag}")
+    if rep.get("ai_mapping"):
+        print(f"AI mapping: {rep['ai_mapping']}")
     print(f"Rows   : {rep['raw_rows']} total | {rep['with_company']} with company | "
           f"{rep['with_website']} with website | {rep['missing_website']} missing website")
     if rep["duplicates"]:
@@ -163,6 +165,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     ins = sub.add_parser("inspect", help="Pre-flight a provided list (columns + data quality)")
     ins.add_argument("target", help="A list file (.csv/.xlsx) or a campaign .yaml")
+    ins.add_argument("--ai", action="store_true",
+                     help="Use the LARA schema-mapper agent for smart column mapping "
+                          "(headers + non-PII samples only)")
     ins.set_defaults(func=cmd_inspect)
 
     im = sub.add_parser("ingest-manual", help="Parse pasted LLM outputs")
