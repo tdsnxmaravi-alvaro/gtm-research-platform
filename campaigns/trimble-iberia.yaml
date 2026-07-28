@@ -95,3 +95,6 @@ research_provider: lara-research
 outreach:
   enabled: true
   language: es
+  min_tier: B
+  sender_name: ""          # fill with the BDR's name for the signature/From
+  sender_email: ""         # fill with the BDR's email for the From header

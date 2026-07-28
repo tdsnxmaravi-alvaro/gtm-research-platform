@@ -115,7 +115,7 @@ pytest -q
 | 0 | Scaffold + config schema + provider interface | ✅ Done |
 | 1 | Prompts + ingest + deterministic anchored scoring + research runner + CLI | ✅ Done |
 | 2 | Enrichment (Apollo emails/phones + LARA web-search agent) | ✅ Done |
-| 3 | Consolidate master list + outreach (`.eml`) | 🚧 In progress |
+| 3 | Consolidate master list + outreach (`.eml`) | ✅ Done |
 | 4 | Django + DRF API | ⏳ Planned |
 | 5 | React wizard UI | ⏳ Planned |
 

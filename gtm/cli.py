@@ -19,6 +19,8 @@ from .prompts import build_prompt, format_companies
 from .ingest import load_provided_list, inspect_provided_list
 from .research import run_campaign, ingest_manual
 from .enrichment import run_enrichment, run_webhook_server
+from .consolidate import build_master
+from .outreach import run_outreach
 
 
 def _provided_count(cfg) -> int:
@@ -78,6 +80,16 @@ def cmd_webhook(args):
     c = load_campaign(args.config)
     store_path = Path("campaigns") / c.name / "phone_reveals.json"
     run_webhook_server(store_path, port=args.port, path=args.path)
+
+
+def cmd_consolidate(args):
+    c = load_campaign(args.config)
+    build_master(c, min_tier=args.min_tier)
+
+
+def cmd_outreach(args):
+    c = load_campaign(args.config)
+    run_outreach(c, min_tier=args.min_tier, limit=args.limit, use_agent=args.agent)
 
 
 def cmd_ingest_manual(args):
@@ -187,6 +199,19 @@ def build_parser() -> argparse.ArgumentParser:
                      help="Use the LARA schema-mapper agent for smart column mapping "
                           "(headers + non-PII samples only)")
     ins.set_defaults(func=cmd_inspect)
+
+    co = sub.add_parser("consolidate", help="Build the master list (results + contacts)")
+    co.add_argument("config")
+    co.add_argument("--min-tier", default=None, help="Only include tiers >= this (e.g. B)")
+    co.set_defaults(func=cmd_consolidate)
+
+    ou = sub.add_parser("outreach", help="Generate .eml drafts from the master list")
+    ou.add_argument("config")
+    ou.add_argument("--min-tier", default=None, help="Only draft for tiers >= this")
+    ou.add_argument("--limit", type=int, default=0)
+    ou.add_argument("--agent", action="store_true",
+                    help="Use the LARA outreach agent (LARA_OUTREACH_ASSISTANT_ID) instead of the template")
+    ou.set_defaults(func=cmd_outreach)
 
     im = sub.add_parser("ingest-manual", help="Parse pasted LLM outputs")
     im.add_argument("config")

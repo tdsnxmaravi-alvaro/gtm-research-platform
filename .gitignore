@@ -19,6 +19,8 @@ campaigns/*/*.state.json
 campaigns/*/*.json
 campaigns/*/results.csv
 campaigns/*/contacts.csv
+campaigns/*/master.csv
+campaigns/*/eml/
 logs/
 *.xlsx
 *.eml

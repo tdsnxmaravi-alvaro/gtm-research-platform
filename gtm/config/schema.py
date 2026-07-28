@@ -190,6 +190,10 @@ class Outreach(BaseModel):
     language: str | None = None          # default: campaign language
     template_eml: str | None = None       # path to a sample .eml (branded template)
     agent_assistant_id_env: str | None = None
+    sender_name: str = ""                 # BDR name for the signature / From
+    sender_email: str = ""               # BDR email for the From header
+    min_tier: str = "B"                   # only draft outreach for tiers >= this
+    subject: str | None = None            # optional subject override/template
 
 
 # --------------------------------------------------------------------------- #
