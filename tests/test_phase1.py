@@ -60,6 +60,24 @@ def test_normalize_result_without_evidence():
     assert r["evidence_count"] == 0
 
 
+def test_normalize_result_sums_dimension_scores():
+    r = normalize_result({
+        "company": "Acme", "website": "a.es",
+        "dimension_scores": [
+            {"name": "VAR capability", "points": 20, "max": 22,
+             "rationale": "mature VAR", "evidence_url": "https://a.es/services"},
+            {"name": "Adjacency", "points": 30, "max": 18,  # over max -> clamp to 18
+             "rationale": "resells Autodesk", "evidence_url": "https://a.es/autodesk"},
+            {"name": "Presence", "points": 10, "max": 20,
+             "rationale": "regional", "evidence_url": ""},
+        ],
+    })
+    # 20 + clamp(30->18) + 10 = 48 (total computed in Python, not from the LLM)
+    assert r["score"] == 48
+    assert r["evidence_count"] == 2
+    assert r["has_verified_url"] is True
+
+
 def test_parse_results_with_leading_bracket_noise():
     # LARA prepends [[LARA_TOOL_ACTIVITY:...]] markers before the JSON object.
     text = ('[[LARA_TOOL_ACTIVITY:eyJhIjoxfQ==]]\n\n[[LARA_TOOL_ACTIVITY:zzz]]\n'

@@ -24,13 +24,19 @@ OUTPUT — return STRICT JSON only (no prose, no markdown fences), one object pe
     "company": "...",
     "website": "...",
     "fit_summary": "1-3 sentences on why it does / does not fit",
-    "score": <int 0-100>,
-    "tier": "A|B|C|D",
-    "evidence": [{"claim": "...", "url": "https://..."}],
+    "dimension_scores": [
+      {"name": "<exact dimension name>", "points": <int>, "max": <int>,
+       "rationale": "which band and why", "evidence_url": "https://..."}
+    ],
     "recommended_products": ["..."],
     "notes": "acquisitions, risks, caveats, or UNVERIFIED flags"
   }
-]}"""
+]}
+Score EACH dimension listed under SCORING against its point-band anchors, using the
+EXACT dimension name and its max. Do NOT output an overall score — it is computed
+deterministically as the sum of dimension points. Any dimension scored above its
+lowest band SHOULD carry an evidence_url; without verifiable evidence, keep it in
+the lowest band."""
 
 
 # --------------------------------------------------------------------------- #

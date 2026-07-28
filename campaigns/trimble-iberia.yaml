@@ -50,47 +50,31 @@ products:
     evidence_required: true
 
 scoring:
+  use_universal: true                # prepend reusable reseller dimensions (60 pts)
+  # Campaign-specific dimensions (40 pts). Scored against point-band anchors and
+  # summed deterministically with the universal ones -> total 100.
   dimensions:
-    - name: Software VAR capability & services
-      max_points: 22
-      description: >-
-        Is it a genuine software reseller/VAR (licensing, renewals, training,
-        implementation, support) able to take on a new software vendor? Pure
-        hardware/box resellers or e-tailers score low. This is the core
-        recruitment signal regardless of what they sell today.
     - name: Customer-base fit for design software
       max_points: 22
       description: >-
-        How design-intensive is its customer base — architecture, engineering,
-        construction, manufacturing, industrial, or creative/media firms that
-        use or would use CAD/BIM/3D design tools. Evidence from case studies,
-        sector focus, references.
+        How design-intensive is its customer base (architecture, engineering,
+        construction, manufacturing, industrial, creative/media).
+      anchors:
+        - "17-22: clear, evidenced base of AEC / engineering / manufacturing / design customers"
+        - "11-16: partial or plausible design-sector customer base"
+        - "4-10: mostly generic IT customers, weak design signal"
+        - "0-3: no design-sector customers evidenced"
     - name: Design-software adjacency (any vendor)
       max_points: 18
       description: >-
         Existing footprint in design / CAD / BIM / engineering / creative software
-        from ANY vendor (Autodesk, Adobe, Bentley, Nemetschek, PTC, Dassault, etc.).
-        Use the "Other Software in Use" hint when present, plus web evidence. A
-        strong plus that lowers ramp-up risk — not a hard requirement.
-    - name: Portfolio breadth & vendor-onboarding capacity
-      max_points: 14
-      description: >-
-        Diversity of vendors/lines carried and VAR maturity (structured
-        onboarding, marketing, multi-vendor management) — capacity to add and
-        actively grow a new software line rather than let it sit idle.
-    - name: Market presence & momentum in Iberia
-      max_points: 14
-      description: >-
-        Established Spanish/Portuguese operation, regional coverage, growth or
-        hiring, events, certifications, recent expansion. Recency matters
-        (2024-2026 signals score higher).
-    - name: Design / geospatial vertical adjacency (bonus)
-      max_points: 10
-      description: >-
-        Optional plus: touches surveying / geospatial / civil, manufacturing/CAM,
-        or other verticals where Trimble is strong — eases a natural cross-sell.
-        Upside only; do not penalize its absence.
-  tier_thresholds: { A: 85, B: 70, C: 50, D: 0 }
+        from ANY vendor (Autodesk, Adobe, Bentley, Nemetschek, PTC, Dassault...).
+      anchors:
+        - "14-18: already resells/implements design or engineering software"
+        - "8-13: sells creative/CAD-adjacent software (e.g. Adobe) or partial signal"
+        - "3-7: generic software only, no design adjacency"
+        - "0-2: no software-vendor adjacency evidenced"
+  tier_thresholds: { A: 80, B: 65, C: 50, D: 0 }
   unverified_tier_cap: C             # no verified source URL -> cannot exceed C
 
 enrichment:

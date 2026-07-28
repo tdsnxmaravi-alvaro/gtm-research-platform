@@ -20,15 +20,24 @@ def _fit_criteria_block(product: Product) -> str:
 def _scoring_block(config: CampaignConfig) -> str:
     dims = config.scoring.dimensions
     if dims:
-        lines = [
-            f"- {d.name} (max {d.max_points} pts)" + (f": {d.description}" if d.description else "")
-            for d in dims
-        ]
+        lines = []
+        for d in dims:
+            head = f"- {d.name} (max {d.max_points} pts)"
+            if d.description:
+                head += f": {d.description}"
+            lines.append(head)
+            for a in d.anchors:
+                lines.append(f"    · {a}")
         dim_text = "\n".join(lines)
+        total = config.scoring.total_max_points()
     else:
         dim_text = "- Overall fit (0-100)"
+        total = 100
     tiers = " · ".join(f"{k} >= {v}" for k, v in config.scoring.tier_thresholds.items())
-    return f"Dimensions:\n{dim_text}\nTiers (by total score): {tiers}"
+    return (
+        f"Score each dimension against its point-band anchors (total {total} pts):\n"
+        f"{dim_text}\nTiers (by total score): {tiers}"
+    )
 
 
 def _evidence_block(config: CampaignConfig) -> str:

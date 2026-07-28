@@ -55,15 +55,56 @@ def _extract_json(text: str) -> dict | list | None:
 
 
 def normalize_result(r: dict) -> dict:
-    """Normalize one LLM result object to the standard result columns."""
-    evidence = r.get("evidence") or []
-    if not isinstance(evidence, list):
-        evidence = []
-    urls = [
-        str(e.get("url")).strip()
-        for e in evidence
-        if isinstance(e, dict) and e.get("url")
-    ]
+    """Normalize one LLM result object to the standard result columns.
+
+    Supports the rubric format (`dimension_scores`: per-dimension points + evidence,
+    summed deterministically) and the legacy holistic format (`score` + `evidence`).
+    """
+    dim_scores = r.get("dimension_scores")
+    urls: list[str] = []
+    breakdown: list[dict] = []
+    score = r.get("score", "")
+
+    if isinstance(dim_scores, list) and dim_scores:
+        total = 0
+        for d in dim_scores:
+            if not isinstance(d, dict):
+                continue
+            try:
+                pts = int(d.get("points", 0) or 0)
+            except (TypeError, ValueError):
+                pts = 0
+            try:
+                mx = int(d.get("max", 0) or 0)
+            except (TypeError, ValueError):
+                mx = 0
+            if mx > 0:
+                pts = max(0, min(pts, mx))  # clamp to the dimension's max
+            total += pts
+            url = str(d.get("evidence_url") or "").strip()
+            if url:
+                urls.append(url)
+            breakdown.append({"name": str(d.get("name", "")).strip(),
+                              "points": pts, "max": mx,
+                              "rationale": str(d.get("rationale", "")).strip(),
+                              "evidence_url": url})
+        score = total
+        evidence_blob = breakdown
+    else:
+        evidence = r.get("evidence") or []
+        if not isinstance(evidence, list):
+            evidence = []
+        urls = [str(e.get("url")).strip() for e in evidence
+                if isinstance(e, dict) and e.get("url")]
+        evidence_blob = evidence
+
+    # De-dup URLs preserving order
+    seen: list[str] = []
+    for u in urls:
+        if u and u not in seen:
+            seen.append(u)
+    urls = seen
+
     rec = r.get("recommended_products") or []
     if isinstance(rec, str):
         rec = [rec]
@@ -71,14 +112,14 @@ def normalize_result(r: dict) -> dict:
         "company": str(r.get("company", "")).strip(),
         "website": str(r.get("website", "")).strip(),
         "fit_summary": str(r.get("fit_summary", "")).strip(),
-        "score": r.get("score", ""),
+        "score": score,
         "tier": str(r.get("tier", "")).strip().upper(),
         "recommended_products": "; ".join(str(x) for x in rec),
         "notes": str(r.get("notes", "")).strip(),
         "evidence_urls": "; ".join(urls),
         "evidence_count": len(urls),
         "has_verified_url": bool(urls),
-        "evidence": json.dumps(evidence, ensure_ascii=False),
+        "evidence": json.dumps(evidence_blob, ensure_ascii=False),
     }
 
 

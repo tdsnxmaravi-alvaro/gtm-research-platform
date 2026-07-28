@@ -124,16 +124,26 @@ class ScoringDimension(BaseModel):
     max_points: int = 10
     weight: float = 1.0
     description: str = ""
+    # Point-band anchors (rubric) that pin the model to concrete criteria and cut
+    # run-to-run variance, e.g. ["11-15: resells design software with services",
+    # "6-10: generic IT software only", "0-5: no software resale / box-mover"].
+    anchors: list[str] = Field(default_factory=list)
 
 
 class Scoring(BaseModel):
     dimensions: list[ScoringDimension] = Field(default_factory=list)
+    # Prepend the reusable universal (vendor/vertical-agnostic) dimensions for the
+    # campaign's target_type, then the campaign adds its specific dimensions.
+    use_universal: bool = False
     # Tier lower-bound thresholds (score >= value). Ordered best -> worst.
     tier_thresholds: dict[str, int] = Field(
         default_factory=lambda: {"A": 85, "B": 70, "C": 50, "D": 0}
     )
     # URL gate: with ZERO verified source URLs, the account cannot exceed this tier.
     unverified_tier_cap: str = "C"
+
+    def total_max_points(self) -> int:
+        return sum(d.max_points for d in self.dimensions)
 
 
 class Enrichment(BaseModel):
@@ -236,6 +246,17 @@ class CampaignConfig(BaseModel):
             self.language = default_lang
         if self.outreach.language is None:
             self.outreach.language = self.language
+
+        # Prepend reusable universal scoring dimensions when requested.
+        if self.scoring.use_universal:
+            from ..scoring.library import universal_dimensions
+            existing = {d.name for d in self.scoring.dimensions}
+            universal = [
+                ScoringDimension(**d)
+                for d in universal_dimensions(self.target_type.value)
+                if d["name"] not in existing
+            ]
+            self.scoring.dimensions = universal + self.scoring.dimensions
         return self
 
     # ----------------------------------------------------------------------- #
