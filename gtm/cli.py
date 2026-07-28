@@ -62,6 +62,12 @@ def cmd_run(args):
 
 def cmd_enrich(args):
     c = load_campaign(args.config)
+    if args.want:
+        from .config.schema import EnrichWant
+        c.enrichment.want = EnrichWant(args.want)
+    if args.provider:
+        from .config.schema import EnrichProvider
+        c.enrichment.provider = EnrichProvider(args.provider)
     run_enrichment(c, limit=args.limit, delay=args.delay,
                    resume=not args.no_resume,
                    poll_wait=args.poll_wait, poll_interval=args.poll_interval,
@@ -160,6 +166,10 @@ def build_parser() -> argparse.ArgumentParser:
     en.add_argument("--poll-wait", type=int, default=0,
                     help="Max seconds to keep polling Apollo phone reveals")
     en.add_argument("--poll-interval", type=int, default=600)
+    en.add_argument("--want", choices=["none", "emails", "emails+phones"],
+                    help="Override enrichment.want for this run")
+    en.add_argument("--provider", choices=["apollo", "lara"],
+                    help="Override enrichment.provider for this run")
     en.add_argument("--webhook", action="store_true",
                     help="Use a live webhook (run `gtm webhook` + cloudflared) "
                          "instead of polling for phone reveals")

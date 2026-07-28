@@ -169,10 +169,13 @@ def run_campaign(
                     r["product"] = product.name
                     r["vertical"] = ""
                 all_results.extend(scored)
-                for r in batch:
-                    done.add(r.get("company"))
-                _save_state(state_path, done)
-                write_rows_csv(all_results, results_path, columns=OUT_COLS)
+                # Only mark companies done when the batch produced results, so a
+                # transient provider error (e.g. HTTP 499) is retried on resume.
+                if scored:
+                    for r in batch:
+                        done.add(r.get("company"))
+                    _save_state(state_path, done)
+                    write_rows_csv(all_results, results_path, columns=OUT_COLS)
                 print(f"  batch {i//batch_size+1}: +{len(scored)} results")
                 time.sleep(delay)
 
