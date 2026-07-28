@@ -35,13 +35,30 @@ def _evidence_block(config: CampaignConfig) -> str:
     return templates.EVIDENCE_RULES.format(tier_cap=config.scoring.unverified_tier_cap)
 
 
-def format_companies(rows: list[dict], fields: tuple[str, ...] = ("company", "website")) -> str:
-    """Render a list of company dicts into a numbered block for `provided` prompts."""
+def format_companies(
+    rows: list[dict],
+    fields: tuple[str, ...] = ("company", "website"),
+    context_fields: tuple[str, ...] = ("other software in use", "company size"),
+) -> str:
+    """Render a list of company dicts into a numbered block for `provided` prompts.
+
+    `fields` are shown plainly (company | website). `context_fields` are appended
+    as labeled hints when present (e.g. the current software portfolio), giving
+    the model qualification signals from the provided list itself.
+    """
     out = []
     for i, r in enumerate(rows, 1):
         parts = [str(r.get(f, "")).strip() for f in fields]
         parts = [p for p in parts if p]
-        out.append(f"{i}. " + " | ".join(parts))
+        line = f"{i}. " + " | ".join(parts)
+        extras = []
+        for cf in context_fields:
+            v = str(r.get(cf, "")).strip()
+            if v:
+                extras.append(f"{cf}: {v}")
+        if extras:
+            line += "  [" + "; ".join(extras) + "]"
+        out.append(line)
     return "\n".join(out)
 
 

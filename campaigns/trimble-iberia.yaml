@@ -1,0 +1,103 @@
+# Iberia (Spain + Portugal) — qualify Datech's Autodesk resellers as candidates to
+# carry Trimble as a NEW VENDOR. Source: stakeholder Excel
+# "Dashboard_Datech_New_Vendor_Resellers_with_Websites.xlsx" (568 partners, with a
+# "Other Software in Use" column used as a fit signal).
+#
+# Context: Datech Solutions is TD SYNNEX's specialist Autodesk value-added
+# distributor in Europe — a SOFTWARE channel. So fit is weighted toward Trimble's
+# AEC SOFTWARE (Tekla, SketchUp, Trimble Connect, Viewpoint/ProjectSight,
+# Quadri/Novapoint) and Autodesk adjacency, NOT geospatial hardware.
+name: datech-trimble-iberia
+target_type: resellers
+mode: provided
+country: Spain and Portugal
+language: es                          # primary; Portuguese partners handled case-by-case
+provided_list_path: campaigns/data/Dashboard_Datech_New_Vendor_Resellers_with_Websites.xlsx
+
+products:
+  - name: Trimble AEC software portfolio
+    value_prop: >-
+      Trimble's channel software for the built environment, distributed alongside
+      Autodesk: Tekla Structures / Structural Designer / Tedds (structural BIM,
+      analysis, steel & concrete detailing), SketchUp (3D modeling), Trimble
+      Connect (cloud collaboration / common data environment), Viewpoint &
+      ProjectSight (construction / project management), and Quadri & Novapoint
+      (civil infrastructure design). Field & geospatial hardware (GNSS, total
+      stations, scanners, machine control) is secondary for this SOFTWARE channel.
+      A reseller "fits" if it can sell and service Trimble AEC software to
+      architecture, engineering and construction customers in Iberia.
+    fit_criteria:
+      - Already resells or services Autodesk or other AEC / BIM / design software
+        (AutoCAD, Revit, Civil 3D, Archicad, Allplan, BricsCAD) — strongest signal
+      - The "Other Software in Use" hint lists design / AEC / engineering software
+        (vs. generic IT only such as Microsoft, Cisco, Dell)
+      - Serves architects, structural or civil engineers, construction firms,
+        fabricators, or surveyors as a meaningful part of its customer base
+      - Provides value-added services (training, technical support, implementation,
+        certified staff) rather than being a pure IT box-mover / e-tailer
+      - Has an established commercial presence and delivery capability in Spain
+        and/or Portugal
+      - "Bonus signal: any surveying / geospatial / civil-field footprint
+        (Trimble Field Systems adjacency)"
+    evidence_required: true
+
+scoring:
+  dimensions:
+    - name: AEC design-software channel & Autodesk adjacency
+      max_points: 28
+      description: >-
+        Does it already resell/implement Autodesk or other AEC/BIM/design software?
+        Use the provided "Other Software in Use" hint plus web evidence. This is
+        the primary signal for a Datech software reseller — generic IT-only
+        resellers (Microsoft/Cisco/Dell) score low here.
+    - name: Target customer-base fit (AEC / engineering / construction)
+      max_points: 22
+      description: >-
+        How well its actual customers match Trimble software end-users: architects,
+        structural / civil engineers, construction firms, fabricators, surveyors.
+        Evidence from case studies, references, or clear sector focus.
+    - name: Technical services & implementation capacity
+      max_points: 16
+      description: >-
+        Ability to deliver training, deployment, support and consulting for design
+        software — certified technicians, support desk, professional services.
+        Signals a value-added reseller able to onboard Trimble software.
+    - name: Software-portfolio breadth & cross-sell capability
+      max_points: 14
+      description: >-
+        Breadth of software vendors carried and VAR maturity (multiple design /
+        engineering / productivity lines), indicating capacity to add and cross-sell
+        a new software vendor.
+    - name: Market presence & momentum in Iberia
+      max_points: 12
+      description: >-
+        Established Spanish/Portuguese operation, regional coverage, growth or
+        hiring, events, vendor certifications, recent expansion. Recency matters
+        (2024-2026 signals score higher).
+    - name: Geospatial / field adjacency (bonus)
+      max_points: 8
+      description: >-
+        Optional plus: also sells or services surveying / geospatial instruments,
+        machine control, or civil positioning — Trimble Field Systems adjacency.
+        Zero if purely software; do not penalize, it is upside only.
+  tier_thresholds: { A: 85, B: 70, C: 50, D: 0 }
+  unverified_tier_cap: C             # no verified source URL -> cannot exceed C
+
+enrichment:
+  apollo: true
+  want: emails+phones
+  max_contacts: 3
+  provider: apollo
+  locations: [Spain, Portugal]       # Apollo geo (country field spans both)
+
+llm_providers:
+  - name: lara-research
+    type: lara
+    web_search: true
+    api_key_env: LARA_RESEARCH_API_KEY
+    assistant_id_env: LARA_RESEARCH_ASSISTANT_ID
+research_provider: lara-research
+
+outreach:
+  enabled: true
+  language: es

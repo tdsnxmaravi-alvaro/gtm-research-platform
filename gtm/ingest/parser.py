@@ -24,6 +24,7 @@ RESULT_COLUMNS = [
 _HEADER_MAP = {
     "company": "company", "company name": "company", "name": "company",
     "account": "company", "reseller": "company",
+    "reseller name": "company", "resellername": "company", "partner name": "company",
     "website": "website", "url": "website", "domain": "website", "web": "website",
 }
 
