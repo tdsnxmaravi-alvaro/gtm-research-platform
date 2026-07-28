@@ -1,0 +1,39 @@
+# Local/dev stack: API + Celery worker + Redis (broker) + Postgres.
+# Mirrors a cloud deployment (managed Redis + Postgres, web & worker containers).
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: gtm
+      POSTGRES_PASSWORD: gtm
+      POSTGRES_DB: gtm
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  web:
+    build: .
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgres://gtm:gtm@db:5432/gtm
+      CELERY_BROKER_URL: redis://redis:6379/0
+      DJANGO_DEBUG: "false"
+      DJANGO_ALLOWED_HOSTS: "*"
+    ports: ["8000:8000"]
+    depends_on: [db, redis]
+
+  worker:
+    build: .
+    command: celery -A gtm_api worker --loglevel=info
+    working_dir: /app/backend
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgres://gtm:gtm@db:5432/gtm
+      CELERY_BROKER_URL: redis://redis:6379/0
+    depends_on: [db, redis]
+
+volumes:
+  pgdata:

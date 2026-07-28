@@ -1,6 +1,9 @@
+from unittest.mock import patch
+
+from django.test import override_settings
 from rest_framework.test import APITestCase
 
-from api.models import Campaign
+from api.models import Campaign, Run
 
 VALID_CONFIG = {
     "name": "t-api",
@@ -42,3 +45,17 @@ class CampaignApiTests(APITestCase):
         resp = self.client.post("/api/campaigns/",
                                 {"name": "bad", "config": bad}, format="json")
         self.assertEqual(resp.status_code, 400)
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
+class ResearchTaskTests(APITestCase):
+    def test_research_runs_task_eager(self):
+        campaign = Campaign.objects.create(name="t-run", config=VALID_CONFIG)
+        # Mock the engine so no external LLM call happens; run eagerly in-process.
+        with patch("gtm.research.run_campaign", return_value=[{"company": "Acme"}]):
+            resp = self.client.post(f"/api/campaigns/{campaign.id}/research/")
+        self.assertEqual(resp.status_code, 202)
+        run = Run.objects.get(campaign=campaign, stage="research")
+        self.assertEqual(run.status, "done")
+        self.assertEqual(run.result_count, 1)
+

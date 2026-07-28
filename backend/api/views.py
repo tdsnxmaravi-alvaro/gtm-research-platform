@@ -1,15 +1,14 @@
-import threading
-from datetime import datetime, timezone
+import csv
 from pathlib import Path
 
 from django.conf import settings
-from django.db import close_old_connections
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .models import Campaign, Run
 from .serializers import CampaignSerializer, RunSerializer
+from .tasks import run_stage
 
 
 def _out_dir(name: str) -> Path:
@@ -22,48 +21,10 @@ def _load_config(cfg: dict):
 
 
 def _read_csv(path: Path) -> list[dict]:
-    import csv
     if not path.exists():
         return []
     with open(path, encoding="utf-8-sig", newline="") as f:
         return list(csv.DictReader(f))
-
-
-def _execute(run_id: int, cfg_dict: dict, stage: str, out_dir: Path):
-    """Run a pipeline stage in a background thread and record status."""
-    close_old_connections()
-    run = Run.objects.get(pk=run_id)
-    run.status = "running"
-    run.save(update_fields=["status"])
-    try:
-        config = _load_config(cfg_dict)
-        if stage == "research":
-            from gtm.research import run_campaign
-            rows = run_campaign(config, out_dir=out_dir)
-            count = len(rows)
-        elif stage == "enrich":
-            from gtm.enrichment import run_enrichment
-            rows = run_enrichment(config, out_dir=out_dir)
-            count = len(rows)
-        elif stage == "consolidate":
-            from gtm.consolidate import build_master
-            rows = build_master(config, out_dir=out_dir)
-            count = len(rows)
-        elif stage == "outreach":
-            from gtm.outreach import run_outreach
-            rows = run_outreach(config, out_dir=out_dir)
-            count = len(rows)
-        else:
-            raise ValueError(f"unknown stage: {stage}")
-        run.status = "done"
-        run.result_count = count
-    except Exception as exc:  # noqa: BLE001 - record failure
-        run.status = "error"
-        run.message = str(exc)[:2000]
-    finally:
-        run.finished_at = datetime.now(timezone.utc)
-        run.save()
-        close_old_connections()
 
 
 class CampaignViewSet(viewsets.ModelViewSet):
@@ -83,12 +44,7 @@ class CampaignViewSet(viewsets.ModelViewSet):
 
     def _start(self, campaign, stage) -> Run:
         run = Run.objects.create(campaign=campaign, stage=stage, status="pending")
-        t = threading.Thread(
-            target=_execute,
-            args=(run.id, campaign.config, stage, _out_dir(campaign.name)),
-            daemon=True,
-        )
-        t.start()
+        run_stage.delay(run.id, campaign.config, stage, campaign.name)
         return run
 
     @action(detail=True, methods=["post"])
