@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import ast
 
 from ..config.schema import CampaignConfig, language_for_country
 
@@ -122,9 +123,18 @@ def _agent_email(prov, config: CampaignConfig, row: dict) -> tuple[str, str] | N
     m = re.search(r"\{.*\}", resp.text or "", re.DOTALL)
     if not m:
         return None
+    data = None
     try:
         data = json.loads(m.group(0))
     except json.JSONDecodeError:
+        try:
+            # Models sometimes return a Python-style dict (single quotes).
+            obj = ast.literal_eval(m.group(0))
+            if isinstance(obj, dict):
+                data = obj
+        except (ValueError, SyntaxError):
+            return None
+    if not isinstance(data, dict):
         return None
     subj, body = data.get("subject"), data.get("body")
     if subj and body:
