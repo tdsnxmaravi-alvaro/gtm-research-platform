@@ -15,6 +15,7 @@ from .schema import (
     LLMProvider,
     Outreach,
     apollo_locations_for,
+    language_for_country,
 )
 from .loader import load_campaign
 
@@ -33,5 +34,6 @@ __all__ = [
     "LLMProvider",
     "Outreach",
     "apollo_locations_for",
+    "language_for_country",
     "load_campaign",
 ]

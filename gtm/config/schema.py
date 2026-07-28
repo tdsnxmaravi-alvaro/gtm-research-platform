@@ -100,6 +100,11 @@ def apollo_locations_for(country: str) -> list[str]:
     return COUNTRY_APOLLO_LOCATIONS.get(key, [country.strip()] if country else [])
 
 
+def language_for_country(country: str) -> str | None:
+    """Map a country to its default language, or None if unknown."""
+    return COUNTRY_LANGUAGE.get((country or "").strip().lower())
+
+
 # --------------------------------------------------------------------------- #
 # Sub-models
 # --------------------------------------------------------------------------- #
@@ -204,6 +209,7 @@ class CampaignConfig(BaseModel):
     target_type: TargetType
     mode: Mode
     country: str
+    vendor: str = ""                       # the vendor being sold (e.g. "Trimble")
     language: str | None = None           # default derived from country
 
     products: list[Product] = Field(min_length=1)

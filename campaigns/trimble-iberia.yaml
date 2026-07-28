@@ -18,6 +18,7 @@ name: datech-trimble-iberia
 target_type: resellers
 mode: provided
 country: Spain and Portugal
+vendor: Trimble
 language: es                          # primary; Portuguese partners handled case-by-case
 provided_list_path: campaigns/data/Dashboard_Datech_New_Vendor_Resellers_with_Websites.xlsx
 

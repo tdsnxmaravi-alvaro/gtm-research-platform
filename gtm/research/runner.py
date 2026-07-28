@@ -24,7 +24,7 @@ from ..scoring import score_results
 from ..providers import build_provider
 
 OUT_COLS = [
-    "product", "vertical", "company", "website", "final_tier", "tier", "score",
+    "product", "vertical", "company", "website", "country", "final_tier", "tier", "score",
     "tier_capped", "tier_cap_reason", "fit_summary", "recommended_products",
     "evidence_count", "has_verified_url", "evidence_urls", "notes", "passes", "evidence",
 ]
@@ -185,9 +185,14 @@ def run_campaign(
                                       company_input=format_companies(batch))
                 tag = f"{product.name}_batch{i//batch_size+1}"
                 scored = _run_batch(config, providers, prompt, logs, tag, passes, delay)
+                # Attach each company's country (from the provided list) to its result.
+                country_by = {(b.get("company") or "").strip().lower(): b.get("country", "")
+                              for b in batch}
                 for r in scored:
                     r["product"] = product.name
                     r["vertical"] = ""
+                    r["country"] = country_by.get((r.get("company") or "").strip().lower(),
+                                                  config.country)
                 all_results.extend(scored)
                 # Only mark companies done when the batch produced results, so a
                 # transient provider error (e.g. HTTP 499) is retried on resume.

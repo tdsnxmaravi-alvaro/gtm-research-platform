@@ -13,6 +13,13 @@ from .eml import write_eml
 _TIER_ORDER = {"A": 0, "B": 1, "C": 2, "D": 3, "": 9}
 
 
+def _num(v) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _safe(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", (name or "").strip())[:60] or "contact"
 
@@ -41,8 +48,29 @@ def run_outreach(
         rows = list(csv.DictReader(f))
 
     cap = _TIER_ORDER.get((min_tier or config.outreach.min_tier or "B").upper(), 1)
-    targets = [r for r in rows
-               if r.get("email") and _TIER_ORDER.get((r.get("tier") or "").upper(), 9) <= cap]
+
+    # One draft per COMPANY: pick the primary contact (best title with an email).
+    priority = ["president", "ceo", "owner", "founder", "managing director",
+                "director", "vp", "vice president", "head", "manager"]
+
+    def _rank(r: dict) -> int:
+        t = (r.get("title") or "").lower()
+        return next((i for i, p in enumerate(priority) if p in t), 99)
+
+    primary: dict[str, dict] = {}
+    for r in rows:
+        if not r.get("email"):
+            continue
+        if _TIER_ORDER.get((r.get("tier") or "").upper(), 9) > cap:
+            continue
+        key = (r.get("company") or "").strip().lower()
+        cur = primary.get(key)
+        if cur is None or _rank(r) < _rank(cur):
+            primary[key] = r
+
+    targets = sorted(primary.values(),
+                     key=lambda x: (_TIER_ORDER.get((x.get("tier") or "").upper(), 9),
+                                    -_num(x.get("score"))))
     if limit:
         targets = targets[:limit]
 

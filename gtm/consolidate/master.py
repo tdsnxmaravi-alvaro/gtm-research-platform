@@ -14,11 +14,10 @@ from pathlib import Path
 from ..config.schema import CampaignConfig
 
 MASTER_COLS = [
-    "tier", "score", "company", "website",
+    "tier", "score", "company", "website", "country",
     "contact_name", "title", "email", "email_status",
     "direct_phone", "corporate_phone", "linkedin",
-    "recommended_products", "fit_summary", "evidence_urls",
-    "product", "country",
+    "vendor", "recommended_products", "fit_summary", "evidence_urls",
 ]
 
 _TIER_ORDER = {"A": 0, "B": 1, "C": 2, "D": 3, "": 9}
@@ -105,6 +104,7 @@ def _master_row(config: CampaignConfig, r: dict, tier: str, c: dict) -> dict:
         "score": r.get("score", ""),
         "company": r.get("company", ""),
         "website": r.get("website", ""),
+        "country": r.get("country") or config.country,
         "contact_name": c.get("contact_name", ""),
         "title": c.get("title", ""),
         "email": c.get("email", ""),
@@ -112,11 +112,10 @@ def _master_row(config: CampaignConfig, r: dict, tier: str, c: dict) -> dict:
         "direct_phone": c.get("direct_phone", ""),
         "corporate_phone": c.get("corporate_phone", ""),
         "linkedin": c.get("linkedin", ""),
+        "vendor": config.vendor or r.get("product", ""),
         "recommended_products": r.get("recommended_products", ""),
         "fit_summary": r.get("fit_summary", ""),
         "evidence_urls": r.get("evidence_urls", ""),
-        "product": r.get("product", ""),
-        "country": config.country,
     }
 
 
@@ -131,16 +130,59 @@ def _write_csv(rows: list[dict], path: Path) -> None:
 def _write_xlsx(rows: list[dict], path: Path) -> None:
     try:
         from openpyxl import Workbook
-        from openpyxl.styles import Font
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
     except ImportError:
         return
     wb = Workbook()
     ws = wb.active
     ws.title = "Master"
-    ws.append(MASTER_COLS)
-    for cell in ws[1]:
-        cell.font = Font(bold=True)
-    for r in rows:
-        ws.append([r.get(k, "") for k in MASTER_COLS])
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor="2F5496")
+    thin = Side(style="thin", color="D9D9D9")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    tier_fill = {
+        "A": PatternFill("solid", fgColor="C6EFCE"),
+        "B": PatternFill("solid", fgColor="BDD7EE"),
+        "C": PatternFill("solid", fgColor="FFF2CC"),
+        "D": PatternFill("solid", fgColor="F2F2F2"),
+    }
+    wrap_cols = {"fit_summary", "evidence_urls", "recommended_products"}
+
+    for col, name in enumerate(MASTER_COLS, 1):
+        cell = ws.cell(row=1, column=col, value=name)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border
+
+    for ri, r in enumerate(rows, 2):
+        for ci, name in enumerate(MASTER_COLS, 1):
+            cell = ws.cell(row=ri, column=ci, value=r.get(name, ""))
+            cell.border = border
+            cell.alignment = Alignment(
+                vertical="top",
+                wrap_text=name in wrap_cols,
+                horizontal="center" if name in ("tier", "score") else "left",
+            )
+            if name == "tier":
+                fill = tier_fill.get(str(r.get("tier", "")).upper())
+                if fill:
+                    cell.fill = fill
+                    cell.font = Font(bold=True)
+
+    widths = {"tier": 6, "score": 7, "company": 30, "website": 26, "country": 12,
+             "contact_name": 22, "title": 26, "email": 28, "email_status": 12,
+             "direct_phone": 16, "corporate_phone": 16, "linkedin": 30,
+             "vendor": 14, "recommended_products": 34, "fit_summary": 60,
+             "evidence_urls": 40}
+    for col, name in enumerate(MASTER_COLS, 1):
+        ws.column_dimensions[get_column_letter(col)].width = widths.get(name, 18)
+
     ws.freeze_panes = "A2"
-    wb.save(path)
+    ws.auto_filter.ref = ws.dimensions
+    try:
+        wb.save(path)
+    except PermissionError:
+        print(f"  !! could not write {path.name} (is it open in Excel?). CSV written OK.")

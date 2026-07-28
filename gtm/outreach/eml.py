@@ -15,12 +15,28 @@ from pathlib import Path
 
 
 def _plain_to_html(body: str) -> str:
+    """Render the plain body inside a clean, bordered branded box."""
     paras = body.strip().split("\n\n")
-    esc = lambda t: (t.replace("&", "&amp;").replace("<", "&lt;")
-                     .replace(">", "&gt;").replace("\n", "<br>\n"))
-    divs = "\n".join(f"<p>{esc(p.strip())}</p>" for p in paras if p.strip())
-    return (f'<html><body style="font-family: Calibri, Arial, sans-serif; '
-            f'font-size: 11pt; color: #000;">\n{divs}\n</body></html>')
+
+    def esc(t: str) -> str:
+        return (t.replace("&", "&amp;").replace("<", "&lt;")
+                .replace(">", "&gt;").replace("\n", "<br>\n"))
+
+    inner = "\n".join(
+        f'<p style="margin:0 0 12px 0;">{esc(p.strip())}</p>'
+        for p in paras if p.strip()
+    )
+    return (
+        '<html><body style="margin:0; padding:24px; background:#f4f5f7; '
+        'font-family: Aptos, Calibri, Arial, sans-serif; font-size:11pt; color:#1a1a1a;">'
+        '<div style="max-width:640px; margin:0 auto; background:#ffffff; '
+        'border:1px solid #e1e4e8; border-radius:8px; overflow:hidden;">'
+        '<div style="height:6px; background:#0f4c81;"></div>'
+        f'<div style="padding:28px 32px; line-height:1.5;">{inner}</div>'
+        '<div style="padding:14px 32px; border-top:1px solid #eee; '
+        'background:#fafbfc; font-size:9pt; color:#8a8f98;">TD SYNNEX</div>'
+        '</div></body></html>'
+    )
 
 
 def write_eml(

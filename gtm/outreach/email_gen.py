@@ -10,7 +10,7 @@ import json
 import os
 import re
 
-from ..config.schema import CampaignConfig
+from ..config.schema import CampaignConfig, language_for_country
 
 
 def _first_name(full: str) -> str:
@@ -24,8 +24,13 @@ def _short(text: str, n: int = 220) -> str:
 
 
 def render_template(config: CampaignConfig, row: dict) -> tuple[str, str]:
-    """Return (subject, body) from the built-in bilingual template."""
-    lang = (config.outreach.language or config.language or "en").lower()
+    """Return (subject, body) from the built-in bilingual template.
+
+    Language is derived from the reseller's own country when available (e.g. a
+    Portuguese partner gets pt), else the campaign/outreach language.
+    """
+    lang = (language_for_country(row.get("country"))
+            or config.outreach.language or config.language or "en").lower()
     product = row.get("product") or (config.products[0].name if config.products else "our solution")
     company = row.get("company", "")
     first = _first_name(row.get("contact_name", ""))
@@ -47,6 +52,18 @@ def render_template(config: CampaignConfig, row: dict) -> tuple[str, str]:
             parts.append(f"Te recomendaríamos empezar por: {rec}.")
         parts.append("¿Tendrías disponibilidad para una breve llamada y explorarlo?")
         parts.append("\n".join(["Un saludo,", *signoff_lines]))
+    elif lang.startswith("pt"):
+        greet = f"Olá {first}," if first else "Olá,"
+        subject = config.outreach.subject or f"{company} × {product}: uma oportunidade para o seu portfólio"
+        parts = [
+            greet,
+            f"Escrevo da TD SYNNEX sobre {product}. {vp}".strip(),
+            f"Segundo a nossa análise, a {company} encaixa bem para o incorporar ao seu portfólio: {fit}".strip(),
+        ]
+        if rec:
+            parts.append(f"Recomendaríamos começar por: {rec}.")
+        parts.append("Teria disponibilidade para uma breve chamada para explorá-lo?")
+        parts.append("\n".join(["Cumprimentos,", *signoff_lines]))
     else:
         greet = f"Hi {first}," if first else "Hi,"
         subject = config.outreach.subject or f"{company} × {product}: a fit worth a conversation"

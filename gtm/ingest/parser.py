@@ -26,6 +26,8 @@ _HEADER_MAP = {
     "account": "company", "reseller": "company",
     "reseller name": "company", "resellername": "company", "partner name": "company",
     "website": "website", "url": "website", "domain": "website", "web": "website",
+    "country": "country", "end customer country": "country", "pais": "country",
+    "país": "country",
 }
 
 
