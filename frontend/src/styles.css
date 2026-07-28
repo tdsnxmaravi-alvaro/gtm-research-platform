@@ -1,0 +1,37 @@
+:root {
+  --blue: #0f4c81;
+  --bg: #f4f5f7;
+  --line: #e1e4e8;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Aptos, Calibri, Segoe UI, Arial, sans-serif; background: var(--bg); color: #1a1a1a; }
+.app { max-width: 900px; margin: 0 auto; padding: 24px; }
+header { display: flex; align-items: center; justify-content: space-between; }
+header h1 { font-size: 20px; }
+nav button, .actions button, .stages button { cursor: pointer; }
+nav button { border: 0; background: none; padding: 8px 12px; border-radius: 6px; }
+nav button.on { background: var(--blue); color: #fff; }
+.card { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 20px; margin-top: 16px; }
+.steps { display: flex; gap: 8px; list-style: none; padding: 0; margin: 0 0 16px; }
+.steps li { flex: 1; text-align: center; padding: 6px; border-radius: 6px; background: #eef1f4; font-size: 13px; color: #8a8f98; }
+.steps li.on { background: var(--blue); color: #fff; }
+.steps li.done { background: #d6e4f0; color: var(--blue); }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.choice { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.choice.on { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(15,76,129,.15); }
+.choice span { color: #6b7280; font-size: 13px; }
+.grid { display: grid; gap: 12px; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
+input, select, textarea { font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
+.review { background: #0d1117; color: #c9d1d9; padding: 14px; border-radius: 8px; overflow: auto; font-size: 12px; }
+.actions { display: flex; justify-content: space-between; margin-top: 20px; }
+.actions .primary, .stages button { background: var(--blue); color: #fff; border: 0; padding: 8px 16px; border-radius: 6px; }
+.actions button:disabled { opacity: .5; }
+.row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; }
+.stages { display: flex; gap: 6px; }
+.stages button { font-size: 12px; }
+.status { grid-column: 1 / -1; font-size: 13px; padding: 8px; border-radius: 6px; background: #f0f3f6; }
+.status.done { background: #e6f4ea; }
+.status.error { background: #fdecea; }
+.status.running { background: #fff7e6; }
+.error { color: #b3261e; }

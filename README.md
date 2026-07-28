@@ -138,7 +138,7 @@ App Service, AWS ECS/Fargate / App Runner, GCP Cloud Run. Managed Postgres
 | 2 | Enrichment (Apollo emails/phones + LARA web-search agent) | ✅ Done |
 | 3 | Consolidate master list + outreach (`.eml`) | ✅ Done |
 | 4 | Django + DRF API | 🚧 In progress (API scaffold + Docker done) |
-| 5 | React wizard UI | ⏳ Planned |
+| 5 | React wizard UI | 🚧 In progress (Vite + React scaffold) |
 
 Roadmap is tracked in [GitHub Issues](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues).
 CI runs the test suite on every push/PR (badge above).
