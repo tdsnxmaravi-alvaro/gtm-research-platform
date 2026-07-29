@@ -35,3 +35,13 @@ input, select, textarea { font: inherit; padding: 8px; border: 1px solid var(--l
 .status.error { background: #fdecea; }
 .status.running { background: #fff7e6; }
 .error { color: #b3261e; }
+.estimate { background: #eef4fb; border: 1px solid #d6e4f0; border-radius: 6px; padding: 10px; font-size: 13px; color: var(--blue); }
+.row-inline { flex-direction: row; align-items: center; gap: 8px; font-weight: 600; }
+table.results { grid-column: 1 / -1; width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+table.results th, table.results td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+table.results th { color: #6b7280; font-weight: 600; }
+td.tier { font-weight: 700; text-align: center; }
+td.tier.tA { color: #1e7d34; }
+td.tier.tB { color: #0f4c81; }
+td.tier.tC { color: #9a6a00; }
+td.tier.tD { color: #8a8f98; }

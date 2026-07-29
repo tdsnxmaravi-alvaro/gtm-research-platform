@@ -43,3 +43,6 @@ frontend/.vite/
 Thumbs.db
 .vscode/
 .idea/
+
+# Stray VS Code workspace files (open the FOLDER, not a .code-workspace)
+*.code-workspace

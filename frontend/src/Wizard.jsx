@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { api } from "./api.js";
 
-const STEPS = ["Target", "Setup", "Product", "Review"];
+const STEPS = ["Target", "Setup", "Product", "Enrich", "Outreach", "Review"];
 
 export default function Wizard({ onCreated }) {
   const [step, setStep] = useState(0);
@@ -17,11 +17,22 @@ export default function Wizard({ onCreated }) {
     product_name: "",
     value_prop: "",
     fit_criteria: "",
+    want: "emails",
+    provider: "apollo",
+    max_contacts: 3,
+    outreach_enabled: true,
+    min_tier: "B",
+    sender_name: "",
+    sender_email: "",
   });
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const setNum = (k) => (e) => setF({ ...f, [k]: Number(e.target.value) });
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
   const back = () => setStep((s) => Math.max(s - 1, 0));
+
+  const perCompany =
+    f.want === "none" ? 0 : f.max_contacts * (1 + (f.want === "emails+phones" ? 8 : 0));
 
   function buildConfig() {
     const cfg = {
@@ -37,6 +48,18 @@ export default function Wizard({ onCreated }) {
           fit_criteria: f.fit_criteria.split("\n").map((s) => s.trim()).filter(Boolean),
         },
       ],
+      enrichment: {
+        apollo: f.provider === "apollo" && f.want !== "none",
+        want: f.want,
+        provider: f.provider,
+        max_contacts: Number(f.max_contacts),
+      },
+      outreach: {
+        enabled: f.outreach_enabled,
+        min_tier: f.min_tier,
+        sender_name: f.sender_name,
+        sender_email: f.sender_email,
+      },
     };
     if (f.mode === "provided") cfg.provided_list_path = f.provided_list_path || "list.csv";
     return cfg;
@@ -111,6 +134,51 @@ export default function Wizard({ onCreated }) {
       )}
 
       {step === 3 && (
+        <section className="grid">
+          <h2>Enrichment</h2>
+          <label>What to find
+            <select value={f.want} onChange={set("want")}>
+              <option value="none">none (qualify only)</option>
+              <option value="emails">emails</option>
+              <option value="emails+phones">emails + phones</option>
+            </select>
+          </label>
+          <label>Provider
+            <select value={f.provider} onChange={set("provider")}>
+              <option value="apollo">Apollo (verified emails/phones, credits)</option>
+              <option value="lara">LARA web search (no Apollo credits)</option>
+            </select>
+          </label>
+          <label>Max contacts per company<input type="number" min="1" max="10" value={f.max_contacts} onChange={setNum("max_contacts")} /></label>
+          <div className="estimate">
+            {f.want === "none"
+              ? "No enrichment."
+              : `≈ ${perCompany} Apollo credits per company (${f.max_contacts} contacts${f.want === "emails+phones" ? " + phone reveals" : ""}).`}
+          </div>
+        </section>
+      )}
+
+      {step === 4 && (
+        <section className="grid">
+          <h2>Outreach</h2>
+          <label className="row-inline">
+            <input type="checkbox" checked={f.outreach_enabled}
+                   onChange={(e) => setF({ ...f, outreach_enabled: e.target.checked })} />
+            Generate .eml drafts
+          </label>
+          <label>Only for tiers ≥
+            <select value={f.min_tier} onChange={set("min_tier")}>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+            </select>
+          </label>
+          <label>Sender name<input value={f.sender_name} onChange={set("sender_name")} placeholder="Name for the signature" /></label>
+          <label>Sender email<input value={f.sender_email} onChange={set("sender_email")} placeholder="you@tdsynnex.com" /></label>
+        </section>
+      )}
+
+      {step === 5 && (
         <section>
           <h2>Review</h2>
           <pre className="review">{JSON.stringify(buildConfig(), null, 2)}</pre>
