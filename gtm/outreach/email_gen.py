@@ -109,19 +109,133 @@ def _clean_body(body: str) -> str:
 def generate_email(config: CampaignConfig, row: dict, use_agent: bool = False) -> tuple[str, str]:
     """Return (subject, body). Uses the LARA agent when requested + configured,
     else the deterministic template. Body is tidied either way."""
-    subject = body = None
+    pkg = generate_outreach(config, row, use_agent=use_agent, want_talking_points=False)
+    return pkg["subject"], pkg["body"]
+
+
+def generate_outreach(config: CampaignConfig, row: dict, use_agent: bool = False,
+                      want_talking_points: bool = False) -> dict:
+    """Return the full outreach package for one contact.
+
+    Keys: subject, body, followup_subject, followup_body, talking_points.
+    ``talking_points`` is only produced when ``want_talking_points`` is True — i.e.
+    a phone number was obtained for the contact (a call script only helps if you
+    can call). Missing agent fields fall back to deterministic templates.
+    """
+    pkg: dict = {}
     if use_agent:
         prov = _lara_agent()
         if prov is not None:
-            out = _agent_email(prov, config, row)
-            if out:
-                subject, body = out
-    if subject is None:
+            pkg = _agent_outreach(prov, config, row, want_talking_points) or {}
+
+    subject = pkg.get("subject")
+    body = pkg.get("body")
+    if not subject or not body:
         subject, body = render_template(config, row)
-    return subject, _clean_body(body)
+    followup_subject = pkg.get("followup_subject") or _followup_subject(subject)
+    followup_body = pkg.get("followup_body") or _template_followup(config, row)
+    talking_points = ""
+    if want_talking_points:
+        talking_points = pkg.get("talking_points") or _template_talking_points(config, row)
+    return {
+        "subject": subject,
+        "body": _clean_body(body),
+        "followup_subject": followup_subject,
+        "followup_body": _clean_body(followup_body),
+        "talking_points": _clean_body(talking_points),
+    }
+
+
+def _followup_subject(subject: str) -> str:
+    s = (subject or "").strip()
+    return s if s.lower().startswith("re:") else f"Re: {s}"
+
+
+def _template_followup(config: CampaignConfig, row: dict) -> str:
+    """Deterministic short follow-up email body (used when no agent copy)."""
+    lang = (config.outreach.language
+            or language_for_country(row.get("country"))
+            or config.language or "en").lower()
+    first = _first_name(row.get("contact_name", ""))
+    company = row.get("company", "")
+    product = row.get("product") or (config.products[0].name if config.products else "our solution")
+    sig_name = (config.outreach.sender_name or "").strip()
+    if lang.startswith("es"):
+        greet = f"Hola {first}:" if first else "Hola:"
+        lines = [greet,
+                 f"Retomo mi mensaje anterior sobre {product} para {company}.",
+                 "Sigue en pie una breve llamada para verlo con calma; "
+                 "si lo lleva otra persona, con gusto me pones en contacto.",
+                 "\n".join(["Un saludo,", sig_name, "TD SYNNEX"] if sig_name
+                           else ["Un saludo,", "El equipo Datech de TD SYNNEX"])]
+    elif lang.startswith("pt"):
+        greet = f"Olá {first}," if first else "Olá,"
+        lines = [greet,
+                 f"Retomando a minha mensagem anterior sobre {product} para a {company}.",
+                 "Continua de pé uma breve chamada para o vermos com calma; "
+                 "se for outra pessoa a tratar disto, agradeço que me encaminhe.",
+                 "\n".join(["Cumprimentos,", sig_name, "TD SYNNEX"] if sig_name
+                           else ["Cumprimentos,", "A equipa Datech da TD SYNNEX"])]
+    else:
+        greet = f"Hi {first}," if first else "Hi,"
+        lines = [greet,
+                 f"Circling back on my earlier note about {product} for {company}.",
+                 "A short call still stands whenever it suits you; if someone else owns "
+                 "this, please point me their way.",
+                 "\n".join(["Best regards,", sig_name, "TD SYNNEX"] if sig_name
+                           else ["Best regards,", "The TD SYNNEX Datech Team"])]
+    return "\n\n".join(lines)
+
+
+def _template_talking_points(config: CampaignConfig, row: dict) -> str:
+    """Deterministic call-script bullets (used when no agent copy)."""
+    lang = (config.outreach.language
+            or language_for_country(row.get("country"))
+            or config.language or "en").lower()
+    first = _first_name(row.get("contact_name", ""))
+    company = row.get("company", "")
+    product = row.get("product") or (config.products[0].name if config.products else "our solution")
+    fit = _short(row.get("fit_summary", ""), 160)
+    rec = row.get("recommended_products", "")
+    if lang.startswith("es"):
+        pts = [
+            f"Apertura: {first or 'Hola'}, te llamo de TD SYNNEX Datech; sumamos partners de {product} "
+            f"donde ya encaja el flujo de trabajo del cliente.",
+            f"Encaje: por qué {company} encaja — {fit}." if fit else f"Encaje: {company} encaja bien.",
+            f"Historia de ingresos: {product} añade una línea de software (licencias + migración, "
+            "formación e implementación).",
+            f"Siguiente paso: empezar por {rec}." if rec else "Siguiente paso: una breve llamada para verlo.",
+        ]
+    elif lang.startswith("pt"):
+        pts = [
+            f"Abertura: {first or 'Olá'}, ligo da TD SYNNEX Datech; estamos a somar parceiros de {product} "
+            "onde o fluxo de trabalho do cliente já encaixa.",
+            f"Encaixe: porque é que a {company} encaixa — {fit}." if fit else f"Encaixe: a {company} encaixa bem.",
+            f"História de receita: {product} acrescenta uma linha de software (licenças + migração, "
+            "formação e implementação).",
+            f"Próximo passo: começar por {rec}." if rec else "Próximo passo: uma breve chamada.",
+        ]
+    else:
+        pts = [
+            f"Opener: {first or 'Hi'}, calling from TD SYNNEX Datech — we're adding {product} reseller "
+            "partners where that workflow is already part of the customer conversation.",
+            f"Fit: why {company} fits — {fit}." if fit else f"Fit: {company} looks like a strong fit.",
+            f"Revenue story: {product} adds a software line (licensing plus migration, training and "
+            "implementation services).",
+            f"Next step: start with {rec}." if rec else "Next step: a short call to explore it.",
+        ]
+    return "\n".join(f"• {p}" for p in pts)
 
 
 def _agent_email(prov, config: CampaignConfig, row: dict) -> tuple[str, str] | None:
+    pkg = _agent_outreach(prov, config, row, want_talking_points=False)
+    if pkg and pkg.get("subject") and pkg.get("body"):
+        return str(pkg["subject"]), str(pkg["body"])
+    return None
+
+
+def _agent_outreach(prov, config: CampaignConfig, row: dict,
+                    want_talking_points: bool) -> dict | None:
     lang = (config.outreach.language
             or language_for_country(row.get("country"))
             or config.language or "en")
@@ -129,15 +243,30 @@ def _agent_email(prov, config: CampaignConfig, row: dict) -> tuple[str, str] | N
                   "fr": "French", "de": "German", "it": "Italian"}
     lang_name = lang_names.get(lang, lang)
     product = row.get("product") or (config.products[0].name if config.products else "")
+    schema = ('{"subject": "...", "body": "...", '
+              '"followup_subject": "...", "followup_body": "..."')
+    tp_line = ""
+    if want_talking_points:
+        schema += ', "talking_points": "..."'
+        tp_line = (
+            "Also write 'talking_points': 4-6 short bullet lines (each prefixed with '• ', "
+            "separated by \\n) as a phone-call script for this contact — an opener, why this "
+            "specific company fits, the revenue/margin story, and a soft next step. "
+        )
+    schema += "}"
     prompt = (
         "Write a concise, warm B2B outreach email (no fluff) for a channel/reseller "
-        f"recruitment motion. Write the ENTIRE email — subject AND body — in {lang_name} "
-        f"({lang}); do NOT use English unless the language is English. Product: {product}. "
-        f"Company: {row.get('company','')}. Contact: {row.get('contact_name','')} "
-        f"({row.get('title','')}). Why they fit: {row.get('fit_summary','')}. "
+        f"recruitment motion. Write EVERYTHING — subject, body, follow-up and any talking "
+        f"points — in {lang_name} ({lang}); do NOT use English unless the language is English. "
+        f"Product: {product}. Company: {row.get('company','')}. "
+        f"Contact: {row.get('contact_name','')} ({row.get('title','')}). "
+        f"Why they fit: {row.get('fit_summary','')}. "
         f"Recommended products: {row.get('recommended_products','')}. "
         f"Sender: {config.outreach.sender_name or 'TD SYNNEX'}.\n\n"
-        'Return ONLY JSON: {"subject": "...", "body": "..."} with \\n line breaks in body.'
+        "Also write a short follow-up email: 'followup_subject' as 'Re: <the subject>' and a "
+        "2-4 line 'followup_body' that politely circles back and restates the single value point. "
+        + tp_line +
+        f'Return ONLY JSON: {schema} with \\n line breaks inside each body.'
     )
     try:
         resp = prov.send(prompt)
@@ -159,7 +288,7 @@ def _agent_email(prov, config: CampaignConfig, row: dict) -> tuple[str, str] | N
             return None
     if not isinstance(data, dict):
         return None
-    subj, body = data.get("subject"), data.get("body")
-    if subj and body:
-        return str(subj), str(body)
-    return None
+    return {k: str(v) for k, v in data.items()
+            if k in ("subject", "body", "followup_subject", "followup_body", "talking_points")
+            and v}
+

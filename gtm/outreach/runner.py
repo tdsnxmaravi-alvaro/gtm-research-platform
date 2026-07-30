@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 from ..config.schema import CampaignConfig
-from .email_gen import generate_email
+from .email_gen import generate_outreach
 from .eml import write_eml
 
 _TIER_ORDER = {"A": 0, "B": 1, "C": 2, "D": 3, "": 9}
@@ -93,8 +93,12 @@ def run_outreach(
             print(f"Outreach template: vendor '{config.vendor}' -> {template_eml}")
 
     drafts: list[dict] = []
+    outreach_rows: list[dict] = []
     for i, r in enumerate(targets, 1):
-        subject, body = generate_email(config, r, use_agent=use_agent)
+        phone = (r.get("direct_phone") or r.get("corporate_phone") or "").strip()
+        pkg = generate_outreach(config, r, use_agent=use_agent,
+                                want_talking_points=bool(phone))
+        subject, body = pkg["subject"], pkg["body"]
         fname = f"{r.get('tier','')}_{_safe(r.get('company',''))}_{_safe(r.get('contact_name',''))}.eml"
         path = write_eml(
             eml_dir / fname,
@@ -106,8 +110,21 @@ def run_outreach(
             logo_path=logo_path,
         )
         drafts.append({"company": r.get("company"), "email": r["email"], "eml": str(path)})
+        outreach_rows.append({
+            "company": r.get("company", ""), "tier": r.get("tier", ""),
+            "score": r.get("score", ""), "contact_name": r.get("contact_name", ""),
+            "title": r.get("title", ""), "email": r.get("email", ""), "phone": phone,
+            "subject": subject, "body": body,
+            "followup_subject": pkg["followup_subject"], "followup_body": pkg["followup_body"],
+            "talking_points": pkg["talking_points"],
+        })
         if progress_cb:
             progress_cb(i, len(targets))
+
+    # Add/refresh the 'Outreach' tab on the existing master.xlsx (no extra file).
+    if outreach_rows:
+        from ..consolidate.master import write_outreach_sheet
+        write_outreach_sheet(out, outreach_rows)
 
     print(f"Outreach: {len(drafts)} .eml drafts -> {eml_dir}")
     return drafts

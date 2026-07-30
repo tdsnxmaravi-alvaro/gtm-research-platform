@@ -42,6 +42,16 @@ CONTACTS_SHEET = [
     ("City", "city"), ("State", "state"), ("Country", "country"),
 ]
 
+# "Outreach" sheet — one row per company (the ready-to-send copy). Talking points
+# are only filled when a phone number was obtained for the contact.
+OUTREACH_SHEET = [
+    ("Company", "company"), ("Tier", "tier"), ("Score", "score"),
+    ("Contact", "contact_name"), ("Title", "title"), ("Email", "email"),
+    ("Phone", "phone"), ("Subject", "subject"), ("Body", "body"),
+    ("Follow-up Subject", "followup_subject"), ("Follow-up Body", "followup_body"),
+    ("Talking Points", "talking_points"),
+]
+
 _CONTACT_PRIORITY = ["president", "ceo", "owner", "founder", "managing director",
                      "director", "vp", "vice president", "head", "manager"]
 
@@ -212,24 +222,70 @@ def _write_xlsx(summary_rows: list[dict], contact_rows: list[dict], path: Path) 
     """Write a two-sheet workbook: 'Master Outreach' (per company) + 'All Contacts'."""
     try:
         from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-        from openpyxl.utils import get_column_letter
     except ImportError:
         return
+    wb = Workbook()
+    _fill_sheet(wb.active, "Master Outreach", SUMMARY_SHEET, summary_rows)
+    _fill_sheet(wb.create_sheet("All Contacts"), "All Contacts", CONTACTS_SHEET, contact_rows)
+    try:
+        wb.save(path)
+    except PermissionError:
+        print(f"  !! could not write {path.name} (is it open in Excel?). CSV written OK.")
 
-    _WIDTHS = {
-        "company": 30, "website": 26, "country": 12, "tier": 6, "score": 7,
-        "employees": 12, "software_resold": 44, "independence": 14, "apollo_verified": 14,
-        "validation": 11, "total_contacts": 13, "verified_emails": 14, "best_contact": 22,
-        "best_title": 24, "best_email": 28, "best_phone": 16, "all_verified_emails": 40,
-        "vendor": 14, "recommended_products": 32, "fit_summary": 60, "evidence_urls": 40,
-        "contact_name": 22, "title": 26, "email": 28, "email_status": 12,
-        "direct_phone": 16, "corporate_phone": 16, "linkedin": 30, "city": 16, "state": 14,
-    }
-    _WRAP = {"fit_summary", "evidence_urls", "recommended_products", "software_resold",
-             "all_verified_emails"}
-    _CENTER = {"tier", "score", "total_contacts", "verified_emails", "apollo_verified",
-               "validation", "employees"}
+
+def write_outreach_sheet(out_dir: str | Path, rows: list[dict]) -> None:
+    """Add/refresh an 'Outreach' sheet on the campaign's master.xlsx.
+
+    Keeps everything in one workbook (no extra Excel file). Called by the outreach
+    stage after drafts are generated; talking points are only present for contacts
+    whose phone number was obtained.
+    """
+    try:
+        from openpyxl import Workbook, load_workbook
+    except ImportError:
+        return
+    path = Path(out_dir) / "master.xlsx"
+    try:
+        if path.exists():
+            wb = load_workbook(path)
+        else:
+            wb = Workbook()
+            wb.remove(wb.active)  # drop the blank default sheet
+    except (OSError, ValueError):
+        wb = Workbook()
+        wb.remove(wb.active)
+    if "Outreach" in wb.sheetnames:
+        wb.remove(wb["Outreach"])
+    _fill_sheet(wb.create_sheet("Outreach"), "Outreach", OUTREACH_SHEET, rows)
+    try:
+        wb.save(path)
+    except PermissionError:
+        print(f"  !! could not write {path.name} (is it open in Excel?).")
+
+
+_XLSX_WIDTHS = {
+    "company": 30, "website": 26, "country": 12, "tier": 6, "score": 7,
+    "employees": 12, "software_resold": 44, "independence": 14, "apollo_verified": 14,
+    "validation": 11, "total_contacts": 13, "verified_emails": 14, "best_contact": 22,
+    "best_title": 24, "best_email": 28, "best_phone": 16, "all_verified_emails": 40,
+    "vendor": 14, "recommended_products": 32, "fit_summary": 60, "evidence_urls": 40,
+    "contact_name": 22, "title": 26, "email": 28, "email_status": 12,
+    "direct_phone": 16, "corporate_phone": 16, "linkedin": 30, "city": 16, "state": 14,
+    "phone": 16, "subject": 34, "body": 68, "followup_subject": 34,
+    "followup_body": 68, "talking_points": 68,
+}
+_XLSX_WRAP = {"fit_summary", "evidence_urls", "recommended_products", "software_resold",
+              "all_verified_emails", "subject", "body", "followup_subject",
+              "followup_body", "talking_points"}
+_XLSX_CENTER = {"tier", "score", "total_contacts", "verified_emails", "apollo_verified",
+                "validation", "employees"}
+
+
+def _fill_sheet(ws, title: str, spec: list, rows: list[dict]) -> None:
+    """Populate a worksheet from a (header, key) spec with the shared styling."""
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
     tier_fill = {
         "A": PatternFill("solid", fgColor="C6EFCE"), "B": PatternFill("solid", fgColor="BDD7EE"),
         "C": PatternFill("solid", fgColor="FFF2CC"), "D": PatternFill("solid", fgColor="F2F2F2"),
@@ -239,35 +295,26 @@ def _write_xlsx(summary_rows: list[dict], contact_rows: list[dict], path: Path) 
     thin = Side(style="thin", color="D9D9D9")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-    def _fill(ws, title, spec, rows):
-        ws.title = title
-        for col, (header, _key) in enumerate(spec, 1):
-            cell = ws.cell(row=1, column=col, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.title = title
+    for col, (header, _key) in enumerate(spec, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border
+    for ri, r in enumerate(rows, 2):
+        for ci, (_header, key) in enumerate(spec, 1):
+            cell = ws.cell(row=ri, column=ci, value=r.get(key, ""))
             cell.border = border
-        for ri, r in enumerate(rows, 2):
-            for ci, (_header, key) in enumerate(spec, 1):
-                cell = ws.cell(row=ri, column=ci, value=r.get(key, ""))
-                cell.border = border
-                cell.alignment = Alignment(vertical="top", wrap_text=key in _WRAP,
-                                           horizontal="center" if key in _CENTER else "left")
-                if key == "tier":
-                    fill = tier_fill.get(str(r.get("tier", "")).upper())
-                    if fill:
-                        cell.fill = fill
-                        cell.font = Font(bold=True)
-        for col, (_header, key) in enumerate(spec, 1):
-            ws.column_dimensions[get_column_letter(col)].width = _WIDTHS.get(key, 16)
-        ws.freeze_panes = "A2"
-        if rows:
-            ws.auto_filter.ref = ws.dimensions
-
-    wb = Workbook()
-    _fill(wb.active, "Master Outreach", SUMMARY_SHEET, summary_rows)
-    _fill(wb.create_sheet("All Contacts"), "All Contacts", CONTACTS_SHEET, contact_rows)
-    try:
-        wb.save(path)
-    except PermissionError:
-        print(f"  !! could not write {path.name} (is it open in Excel?). CSV written OK.")
+            cell.alignment = Alignment(vertical="top", wrap_text=key in _XLSX_WRAP,
+                                       horizontal="center" if key in _XLSX_CENTER else "left")
+            if key == "tier":
+                fill = tier_fill.get(str(r.get("tier", "")).upper())
+                if fill:
+                    cell.fill = fill
+                    cell.font = Font(bold=True)
+    for col, (_header, key) in enumerate(spec, 1):
+        ws.column_dimensions[get_column_letter(col)].width = _XLSX_WIDTHS.get(key, 16)
+    ws.freeze_panes = "A2"
+    if rows:
+        ws.auto_filter.ref = ws.dimensions
