@@ -42,6 +42,25 @@ class CampaignViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST)
         return Response({"valid": True})
 
+    @action(detail=False, methods=["post"])
+    def preview_prompt(self, request):
+        """Render the research prompt for an unsaved config (wizard prompt builder).
+
+        Always builds from the template (ignores any existing search_prompt) so the
+        client can regenerate a fresh prompt. Provided-mode companies are represented
+        by the [[COMPANIES]] sentinel, spliced in at run time.
+        """
+        from gtm.prompts import build_prompt
+        cfg = request.data.get("config", request.data)
+        try:
+            config = _load_config(cfg)
+        except Exception as exc:  # noqa: BLE001
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        product = config.products[0].model_copy(update={"search_prompt": None})
+        vert = config.verticals[0] if config.verticals else None
+        prompt = build_prompt(config, product, vertical=vert)
+        return Response({"prompt": prompt})
+
     def _start(self, campaign, stage) -> Run:
         run = Run.objects.create(campaign=campaign, stage=stage, status="pending")
         run_stage.delay(run.id, campaign.config, stage, campaign.name)

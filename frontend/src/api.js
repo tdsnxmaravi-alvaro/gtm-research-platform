@@ -18,6 +18,8 @@ export const api = {
   listCampaigns: () => req("/campaigns/"),
   createCampaign: (name, config) =>
     req("/campaigns/", { method: "POST", body: JSON.stringify({ name, config }) }),
+  previewPrompt: (config) =>
+    req("/campaigns/preview_prompt/", { method: "POST", body: JSON.stringify({ config }) }),
   runStage: (id, stage) => req(`/campaigns/${id}/${stage}/`, { method: "POST" }),
   results: (id) => req(`/campaigns/${id}/results/`),
   getRun: (id) => req(`/runs/${id}/`),

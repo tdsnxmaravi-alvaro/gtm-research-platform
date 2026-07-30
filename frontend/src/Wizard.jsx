@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { api } from "./api.js";
 
-const STEPS = ["Target", "Setup", "Details", "Enrich", "Outreach", "Review"];
+const STEPS = ["Target", "Setup", "Details", "Prompt", "Enrich", "Outreach", "Review"];
 const VENDORS = ["Bricsys", "DraftSight", "Novade", "Newforma", "Unity", "Trimble"];
 const ALL_TIERS = ["A", "B", "C", "D"];
 
@@ -12,6 +12,8 @@ export default function Wizard({ onCreated }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [promptErr, setPromptErr] = useState("");
   const [f, setF] = useState({
     name: "",
     target_type: "resellers",
@@ -21,6 +23,7 @@ export default function Wizard({ onCreated }) {
     provided_list_path: "",
     value_prop: "",
     fit_criteria: "",
+    search_prompt: "",
     want: "emails",
     provider: "apollo",
     max_contacts: 3,
@@ -41,20 +44,24 @@ export default function Wizard({ onCreated }) {
 
   // --- per-step validation (#7) ---
   function stepError(s) {
-    if (s === 1) {
+    const name = STEPS[s];
+    if (name === "Setup") {
       if (!f.name.trim()) return "Campaign name is required.";
       if (!f.vendor) return "Pick a vendor.";
       if (!f.country.trim()) return "Country is required.";
       if (f.mode === "provided" && !f.provided_list_path.trim())
         return "Provide the list path (or upload the list).";
     }
-    if (s === 2) {
+    if (name === "Details") {
       if (!f.value_prop.trim() && !f.fit_criteria.trim())
         return "Add a value proposition or at least one fit criterion.";
     }
-    if (s === 3 && f.want !== "none" && f.max_contacts < 1)
+    if (name === "Prompt") {
+      if (!f.search_prompt.trim()) return "The research prompt cannot be empty.";
+    }
+    if (name === "Enrich" && f.want !== "none" && f.max_contacts < 1)
       return "Max contacts must be ≥ 1.";
-    if (s === 4 && f.outreach_enabled) {
+    if (name === "Outreach" && f.outreach_enabled) {
       if (f.tiers.length === 0) return "Select at least one tier for outreach.";
       if (!f.sender_name.trim()) return "Sender name is required for outreach.";
       if (!emailOk(f.sender_email)) return "A valid sender email is required for outreach.";
@@ -63,7 +70,8 @@ export default function Wizard({ onCreated }) {
   }
 
   const curErr = stepError(step);
-  const priorValid = [0, 1, 2, 3].every((s) => !stepError(s));
+  const enrichIdx = STEPS.indexOf("Enrich");
+  const priorValid = STEPS.slice(0, enrichIdx).every((_, i) => !stepError(i));
   const allValid = STEPS.every((_, i) => !stepError(i));
 
   const next = () => {
@@ -96,6 +104,7 @@ export default function Wizard({ onCreated }) {
           name: f.vendor || "Product",
           value_prop: f.value_prop,
           fit_criteria: f.fit_criteria.split("\n").map((s) => s.trim()).filter(Boolean),
+          ...(f.search_prompt.trim() ? { search_prompt: f.search_prompt } : {}),
         },
       ],
       enrichment: {
@@ -133,6 +142,27 @@ export default function Wizard({ onCreated }) {
     }
   }
 
+  async function regeneratePrompt() {
+    setPromptLoading(true);
+    setPromptErr("");
+    try {
+      const { prompt } = await api.previewPrompt(buildConfig());
+      setF((prev) => ({ ...prev, search_prompt: prompt }));
+    } catch (e) {
+      setPromptErr(String(e.message || e));
+    } finally {
+      setPromptLoading(false);
+    }
+  }
+
+  // Auto-fill the research prompt the first time the user reaches the Prompt step.
+  useEffect(() => {
+    if (STEPS[step] === "Prompt" && !f.search_prompt && !promptLoading && !promptErr) {
+      regeneratePrompt();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
   return (
     <div className="card">
       <ol className="steps">
@@ -141,7 +171,7 @@ export default function Wizard({ onCreated }) {
         ))}
       </ol>
 
-      {step === 0 && (
+      {STEPS[step] === "Target" && (
         <section>
           <h2>What are you targeting?</h2>
           <div className="choices">
@@ -163,7 +193,7 @@ export default function Wizard({ onCreated }) {
         </section>
       )}
 
-      {step === 1 && (
+      {STEPS[step] === "Setup" && (
         <section className="grid">
           <label>Campaign name<input value={f.name} onChange={set("name")} placeholder="trimble-iberia" /></label>
           <label>Vendor
@@ -188,15 +218,42 @@ export default function Wizard({ onCreated }) {
         </section>
       )}
 
-      {step === 2 && (
+      {STEPS[step] === "Details" && (
         <section className="grid">
           <label>Value proposition<textarea value={f.value_prop} onChange={set("value_prop")} rows={3} placeholder="Why this vendor fits this audience…" /></label>
           <label>Fit criteria (one per line)<textarea value={f.fit_criteria} onChange={set("fit_criteria")} rows={4} placeholder={"Sells CAD/design software\nActive construction projects"} /></label>
-          <small className="hint">These feed the research prompt. The vendor-driven prompt builder is coming (#12).</small>
+          <small className="hint">These feed the research prompt on the next step.</small>
         </section>
       )}
 
-      {step === 3 && (
+      {STEPS[step] === "Prompt" && (
+        <section className="grid">
+          <h2>Research prompt</h2>
+          <small className="hint">
+            Assembled from the vendor, target, country, fit criteria and scoring. Edit it freely — this exact text drives qualification.
+            {f.mode === "provided" ? " The [[COMPANIES]] marker is replaced with your uploaded list at run time." : ""}
+          </small>
+          {promptLoading ? (
+            <div className="estimate">Building prompt…</div>
+          ) : (
+            <textarea
+              className="prompt-area"
+              value={f.search_prompt}
+              onChange={set("search_prompt")}
+              rows={16}
+              spellCheck={false}
+            />
+          )}
+          {promptErr && <p className="error">{promptErr}</p>}
+          <div>
+            <button type="button" className="link" onClick={regeneratePrompt} disabled={promptLoading}>
+              ↻ Regenerate from template (discards edits)
+            </button>
+          </div>
+        </section>
+      )}
+
+      {STEPS[step] === "Enrich" && (
         <section className="grid">
           <h2>Enrichment</h2>
           <label>What to find
@@ -232,7 +289,7 @@ export default function Wizard({ onCreated }) {
         </section>
       )}
 
-      {step === 4 && (
+      {STEPS[step] === "Outreach" && (
         <section className="grid">
           <h2>Outreach</h2>
           <label className="row-inline">
@@ -259,7 +316,7 @@ export default function Wizard({ onCreated }) {
         </section>
       )}
 
-      {step === 5 && (
+      {STEPS[step] === "Review" && (
         <section>
           <h2>Review</h2>
           <ul className="summary">

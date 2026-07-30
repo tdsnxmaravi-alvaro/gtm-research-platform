@@ -44,6 +44,11 @@ def _evidence_block(config: CampaignConfig) -> str:
     return templates.EVIDENCE_RULES.format(tier_cap=config.scoring.unverified_tier_cap)
 
 
+# Sentinel injected into a previewed/edited prompt where the provided companies
+# will be spliced in at run time (companies aren't known when editing the prompt).
+COMPANIES_TOKEN = "[[COMPANIES]]"
+
+
 def format_companies(
     rows: list[dict],
     fields: tuple[str, ...] = ("company", "website"),
@@ -79,6 +84,13 @@ def build_prompt(
     vertical: Vertical | None = None,
 ) -> str:
     """Build the final research prompt string for a campaign + product."""
+    # Explicit user-edited prompt (from the wizard prompt builder) wins over the
+    # template. Splice the provided companies into the sentinel when running.
+    if product.search_prompt:
+        base = product.search_prompt
+        if company_input is not None:
+            base = base.replace(COMPANIES_TOKEN, company_input)
+        return base
     key = config.prompt_template_key()
     template = templates.TEMPLATES[key]
     ctx = {
@@ -91,6 +103,6 @@ def build_prompt(
         "scoring": _scoring_block(config),
         "output_schema": templates.OUTPUT_SCHEMA,
         "vertical_name": vertical.name if vertical else "",
-        "company_input": company_input or "",
+        "company_input": company_input if company_input is not None else COMPANIES_TOKEN,
     }
     return template.format(**ctx)
