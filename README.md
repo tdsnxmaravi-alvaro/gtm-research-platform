@@ -111,6 +111,84 @@ pytest -q
 ## Backend API (Django + DRF)
 
 Thin HTTP wrapper over the `gtm` engine. Cloud-agnostic (12-factor): all config
+comes from environment variables; SQLite locally, Postgres in the cloud via
+`DATABASE_URL`; async pipeline stages via Celery + Redis (or run inline locally).
+
+## Running the servers
+
+The app is **two servers**: the **Django API** (backend) and the **Vite/React web
+app** (frontend). Run both.
+
+### Development (local, no Docker)
+
+Backend — from the repo root:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+pip install -e .                          # the gtm engine (+ extract-msg for templates)
+pip install -r backend/requirements.txt
+$env:CELERY_TASK_ALWAYS_EAGER = "true"    # run stages in a background thread — no Redis needed
+$env:GTM_DATA_ROOT = "$PWD\campaigns"     # where campaign results/state/caches are written
+python backend\manage.py migrate
+python backend\manage.py runserver 127.0.0.1:8000
+```
+
+Frontend — in a second terminal:
+
+```powershell
+cd frontend
+npm install
+npm run dev            # http://localhost:5173  (proxies /api -> 127.0.0.1:8000)
+```
+
+Open http://localhost:5173. Optional provider keys go in `.env` (`LARA_*`,
+`APOLLO_*`, `AZURE_OPENAI_*`); without them research/enrich/outreach use their
+offline fallbacks.
+
+> Restart `runserver` after editing Python so the new logic is loaded.
+
+### Production
+
+Run a real **Celery worker + Redis + Postgres**, serve the **built frontend** as
+static assets, and run Django under a WSGI server. The committed
+`docker-compose.yml` wires it all together:
+
+```powershell
+copy .env.example .env      # fill DATABASE_URL, CELERY_BROKER_URL, DJANGO_*, provider keys...
+docker compose up -d --build
+```
+
+That starts `web` (Django/gunicorn), `worker` (Celery), `redis` and `postgres`,
+mounting host `campaigns/` as `GTM_DATA_ROOT`. The manual (no-Docker) equivalent:
+
+```powershell
+# API (WSGI)
+pip install -e . -r backend/requirements.txt gunicorn
+python backend\manage.py migrate
+python backend\manage.py collectstatic --noinput
+gunicorn gtm_api.wsgi --chdir backend --bind 0.0.0.0:8000
+# Worker (separate process) — needs CELERY_BROKER_URL pointing at Redis
+celery -A gtm_api --workdir backend worker -l info
+# Frontend — build once, serve frontend/dist behind your web server / CDN
+cd frontend; npm ci; npm run build
+```
+
+Key production env vars: `DATABASE_URL`, `CELERY_BROKER_URL`, `GTM_DATA_ROOT`,
+`DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, plus provider
+keys. Leave `CELERY_TASK_ALWAYS_EAGER` **unset/false** in production so stages run
+on the worker (not in the request).
+
+## Outreach templates (`templates/`)
+
+**Do not delete `templates/`.** It holds the per-vendor Outlook `.oft` branded
+email templates (Bricsys, Dassault → DraftSight, Novade, Newforma, Unity, Trimble).
+When a campaign's vendor matches one, its template is **auto-selected** for the
+`.eml` drafts — the logo and BDR signature are preserved and the generated body is
+injected. The folder is **required at runtime and committed to the repo**.
+
+Override per campaign by uploading a **custom header/logo** in the wizard (or your
+own `.eml`); custom always wins over the vendor default. Point at a different
+folder with `GTM_TEMPLATES_DIR`.
 via env vars, SQLite locally / Postgres via `DATABASE_URL` in the cloud.
 
 ```powershell
