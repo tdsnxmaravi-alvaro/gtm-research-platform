@@ -84,7 +84,8 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str) -> str:
         if stage == "research":
             from gtm.research import run_campaign
             results = run_campaign(config, out_dir=out_dir, limit=config.process_limit,
-                                   progress_cb=_progress, should_cancel=_should_cancel)
+                                   progress_cb=_progress, should_cancel=_should_cancel,
+                                   use_research_cache=config.research_cache)
             count = len(results)
             tiers = Counter((r.get("final_tier") or r.get("tier") or "?") for r in results)
             breakdown = ", ".join(f"{k}:{tiers[k]}" for k in ("A", "B", "C", "D") if tiers.get(k))

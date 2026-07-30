@@ -221,6 +221,9 @@ class CampaignConfig(BaseModel):
     provided_column_overrides: dict[str, str] = Field(default_factory=dict)
     # Cap how many companies from the provided list to process (0 = all).
     process_limit: int = 0
+    # Reuse a company's scored analysis for the same vendor/product across runs and
+    # campaigns (saves LLM tokens). Disable to force fresh research.
+    research_cache: bool = True
 
     scoring: Scoring = Field(default_factory=Scoring)
     enrichment: Enrichment = Field(default_factory=Enrichment)

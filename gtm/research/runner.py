@@ -22,6 +22,7 @@ from ..prompts import build_prompt, format_companies
 from ..ingest import parse_results, load_provided_list, write_rows_csv
 from ..scoring import score_results
 from ..providers import build_provider
+from .cache import ResearchCache, _domain_or_name
 
 OUT_COLS = [
     "product", "vertical", "company", "website", "country", "final_tier", "tier", "score",
@@ -168,11 +169,14 @@ def run_campaign(
     out_dir: str | Path | None = None,
     progress_cb=None,
     should_cancel=None,
+    use_research_cache: bool | None = None,
 ) -> list[dict]:
     out = Path(out_dir or (Path("campaigns") / config.name))
     logs = out / "logs"
     results_path = out / "results.csv"
     state_path = out / "state.json"
+    if use_research_cache is None:
+        use_research_cache = config.research_cache
 
     if provider is None:
         providers = _providers_for(config)
@@ -192,16 +196,44 @@ def run_campaign(
             pending = pending[:limit]
         print(f"Provided: {len(rows)} companies | pending {len(pending)} | batch {batch_size}")
 
-        total = len(pending)
+        cache = ResearchCache(path=out.parent / ".gtm_cache" / "research.json",
+                              enabled=use_research_cache)
+        total = len(pending) * max(1, len(config.products))
         processed = 0
         if progress_cb:
             progress_cb(0, total)
         for product in config.products:
-            for i in range(0, len(pending), batch_size):
+            # Reuse a company's scored analysis for the same vendor/product/domain.
+            to_research: list[dict] = []
+            hits = 0
+            for r in pending:
+                ck = ResearchCache.key(config.vendor, config.target_type.value,
+                                       product.name, _domain_or_name(r))
+                cached = cache.get(ck)
+                if cached is not None:
+                    row = dict(cached)
+                    row["company"] = r.get("company") or row.get("company", "")
+                    row["product"] = product.name
+                    row["vertical"] = ""
+                    row["country"] = r.get("country") or config.country
+                    all_results.append(row)
+                    done.add(r.get("company"))
+                    hits += 1
+                    processed += 1
+                    if progress_cb:
+                        progress_cb(processed, total)
+                else:
+                    to_research.append(r)
+            if hits:
+                _save_state(state_path, done)
+                write_rows_csv(all_results, results_path, columns=OUT_COLS)
+                print(f"  {product.name}: {hits} reused from research cache")
+
+            for i in range(0, len(to_research), batch_size):
                 if should_cancel and should_cancel():
                     print("  canceled — stopping after saved progress")
                     return all_results
-                batch = pending[i:i + batch_size]
+                batch = to_research[i:i + batch_size]
                 prompt = build_prompt(config, product,
                                       company_input=format_companies(batch))
                 tag = f"{product.name}_batch{i//batch_size+1}"
@@ -209,11 +241,15 @@ def run_campaign(
                 # Attach each company's country (from the provided list) to its result.
                 country_by = {(b.get("company") or "").strip().lower(): b.get("country", "")
                               for b in batch}
+                domain_by = {(b.get("company") or "").strip().lower(): _domain_or_name(b)
+                             for b in batch}
                 for r in scored:
+                    comp = (r.get("company") or "").strip().lower()
                     r["product"] = product.name
                     r["vertical"] = ""
-                    r["country"] = country_by.get((r.get("company") or "").strip().lower(),
-                                                  config.country)
+                    r["country"] = country_by.get(comp, config.country)
+                    cache.put(ResearchCache.key(config.vendor, config.target_type.value,
+                                                product.name, domain_by.get(comp, comp)), r)
                 all_results.extend(scored)
                 # Only mark companies done when the batch produced results, so a
                 # transient provider error (e.g. HTTP 499) is retried on resume.

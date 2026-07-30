@@ -64,6 +64,8 @@ DATABASES = {
 
 # Where campaign run artifacts (results/contacts/master/eml) are written.
 GTM_DATA_ROOT = Path(os.getenv("GTM_DATA_ROOT", BASE_DIR / "data"))
+# Vendor .oft outreach templates live at the repo root /templates.
+os.environ.setdefault("GTM_TEMPLATES_DIR", str(BASE_DIR.parent / "templates"))
 
 AUTH_PASSWORD_VALIDATORS = []
 LANGUAGE_CODE = "en-us"
