@@ -90,6 +90,9 @@ export default function Campaigns({ onEdit }) {
   }
 
   async function start(id, config) {
+    // Optimistic: reflect "running" immediately so Start disables and Pause/Stop enable.
+    setRuns((r) => ({ ...r, [id]: { status: "pending", stage: "research", processed: 0, total: 0 } }));
+    setStageRuns((s) => ({ ...s, [id]: { ...(s[id] || {}), research: { stage: "research", status: "pending" } } }));
     try {
       await api.start(id);
       pollPipeline(id, config);

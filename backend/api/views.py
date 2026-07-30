@@ -89,12 +89,65 @@ class CampaignViewSet(viewsets.ModelViewSet):
         if not preset:
             return Response({"vendor": vendor, "known": False,
                              "vendors": sorted(VENDOR_PRESETS)})
+        from gtm.scoring.library import universal_dimensions
+
+        def _dim(d):
+            return {"name": d["name"], "max_points": d["max_points"],
+                    "description": d.get("description", "")}
+
         return Response({
             "vendor": vendor, "known": True,
             "product_name": preset["product_name"],
             "value_prop": preset["value_prop"],
             "fit_criteria": preset["fit_criteria"],
+            "universal_dimensions": [_dim(d) for d in universal_dimensions(target_type)],
+            "specific_dimensions": [_dim(d) for d in preset["dimensions"]],
         })
+
+    @action(detail=False, methods=["post"])
+    def outreach_preview(self, request):
+        """Render the outreach email HTML (vendor branded template + sample body in
+        the chosen language) for the wizard preview. Inline images are inlined as
+        data URIs so the logo shows in an iframe."""
+        import base64
+
+        from gtm.config.schema import CampaignConfig
+        from gtm.outreach.email_gen import render_template
+        from gtm.outreach.eml import _plain_to_html, load_eml_template, apply_template
+        from gtm.outreach.oft import vendor_template_eml
+        from gtm.prompts import enrich_config_dict
+
+        cfg = enrich_config_dict(request.data.get("config", request.data))
+        try:
+            config = CampaignConfig(**cfg)
+        except Exception as exc:  # noqa: BLE001
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        row = {"company": "Acme Solutions SL", "contact_name": "Pablo",
+               "country": config.country or "Spain",
+               "product": config.products[0].name if config.products else "",
+               "fit_summary": "a strong fit for this vendor's portfolio"}
+        subject, body = render_template(config, row)
+
+        html = None
+        tpl = config.outreach.template_eml
+        if not tpl and not config.outreach.logo_path and config.vendor:
+            tpl = vendor_template_eml(config.vendor, Path(settings.GTM_DATA_ROOT) / ".templates")
+        if tpl:
+            try:
+                tpl_html, imgs = load_eml_template(tpl)
+                html = apply_template(tpl_html, body) if tpl_html else None
+                if html:
+                    for im in imgs:
+                        uri = (f"data:image/{im['subtype']};base64,"
+                               + base64.b64encode(im["data"]).decode())
+                        html = html.replace(f"cid:{im['cid']}", uri)
+            except Exception:  # noqa: BLE001
+                html = None
+        if html is None:
+            html = _plain_to_html(body)
+        source = "vendor template" if tpl else "built-in frame"
+        return Response({"subject": subject, "html": html, "source": source})
 
     @action(detail=False, methods=["post"])
     def upload_logo(self, request):

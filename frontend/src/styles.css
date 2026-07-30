@@ -17,7 +17,7 @@ nav button.on { background: var(--blue); color: #fff; }
 .steps li.on { background: var(--blue); color: #fff; }
 .steps li.done { background: #d6e4f0; color: var(--blue); }
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.choice { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.choice { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; }
 .choice.on { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(15,76,129,.15); }
 .choice span { color: #6b7280; font-size: 13px; }
 .grid { display: grid; gap: 12px; }
@@ -82,3 +82,12 @@ details summary::-webkit-details-marker { display: none; }
 .mailframe .brandbar { height: 6px; background: var(--blue); }
 .mailframe .mailbody { padding: 20px 22px; font-size: 13px; line-height: 1.5; }
 .mailframe .mailbody p { margin: 0 0 10px; }
+.mailpreview { width: 100%; height: 460px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.criteria { display: grid; gap: 14px; margin: 6px 0 4px; }
+.crit-group h4 { margin: 0 0 8px; font-size: 14px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.crit-card { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: #f6f8fa; }
+.crit-card.spec { background: #eef4fb; border-color: #d6e4f0; }
+.crit-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.crit-top span { color: var(--blue); font-weight: 600; white-space: nowrap; }
+.crit-card small { color: #6b7280; font-size: 12px; }

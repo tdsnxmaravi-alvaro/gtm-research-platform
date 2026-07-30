@@ -48,7 +48,9 @@ def find_vendor_template(vendor: str, directory: Path | None = None) -> Path | N
 
 
 def _inject_body_marker(html: str) -> str:
-    """Insert {{BODY}} into the first empty body cell after the banner image."""
+    """Insert {{BODY}} into the first empty body cell after the banner image, then
+    strip the placeholder BDR signature (text after the body) so the draft ends on
+    the branded footer. Keeps tags/colored bars — only blanks visible signature text."""
     img = re.search(r'<img[^>]+cid:[^>]+>', html, re.I)
     start = img.end() if img else 0
     head, tail = html[:start], html[start:]
@@ -67,9 +69,21 @@ def _inject_body_marker(html: str) -> str:
 
     tail = re.compile(r"(<td\b[^>]*padding:15[^>]*>)(.*?)(</td>)", re.I | re.S).sub(_once, tail)
     if not injected["done"]:
-        # Fallback: drop the body right after the banner image.
         tail = f"<div>{BODY_MARKER}</div>" + tail
-    return head + tail
+
+    html = head + tail
+    # Blank visible text nodes AFTER the marker (the placeholder signature); the
+    # branded footer bars are empty/colored cells and are preserved.
+    idx = html.find(BODY_MARKER)
+    if idx >= 0:
+        cut = idx + len(BODY_MARKER)
+
+        def _blank(m: re.Match) -> str:
+            t = m.group(1)
+            return "> <" if (t.strip() and t.strip() != "&nbsp;") else m.group(0)
+
+        html = html[:cut] + re.sub(r">([^<]+)<", _blank, html[cut:])
+    return html
 
 
 def oft_to_eml(oft_path: str | Path, out_path: str | Path) -> Path:
@@ -83,9 +97,11 @@ def oft_to_eml(oft_path: str | Path, out_path: str | Path) -> Path:
 
     images: list[tuple[str, str, bytes]] = []
     for a in msg_o.attachments:
-        cid = (getattr(a, "cid", "") or "").strip("<>")
+        # Outlook cids/mimetypes can carry stray null bytes — sanitize so the
+        # Content-ID matches the HTML's cid: reference (else the image breaks).
+        cid = (getattr(a, "cid", "") or "").replace("\x00", "").strip().strip("<>")
         data = getattr(a, "data", None)
-        mimetype = getattr(a, "mimetype", "") or ""
+        mimetype = (getattr(a, "mimetype", "") or "").replace("\x00", "").strip()
         if cid and data and mimetype.startswith("image"):
             images.append((cid, mimetype.split("/")[-1] or "png", data))
 
@@ -104,14 +120,16 @@ def oft_to_eml(oft_path: str | Path, out_path: str | Path) -> Path:
 
 
 def vendor_template_eml(vendor: str, cache_dir: Path) -> str | None:
-    """Resolve (and cache) a vendor's branded `.eml` template, or None if absent."""
+    """Resolve a vendor's branded `.eml` template, or None if absent.
+
+    Regenerated each call (conversion is cheap) so template/code changes take effect.
+    """
     oft = find_vendor_template(vendor)
     if not oft:
         return None
     eml = Path(cache_dir) / f"{(vendor or 'vendor').strip()}.eml"
     try:
-        if not eml.exists() or eml.stat().st_mtime < oft.stat().st_mtime:
-            oft_to_eml(oft, eml)
+        oft_to_eml(oft, eml)
     except Exception:  # noqa: BLE001 - never block outreach on template issues
         return None
     return str(eml)

@@ -58,6 +58,8 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
   const [uploadErr, setUploadErr] = useState("");
   const [listReport, setListReport] = useState(null);
   const [logoUrl, setLogoUrl] = useState("");
+  const [dims, setDims] = useState({ universal: [], specific: [] });
+  const [emailPreview, setEmailPreview] = useState({ html: "", source: "", loading: false });
   const [f, setF] = useState(() =>
     initialConfig
       ? hydrate(initialConfig)
@@ -310,6 +312,28 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
+  // Load the qualification criteria (universal vs vendor-specific) for the cards.
+  useEffect(() => {
+    if (STEPS[step] !== "Prompt" || !f.vendor) return;
+    api.vendorPreset(f.vendor, f.target_type)
+      .then((p) => p.known && setDims({
+        universal: p.universal_dimensions || [],
+        specific: p.specific_dimensions || [],
+      }))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, f.vendor, f.target_type]);
+
+  // Live email preview (real vendor template + sample body in the chosen language).
+  useEffect(() => {
+    if (STEPS[step] !== "Outreach" || !f.outreach_enabled) return;
+    setEmailPreview((p) => ({ ...p, loading: true }));
+    api.outreachPreview(buildConfig())
+      .then((r) => setEmailPreview({ html: r.html || "", source: r.source || "", loading: false }))
+      .catch(() => setEmailPreview({ html: "", source: "", loading: false }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, f.vendor, f.outreach_language, f.logo_path]);
+
   return (
     <div className="card">
       <ol className="steps">
@@ -426,6 +450,32 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
             <li>Requires a source URL for every claim — without evidence a company can’t exceed the capped tier.</li>
             <li>Edit the prompt directly, or tweak the value prop / fit criteria below and regenerate.</li>
           </ul>
+          {(dims.universal.length > 0 || dims.specific.length > 0) && (
+            <div className="criteria">
+              <div className="crit-group">
+                <h4>Universal criteria <span className="hint">(any vendor · 60 pts)</span></h4>
+                <div className="cards">
+                  {dims.universal.map((d) => (
+                    <div className="crit-card" key={d.name}>
+                      <div className="crit-top"><b>{d.name}</b><span>{d.max_points} pts</span></div>
+                      <small>{d.description}</small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="crit-group">
+                <h4>{f.vendor || "Vendor"}-specific criteria <span className="hint">(40 pts)</span></h4>
+                <div className="cards">
+                  {dims.specific.map((d) => (
+                    <div className="crit-card spec" key={d.name}>
+                      <div className="crit-top"><b>{d.name}</b><span>{d.max_points} pts</span></div>
+                      <small>{d.description}</small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           {promptLoading ? (
             <div className="estimate">Building prompt…</div>
           ) : (
@@ -536,16 +586,14 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
                 {f.logo_path && <small className="hint">Custom header set: {f.logo_path.split(/[\\/]/).pop()}</small>}
               </div>
               <div className="field">
-                <span className="lbl">Email preview</span>
-                <div className="mailframe">
-                  {logoUrl ? <img src={logoUrl} alt="" className="banner" /> : <div className="brandbar" />}
-                  <div className="mailbody">
-                    <p>Hi {"{first name}"},</p>
-                    <p>TD SYNNEX is actively recruiting resellers for <b>{f.vendor || "the vendor"}</b>.</p>
-                    <p style={{ color: "#8a8f98" }}>[… AI-personalized body per company, in {f.outreach_language ? ({ en: "English", es: "Spanish", pt: "Portuguese" }[f.outreach_language]) : "each company's language"}, based on its qualification evidence …]</p>
-                    <p style={{ marginTop: 16, color: "#8a8f98" }}>[Signature comes from each BDM's own template]</p>
-                  </div>
-                </div>
+                <span className="lbl">Email preview{emailPreview.source ? ` (${emailPreview.source})` : ""}</span>
+                {emailPreview.loading ? (
+                  <div className="estimate">Rendering preview…</div>
+                ) : emailPreview.html ? (
+                  <iframe className="mailpreview" title="email preview" srcDoc={emailPreview.html} />
+                ) : (
+                  <small className="hint">Preview unavailable — complete the earlier steps.</small>
+                )}
               </div>
             </>
           )}
