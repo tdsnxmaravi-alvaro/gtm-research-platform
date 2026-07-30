@@ -218,10 +218,26 @@ export default function Wizard({ onCreated }) {
   }
 
   // Auto-fill the research prompt the first time the user reaches the Prompt step.
+  // Seeds the value prop / fit criteria from the vendor preset when still empty.
   useEffect(() => {
-    if (STEPS[step] === "Prompt" && !f.search_prompt && !promptLoading && !promptErr) {
+    if (STEPS[step] !== "Prompt" || f.search_prompt || promptLoading || promptErr) return;
+    (async () => {
+      if (f.vendor && !f.value_prop && !f.fit_criteria) {
+        try {
+          const p = await api.vendorPreset(f.vendor, f.target_type);
+          if (p.known) {
+            setF((prev) => ({
+              ...prev,
+              value_prop: prev.value_prop || p.value_prop || "",
+              fit_criteria: prev.fit_criteria || (p.fit_criteria || []).join("\n"),
+            }));
+          }
+        } catch {
+          /* preset is best-effort; the server also enriches on preview */
+        }
+      }
       regeneratePrompt();
-    }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 

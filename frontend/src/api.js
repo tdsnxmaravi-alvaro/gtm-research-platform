@@ -20,6 +20,8 @@ export const api = {
     req("/campaigns/", { method: "POST", body: JSON.stringify({ name, config }) }),
   previewPrompt: (config) =>
     req("/campaigns/preview_prompt/", { method: "POST", body: JSON.stringify({ config }) }),
+  vendorPreset: (vendor, targetType) =>
+    req(`/campaigns/vendor_preset/?vendor=${encodeURIComponent(vendor)}&target_type=${encodeURIComponent(targetType)}`),
   uploadList: (file) => {
     const fd = new FormData();
     fd.append("file", file);

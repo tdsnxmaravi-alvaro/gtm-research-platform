@@ -18,9 +18,16 @@ class CampaignSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def validate_config(self, value):
-        """Validate the config against the CampaignConfig schema."""
+        """Validate the config against the CampaignConfig schema.
+
+        Also fills vendor-preset defaults (value prop / fit criteria / scoring rubric)
+        for the selected vendor so the stored config carries the qualification
+        framework into research and outreach.
+        """
         from gtm.config.schema import CampaignConfig
+        from gtm.prompts import enrich_config_dict
         from pydantic import ValidationError
+        value = enrich_config_dict(value)
         try:
             CampaignConfig(**value)
         except ValidationError as exc:

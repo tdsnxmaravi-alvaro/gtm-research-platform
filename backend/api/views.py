@@ -53,8 +53,9 @@ class CampaignViewSet(viewsets.ModelViewSet):
         client can regenerate a fresh prompt. Provided-mode companies are represented
         by the [[COMPANIES]] sentinel, spliced in at run time.
         """
-        from gtm.prompts import build_prompt
+        from gtm.prompts import build_prompt, enrich_config_dict
         cfg = request.data.get("config", request.data)
+        cfg = enrich_config_dict(cfg)
         try:
             config = _load_config(cfg)
         except Exception as exc:  # noqa: BLE001
@@ -63,6 +64,27 @@ class CampaignViewSet(viewsets.ModelViewSet):
         vert = config.verticals[0] if config.verticals else None
         prompt = build_prompt(config, product, vertical=vert)
         return Response({"prompt": prompt})
+
+    @action(detail=False, methods=["get"])
+    def vendor_preset(self, request):
+        """Return the ready-made value prop + fit criteria for a vendor + target_type.
+
+        Feeds the wizard's prompt step so the editable fields start from the
+        vendor's qualification framework (country stays a variable).
+        """
+        from gtm.prompts import preset_for, VENDOR_PRESETS
+        vendor = request.query_params.get("vendor", "")
+        target_type = request.query_params.get("target_type", "resellers")
+        preset = preset_for(vendor, target_type)
+        if not preset:
+            return Response({"vendor": vendor, "known": False,
+                             "vendors": sorted(VENDOR_PRESETS)})
+        return Response({
+            "vendor": vendor, "known": True,
+            "product_name": preset["product_name"],
+            "value_prop": preset["value_prop"],
+            "fit_criteria": preset["fit_criteria"],
+        })
 
     @action(detail=False, methods=["post"])
     def upload_list(self, request):
