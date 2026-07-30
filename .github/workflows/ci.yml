@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
-    name: Tests (Python ${{ matrix.python-version }})
+  cli:
+    name: CLI / engine (gtm) — pytest
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

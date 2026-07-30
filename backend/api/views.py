@@ -161,10 +161,10 @@ class CampaignViewSet(viewsets.ModelViewSet):
     def _start(self, campaign, stage) -> Run:
         run = Run.objects.create(campaign=campaign, stage=stage, status="pending")
         clear_cancel(campaign.name)
-        # With a real broker, dispatch to a worker. In local eager mode, run in a
-        # background thread so the request returns immediately and progress (%) is
-        # pollable while the stage executes.
-        if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+        # In local dev (no broker) run in a background thread so the request returns
+        # immediately and progress is pollable; otherwise dispatch to the broker
+        # (and, under the test runner, run eagerly/synchronously).
+        if getattr(settings, "RUN_STAGES_IN_THREAD", False):
             import threading
             threading.Thread(
                 target=run_stage,
@@ -177,11 +177,14 @@ class CampaignViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
-        """Run the whole pipeline (research -> enrich -> consolidate -> outreach)
+        """Run the whole pipeline (research -> consolidate -> enrich -> outreach)
         phase by phase, stopping on error or when stopped. Resumable."""
         campaign = self.get_object()
-        import threading
-        threading.Thread(target=run_pipeline, args=(campaign.id,), daemon=True).start()
+        if getattr(settings, "RUN_STAGES_IN_THREAD", False):
+            import threading
+            threading.Thread(target=run_pipeline, args=(campaign.id,), daemon=True).start()
+        else:
+            run_pipeline(campaign.id)
         return Response({"started": True}, status=status.HTTP_202_ACCEPTED)
 
     @action(detail=True, methods=["post"])
@@ -206,6 +209,16 @@ class CampaignViewSet(viewsets.ModelViewSet):
         campaign = self.get_object()
         run = campaign.runs.first()  # ordered by -created_at
         return Response(RunSerializer(run).data if run else {})
+
+    @action(detail=True, methods=["get"])
+    def runs(self, request, pk=None):
+        """Latest run per stage — powers the per-phase summary (incl. credits)."""
+        campaign = self.get_object()
+        latest: dict = {}
+        for r in campaign.runs.all():  # ordered by -created_at
+            if r.stage not in latest:
+                latest[r.stage] = RunSerializer(r).data
+        return Response(latest)
 
     @action(detail=True, methods=["get"])
     def download(self, request, pk=None):

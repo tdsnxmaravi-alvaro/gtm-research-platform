@@ -30,8 +30,18 @@ function describe(cfg) {
 export default function Campaigns() {
   const [campaigns, setCampaigns] = useState([]);
   const [runs, setRuns] = useState({}); // campaignId -> latest run
+  const [stageRuns, setStageRuns] = useState({}); // campaignId -> { stage: run }
   const [results, setResults] = useState({}); // campaignId -> rows
   const [error, setError] = useState("");
+
+  async function refreshStages(id) {
+    try {
+      const data = await api.campaignRuns(id);
+      setStageRuns((s) => ({ ...s, [id]: data }));
+    } catch {
+      /* ignore */
+    }
+  }
 
   async function load() {
     try {
@@ -46,6 +56,7 @@ export default function Campaigns() {
         } catch {
           /* ignore */
         }
+        refreshStages(c.id);
       });
     } catch (e) {
       setError(String(e.message || e));
@@ -67,6 +78,7 @@ export default function Campaigns() {
       try {
         const run = await api.campaignStatus(id);
         setRuns((r) => ({ ...r, [id]: run }));
+        refreshStages(id);
         const terminal =
           ["error", "canceled", "paused"].includes(run.status) ||
           (run.stage === last && run.status === "done");
@@ -103,6 +115,7 @@ export default function Campaigns() {
       try {
         const run = await api.getRun(runId);
         setRuns((r) => ({ ...r, [campaignId]: run }));
+        refreshStages(campaignId);
         if (TERMINAL.includes(run.status)) clearInterval(t);
       } catch {
         clearInterval(t);
@@ -149,12 +162,17 @@ export default function Campaigns() {
               <small>{describe(c.config)}</small>
             </div>
             <div className="stages">
-              <button className="primary" onClick={() => start(c.id, c.config)} disabled={running}>▶ Start</button>
-              <button onClick={() => pause(c.id)} disabled={!running}>⏸ Pause</button>
-              <button onClick={() => stop(c.id)} disabled={!running}>■ Stop</button>
-              <button onClick={() => viewResults(c.id)}>results</button>
-              <a className="dl" href={`/api/campaigns/${c.id}/download/?artifact=master.xlsx`}>⬇ Excel</a>
-              <a className="dl" href={`/api/campaigns/${c.id}/download_eml/`}>⬇ Emails</a>
+              <button className="primary" onClick={() => start(c.id, c.config)} disabled={running}
+                      title="Run all phases in order: research → consolidate → enrich → outreach">▶ Start</button>
+              <button onClick={() => pause(c.id)} disabled={!running}
+                      title="Pause after the current step — resume later with Start (e.g. if low on Apollo credits)">⏸ Pause</button>
+              <button onClick={() => stop(c.id)} disabled={!running}
+                      title="Cancel the run. Saved progress is kept, so Start won't re-charge done companies">■ Stop</button>
+              <button onClick={() => viewResults(c.id)} title="Show the scored companies (sorted by tier & score)">results</button>
+              <a className="dl" href={`/api/campaigns/${c.id}/download/?artifact=master.xlsx`}
+                 title="Download the consolidated list with contacts (Excel)">⬇ Excel</a>
+              <a className="dl" href={`/api/campaigns/${c.id}/download_eml/`}
+                 title="Download all outreach .eml drafts as a zip">⬇ Emails</a>
             </div>
             {run && (
               <div className={`status ${run.status}`}>
@@ -171,11 +189,30 @@ export default function Campaigns() {
                   ))}
               </div>
             )}
+            {stageRuns[c.id] && (
+              <div className="phases">
+                {STAGES.map((s) => {
+                  const sr = stageRuns[c.id][s];
+                  const help = {
+                    research: "Score each company's fit (with evidence URLs) → tier A–D",
+                    consolidate: "Dedupe + keep the qualified companies (tier ≥ min) → master",
+                    enrich: "Find contacts (email/phone) for the qualified companies",
+                    outreach: "Generate personalized .eml drafts",
+                  }[s];
+                  return (
+                    <div key={s} className={`phase ${sr ? sr.status : "idle"}`} title={help}>
+                      <b>{s}</b> · {sr ? sr.status : "—"}
+                      {sr && sr.message ? <span className="phase-msg"> · {sr.message}</span> : null}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <details>
               <summary className="link">Run a single stage (manual)</summary>
               <div className="stages" style={{ marginTop: 8 }}>
                 {STAGES.map((s) => (
-                  <button key={s} onClick={() => startStage(c.id, s)}>{s}</button>
+                  <button key={s} onClick={() => startStage(c.id, s)} disabled={running}>{s}</button>
                 ))}
               </div>
             </details>

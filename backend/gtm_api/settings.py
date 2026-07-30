@@ -4,6 +4,7 @@ Runs the same on a laptop (SQLite) and on Azure/AWS (Postgres via DATABASE_URL).
 """
 
 import os
+import sys
 from pathlib import Path
 
 import dj_database_url
@@ -89,3 +90,9 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
 CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() == "true"
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", "7200"))
+
+# Local dev without a broker: run pipeline stages in a background thread so the
+# request returns immediately and progress (%) is pollable. Disabled under the
+# test runner so tasks execute synchronously (eager) and assertions are stable.
+TESTING = "test" in sys.argv
+RUN_STAGES_IN_THREAD = CELERY_TASK_ALWAYS_EAGER and not TESTING

@@ -73,10 +73,11 @@ VENDOR_PRESETS: dict[str, dict] = {
             "Established commercial presence and delivery capability in the target country",
         ],
         "account_fit": [
-            "Relies on DWG/CAD for drafting, design or documentation and faces AutoCAD subscription-cost pressure",
-            "Demand triggers: CAD license renewals, drawing-standardization projects, hiring of drafters/engineers",
-            "Runs manufacturing or AEC workflows needing 2D drafting, mechanical modeling or DWG-based BIM",
-            "Manages large legacy DWG libraries that need cleanup / standardization",
+            "Aggressively hiring CAD/BIM/drafting/engineering roles (needs more design seats) — a top trigger",
+            "Recent M&A, restructuring or cost-cutting forcing an IT/CAD license audit (network vs named-user AutoCAD) — a top trigger",
+            "Manufacturing or infrastructure output (new products, facilities, contracts awarded) requiring heavy 2D/3D design",
+            "Relies on DWG/CAD and faces AutoCAD subscription-cost pressure or legacy-DWG standardization needs",
+            "Note: digital-twin / AI signals count only when tied to real DWG/CAD seat demand",
         ],
     },
     "DraftSight": {
@@ -151,9 +152,11 @@ VENDOR_PRESETS: dict[str, dict] = {
             "Established commercial presence in the target country",
         ],
         "account_fit": [
-            "Is an architecture / engineering / construction firm managing many concurrent projects and documents",
-            "Demand triggers: growth in project volume, RFI/submittal overload, BIM coordination needs, risk/liability or claims exposure",
-            "Collaborates across disciplines and needs email/document/model information control and an audit trail",
+            "Runs active building/construction programs: permits, RFIs/submittals, drawings, capital programs — the primary trigger",
+            "Involved in JVs, mega-projects or design-build with multi-company document/handover complexity",
+            "M&A integration or facility expansion creating legacy-data, as-built or regulated-handover complexity",
+            "Architecture/engineering firm with high email + document volume across many concurrent projects",
+            "Note: pure IT/marketing/AI moves or office relocations count only when tied to real construction/AEC document activity",
         ],
     },
     "Unity": {
@@ -161,25 +164,28 @@ VENDOR_PRESETS: dict[str, dict] = {
         "domain": "real-time 3D (RT3D) / visualization / digital-twin / AR-VR software",
         "sectors": "manufacturing, automotive, AEC visualization, media & entertainment, training/simulation",
         "value_prop": (
-            "Unity is a real-time 3D platform for interactive experiences. Beyond games, Unity Industry "
-            "(built on Unity Pro/Enterprise) targets non-game applications — industrial digital twins, "
-            "product and AEC visualization, HMI, AR/VR, simulation and training — with Unity Cloud for "
-            "build/asset management, Pixyz to import and optimize CAD/BIM/3D data for real-time, and Unity "
-            "AI (Muse/Sentis). It publishes across desktop, mobile, web, AR and VR. Resellers can attach "
-            "licensing plus 3D/development and integration services across manufacturing, automotive, AEC and media accounts."
+            "Unity is a real-time 3D (RT3D) platform. For non-game use, Unity Industry is the "
+            "primary SKU (Unity 6 engine, Studio no-code authoring, Asset Manager) for digital "
+            "twins, product & AEC visualization, HMI, AR/VR, simulation and immersive training; "
+            "the Asset Transformer Toolkit (formerly Pixyz) preps CAD/BIM/3D data for real-time; "
+            "and Parsec (by Unity) is a separate add-on for remote GPU sharing across distributed "
+            "teams. Resellers attach licensing plus 3D/development and integration services across "
+            "manufacturing, automotive, AEC and media accounts."
         ),
         "reseller_fit": [
             "Sells software and/or 3D / application-development / integration services (not hardware only)",
             "Serves customers needing real-time 3D: digital twins, product/AEC visualization, AR/VR, HMI, simulation or training",
-            "Adjacency to 3D / CAD / creative / real-time / game-engine tooling or Pixyz-style CAD data prep — a plus",
+            "Adjacency to 3D / CAD / creative / real-time / game-engine tooling or CAD data prep (Asset Transformer / Pixyz) — a plus",
             "Provides development, integration, training and support capability (RT3D is services-led)",
             "Can engage industrial / enterprise accounts (Unity Industry) beyond individual creators",
             "Established commercial presence in the target country",
         ],
         "account_fit": [
-            "Needs real-time 3D: digital twins, product/AEC viz, AR/VR, HMI, simulation or immersive training",
-            "Demand triggers: new visualization/immersive/Industry-4.0 initiatives, 3D/XR hiring, R&D or innovation projects",
-            "Owns CAD/BIM/3D data (Pixyz) that would benefit from interactive, real-time experiences",
+            "Active XR/VR/AR, digital-twin (with a 3D/visual layer), HMI or immersive-training program — a top trigger",
+            "Complex physical products needing 3D configurators / design visualization (auto, aerospace, machinery, medical devices); active product launches",
+            "Hiring 3D artists / XR / Unity / visualization engineers — a high-value trigger",
+            "Heavy CAD/BIM environment (CATIA, NX, SolidWorks, Revit) + Industry 4.0 / smart-factory initiative; distributed teams needing remote GPU (Parsec)",
+            "Note: 'digital twin', 'simulation' or 'AI' count only when tied to real-time 3D / visual / XR content",
         ],
     },
 }

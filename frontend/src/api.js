@@ -55,6 +55,7 @@ export const api = {
   stop: (id) => req(`/campaigns/${id}/stop/`, { method: "POST" }),
   pause: (id) => req(`/campaigns/${id}/pause/`, { method: "POST" }),
   campaignStatus: (id) => req(`/campaigns/${id}/status/`),
+  campaignRuns: (id) => req(`/campaigns/${id}/runs/`),
   results: (id) => req(`/campaigns/${id}/results/`),
   getRun: (id) => req(`/runs/${id}/`),
 };
