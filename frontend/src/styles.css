@@ -45,3 +45,15 @@ td.tier.tA { color: #1e7d34; }
 td.tier.tB { color: #0f4c81; }
 td.tier.tC { color: #9a6a00; }
 td.tier.tD { color: #8a8f98; }
+.hint { font-weight: 400; color: #6b7280; font-size: 12px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field .lbl { font-size: 13px; font-weight: 600; }
+.segmented { display: flex; gap: 8px; flex-wrap: wrap; }
+.segmented button { flex: 1; min-width: 180px; border: 1px solid var(--line); background: #fff; padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+.segmented button.on { border-color: var(--blue); background: #eef4fb; color: var(--blue); font-weight: 600; box-shadow: 0 0 0 2px rgba(15,76,129,.15); }
+.checks { display: flex; gap: 14px; flex-wrap: wrap; }
+.chk { flex-direction: row; align-items: center; gap: 6px; font-weight: 600; }
+.estimate.warn { background: #fff7e6; border-color: #f0e0c0; color: #9a6a00; }
+.summary { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
+.summary li { background: #f6f8fa; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+.link { background: none; border: 0; color: var(--blue); cursor: pointer; padding: 4px 0; font-size: 13px; text-decoration: underline; }
