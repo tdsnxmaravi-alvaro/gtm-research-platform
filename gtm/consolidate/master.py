@@ -14,11 +14,36 @@ from pathlib import Path
 from ..config.schema import CampaignConfig
 
 MASTER_COLS = [
-    "tier", "score", "company", "website", "country",
+    "tier", "score", "company", "website", "country", "employees", "software_resold",
     "contact_name", "title", "email", "email_status",
     "direct_phone", "corporate_phone", "linkedin",
     "vendor", "recommended_products", "fit_summary", "evidence_urls",
 ]
+
+# "Master Outreach" sheet — one row per company (header, source key).
+SUMMARY_SHEET = [
+    ("Company", "company"), ("Website", "website"), ("Tier", "tier"), ("Score", "score"),
+    ("Country", "country"), ("Employees", "employees"), ("Software Resold", "software_resold"),
+    ("Independence", "independence"), ("Apollo Verified", "apollo_verified"),
+    ("Validation", "validation"), ("Total Contacts", "total_contacts"),
+    ("Verified Emails", "verified_emails"), ("Best Contact", "best_contact"),
+    ("Best Contact Title", "best_title"), ("Best Contact Email", "best_email"),
+    ("Best Contact Phone", "best_phone"), ("All Verified Emails", "all_verified_emails"),
+    ("Vendor", "vendor"), ("Recommended Products", "recommended_products"),
+    ("Fit Summary", "fit_summary"), ("Evidence URLs", "evidence_urls"),
+]
+
+# "All Contacts" sheet — one row per contact.
+CONTACTS_SHEET = [
+    ("Company", "company"), ("Tier", "tier"), ("Score", "score"),
+    ("Contact Name", "contact_name"), ("Title", "title"), ("Email", "email"),
+    ("Email Status", "email_status"), ("Direct Phone", "direct_phone"),
+    ("Corporate Phone", "corporate_phone"), ("LinkedIn", "linkedin"),
+    ("City", "city"), ("State", "state"), ("Country", "country"),
+]
+
+_CONTACT_PRIORITY = ["president", "ceo", "owner", "founder", "managing director",
+                     "director", "vp", "vice president", "head", "manager"]
 
 _TIER_ORDER = {"A": 0, "B": 1, "C": 2, "D": 3, "": 9}
 
@@ -69,23 +94,29 @@ def build_master(config: CampaignConfig, out_dir: str | Path | None = None,
         contacts_by_company.setdefault(key, []).append(c)
 
     rows: list[dict] = []
+    summary: list[dict] = []
+    contact_rows: list[dict] = []
     for key, r in best.items():
         tier = (r.get("final_tier") or r.get("tier") or "").upper()
         if min_tier and _TIER_ORDER.get(tier, 9) > tier_cap:
             continue
-        company_contacts = contacts_by_company.get(key, [])
-        if company_contacts:
-            for c in company_contacts:
+        cs = contacts_by_company.get(key, [])
+        if cs:
+            for c in cs:
                 rows.append(_master_row(config, r, tier, c))
         else:
             rows.append(_master_row(config, r, tier, {}))
+        contact_rows.extend(cs)
+        summary.append(_summary_row(config, r, tier, cs))
 
     rows.sort(key=lambda x: (_TIER_ORDER.get(x["tier"], 9), -_num(x["score"])))
+    summary.sort(key=lambda x: (_TIER_ORDER.get(x["tier"], 9), -_num(x["score"])))
     _write_csv(rows, out / "master.csv")
-    _write_xlsx(rows, out / "master.xlsx")
+    _write_xlsx(summary, contact_rows, out / "master.xlsx")
     if progress_cb:
         progress_cb(len(rows), len(rows) or 1)
-    print(f"Master: {len(rows)} rows -> {out / 'master.csv'} (+ .xlsx)")
+    print(f"Master: {len(summary)} companies, {len(rows)} contact rows -> "
+          f"{out / 'master.csv'} (+ .xlsx: Master Outreach + All Contacts)")
     return rows
 
 
@@ -107,6 +138,8 @@ def _master_row(config: CampaignConfig, r: dict, tier: str, c: dict) -> dict:
         "company": r.get("company", ""),
         "website": r.get("website", ""),
         "country": r.get("country") or config.country,
+        "employees": r.get("employees", ""),
+        "software_resold": r.get("software_resold", ""),
         "contact_name": c.get("contact_name", ""),
         "title": c.get("title", ""),
         "email": c.get("email", ""),
@@ -114,6 +147,52 @@ def _master_row(config: CampaignConfig, r: dict, tier: str, c: dict) -> dict:
         "direct_phone": c.get("direct_phone", ""),
         "corporate_phone": c.get("corporate_phone", ""),
         "linkedin": c.get("linkedin", ""),
+        "vendor": config.vendor or r.get("product", ""),
+        "recommended_products": r.get("recommended_products", ""),
+        "fit_summary": r.get("fit_summary", ""),
+        "evidence_urls": r.get("evidence_urls", ""),
+    }
+
+
+def _best_contact(cs: list[dict]) -> dict:
+    """Pick the top-ranked contact that has an email (else the top-ranked)."""
+    pool = [c for c in cs if c.get("email")] or cs
+    if not pool:
+        return {}
+
+    def rank(c: dict) -> int:
+        t = (c.get("title") or "").lower()
+        return next((i for i, p in enumerate(_CONTACT_PRIORITY) if p in t), 99)
+
+    return sorted(pool, key=rank)[0]
+
+
+def _summary_row(config: CampaignConfig, r: dict, tier: str, cs: list[dict]) -> dict:
+    """One company-level row for the 'Master Outreach' sheet."""
+    verified = [c for c in cs
+                if (c.get("email_status") or "").lower() == "verified" and c.get("email")]
+    bc = _best_contact(cs)
+    has_url = (str(r.get("has_verified_url", "")).lower() in ("true", "1", "yes")
+               or _num(r.get("evidence_count")) > 0)
+    return {
+        "company": r.get("company", ""),
+        "website": r.get("website", ""),
+        "tier": tier,
+        "score": r.get("score", ""),
+        "country": r.get("country") or config.country,
+        "employees": r.get("employees", ""),
+        "software_resold": r.get("software_resold", ""),
+        "independence": r.get("independence", ""),
+        "apollo_verified": ("Yes" if any((c.get("email_status") or "").lower() == "verified"
+                                          for c in cs) else ("No" if cs else "")),
+        "validation": "PASS" if has_url else "REVIEW",
+        "total_contacts": len(cs),
+        "verified_emails": len(verified),
+        "best_contact": bc.get("contact_name", ""),
+        "best_title": bc.get("title", ""),
+        "best_email": bc.get("email", ""),
+        "best_phone": bc.get("direct_phone", "") or bc.get("corporate_phone", ""),
+        "all_verified_emails": "; ".join(c.get("email", "") for c in verified),
         "vendor": config.vendor or r.get("product", ""),
         "recommended_products": r.get("recommended_products", ""),
         "fit_summary": r.get("fit_summary", ""),
@@ -129,61 +208,65 @@ def _write_csv(rows: list[dict], path: Path) -> None:
         w.writerows(rows)
 
 
-def _write_xlsx(rows: list[dict], path: Path) -> None:
+def _write_xlsx(summary_rows: list[dict], contact_rows: list[dict], path: Path) -> None:
+    """Write a two-sheet workbook: 'Master Outreach' (per company) + 'All Contacts'."""
     try:
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
         from openpyxl.utils import get_column_letter
     except ImportError:
         return
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Master"
 
+    _WIDTHS = {
+        "company": 30, "website": 26, "country": 12, "tier": 6, "score": 7,
+        "employees": 12, "software_resold": 44, "independence": 14, "apollo_verified": 14,
+        "validation": 11, "total_contacts": 13, "verified_emails": 14, "best_contact": 22,
+        "best_title": 24, "best_email": 28, "best_phone": 16, "all_verified_emails": 40,
+        "vendor": 14, "recommended_products": 32, "fit_summary": 60, "evidence_urls": 40,
+        "contact_name": 22, "title": 26, "email": 28, "email_status": 12,
+        "direct_phone": 16, "corporate_phone": 16, "linkedin": 30, "city": 16, "state": 14,
+    }
+    _WRAP = {"fit_summary", "evidence_urls", "recommended_products", "software_resold",
+             "all_verified_emails"}
+    _CENTER = {"tier", "score", "total_contacts", "verified_emails", "apollo_verified",
+               "validation", "employees"}
+    tier_fill = {
+        "A": PatternFill("solid", fgColor="C6EFCE"), "B": PatternFill("solid", fgColor="BDD7EE"),
+        "C": PatternFill("solid", fgColor="FFF2CC"), "D": PatternFill("solid", fgColor="F2F2F2"),
+    }
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill("solid", fgColor="2F5496")
     thin = Side(style="thin", color="D9D9D9")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    tier_fill = {
-        "A": PatternFill("solid", fgColor="C6EFCE"),
-        "B": PatternFill("solid", fgColor="BDD7EE"),
-        "C": PatternFill("solid", fgColor="FFF2CC"),
-        "D": PatternFill("solid", fgColor="F2F2F2"),
-    }
-    wrap_cols = {"fit_summary", "evidence_urls", "recommended_products"}
 
-    for col, name in enumerate(MASTER_COLS, 1):
-        cell = ws.cell(row=1, column=col, value=name)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        cell.border = border
-
-    for ri, r in enumerate(rows, 2):
-        for ci, name in enumerate(MASTER_COLS, 1):
-            cell = ws.cell(row=ri, column=ci, value=r.get(name, ""))
+    def _fill(ws, title, spec, rows):
+        ws.title = title
+        for col, (header, _key) in enumerate(spec, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border = border
-            cell.alignment = Alignment(
-                vertical="top",
-                wrap_text=name in wrap_cols,
-                horizontal="center" if name in ("tier", "score") else "left",
-            )
-            if name == "tier":
-                fill = tier_fill.get(str(r.get("tier", "")).upper())
-                if fill:
-                    cell.fill = fill
-                    cell.font = Font(bold=True)
+        for ri, r in enumerate(rows, 2):
+            for ci, (_header, key) in enumerate(spec, 1):
+                cell = ws.cell(row=ri, column=ci, value=r.get(key, ""))
+                cell.border = border
+                cell.alignment = Alignment(vertical="top", wrap_text=key in _WRAP,
+                                           horizontal="center" if key in _CENTER else "left")
+                if key == "tier":
+                    fill = tier_fill.get(str(r.get("tier", "")).upper())
+                    if fill:
+                        cell.fill = fill
+                        cell.font = Font(bold=True)
+        for col, (_header, key) in enumerate(spec, 1):
+            ws.column_dimensions[get_column_letter(col)].width = _WIDTHS.get(key, 16)
+        ws.freeze_panes = "A2"
+        if rows:
+            ws.auto_filter.ref = ws.dimensions
 
-    widths = {"tier": 6, "score": 7, "company": 30, "website": 26, "country": 12,
-             "contact_name": 22, "title": 26, "email": 28, "email_status": 12,
-             "direct_phone": 16, "corporate_phone": 16, "linkedin": 30,
-             "vendor": 14, "recommended_products": 34, "fit_summary": 60,
-             "evidence_urls": 40}
-    for col, name in enumerate(MASTER_COLS, 1):
-        ws.column_dimensions[get_column_letter(col)].width = widths.get(name, 18)
-
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = ws.dimensions
+    wb = Workbook()
+    _fill(wb.active, "Master Outreach", SUMMARY_SHEET, summary_rows)
+    _fill(wb.create_sheet("All Contacts"), "All Contacts", CONTACTS_SHEET, contact_rows)
     try:
         wb.save(path)
     except PermissionError:

@@ -25,10 +25,23 @@ from ..providers import build_provider
 from .cache import ResearchCache, _domain_or_name
 
 OUT_COLS = [
-    "product", "vertical", "company", "website", "country", "final_tier", "tier", "score",
+    "product", "vertical", "company", "website", "country", "employees", "software_resold",
+    "final_tier", "tier", "score",
     "tier_capped", "tier_cap_reason", "fit_summary", "recommended_products",
     "evidence_count", "has_verified_url", "evidence_urls", "notes", "passes", "evidence",
 ]
+
+# Context columns carried from the provided list into the results (for the master).
+_EMP_KEYS = ("number of employees", "employees", "company size", "size")
+_SW_KEYS = ("other software in use", "software resold", "software", "other software")
+
+
+def _ctx_val(row: dict, keys) -> str:
+    for k in keys:
+        v = row.get(k)
+        if v not in (None, ""):
+            return str(v).strip()
+    return ""
 
 
 def _provider_for(config: CampaignConfig):
@@ -216,6 +229,8 @@ def run_campaign(
                     row["product"] = product.name
                     row["vertical"] = ""
                     row["country"] = r.get("country") or config.country
+                    row["employees"] = _ctx_val(r, _EMP_KEYS)
+                    row["software_resold"] = _ctx_val(r, _SW_KEYS)
                     all_results.append(row)
                     done.add(r.get("company"))
                     hits += 1
@@ -243,11 +258,17 @@ def run_campaign(
                               for b in batch}
                 domain_by = {(b.get("company") or "").strip().lower(): _domain_or_name(b)
                              for b in batch}
+                emp_by = {(b.get("company") or "").strip().lower(): _ctx_val(b, _EMP_KEYS)
+                          for b in batch}
+                sw_by = {(b.get("company") or "").strip().lower(): _ctx_val(b, _SW_KEYS)
+                         for b in batch}
                 for r in scored:
                     comp = (r.get("company") or "").strip().lower()
                     r["product"] = product.name
                     r["vertical"] = ""
                     r["country"] = country_by.get(comp, config.country)
+                    r["employees"] = emp_by.get(comp, "")
+                    r["software_resold"] = sw_by.get(comp, "")
                     cache.put(ResearchCache.key(config.vendor, config.target_type.value,
                                                 product.name, domain_by.get(comp, comp)), r)
                 all_results.extend(scored)
