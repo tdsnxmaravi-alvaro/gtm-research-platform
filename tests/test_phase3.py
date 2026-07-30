@@ -6,6 +6,7 @@ import email.policy
 from gtm.config import CampaignConfig
 from gtm.consolidate import normalize_name, build_master
 from gtm.outreach import render_template, write_eml
+from gtm.outreach.eml import apply_template
 
 
 def _cfg(**over):
@@ -72,3 +73,39 @@ def test_write_eml_is_smtp_and_unsent(tmp_path):
     assert msg["X-Unsent"] == "1"
     assert msg["Subject"] == "Hola"
     assert msg.is_multipart()  # text + html alternative
+
+
+def test_apply_template_replaces_marker():
+    html = '<div class="box"><img src="cid:banner"><div>{{BODY}}</div>-- TD SYNNEX</div>'
+    out = apply_template(html, "Hola Acme.\n\nSaludos")
+    assert "{{BODY}}" not in out
+    assert "Hola Acme." in out and "Saludos" in out
+    assert 'class="box"' in out and "TD SYNNEX" in out  # box preserved
+    assert apply_template("<div>no marker</div>", "x") is None
+
+
+def test_write_eml_uses_branded_template_and_carries_inline_image(tmp_path):
+    # Build a branded sample .eml with a {{BODY}} marker + inline CID image.
+    from email.message import EmailMessage
+    tpl = EmailMessage()
+    tpl["Subject"], tpl["From"], tpl["To"] = "s", "a@b.com", "c@d.com"
+    tpl.set_content("plain")
+    tpl.add_alternative(
+        '<html><body><div style="border:1px solid #ccc">'
+        '<img src="cid:banner1"><div>{{BODY}}</div><div>-- TD SYNNEX</div>'
+        "</div></body></html>",
+        subtype="html",
+    )
+    tpl.get_payload()[-1].add_related(b"\x89PNG_fake", maintype="image",
+                                      subtype="png", cid="<banner1>")
+    sample = tmp_path / "sample.eml"
+    sample.write_bytes(tpl.as_bytes(policy=email.policy.SMTP))
+
+    out = write_eml(tmp_path / "out.eml", to_email="x@y.com", subject="Hi",
+                    body="Hola Acme.\n\nEsto es una prueba.", template_eml=str(sample))
+    msg = email.message_from_bytes(out.read_bytes(), policy=email.policy.default)
+    html = next(p.get_content() for p in msg.walk() if p.get_content_type() == "text/html")
+    imgs = [p for p in msg.walk() if p.get_content_maintype() == "image"]
+    assert "{{BODY}}" not in html and "Hola Acme." in html
+    assert "border:1px solid #ccc" in html and "cid:banner1" in html  # box + ref kept
+    assert len(imgs) == 1 and imgs[0]["Content-ID"] == "<banner1>"  # inline image carried

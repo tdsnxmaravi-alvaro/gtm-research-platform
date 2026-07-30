@@ -39,6 +39,52 @@ def _plain_to_html(body: str) -> str:
     )
 
 
+# Marker in a branded sample .eml where the per-company body is injected.
+BODY_MARKER = "{{BODY}}"
+
+
+def _body_to_html_paragraphs(body: str) -> str:
+    def esc(t: str) -> str:
+        return (t.replace("&", "&amp;").replace("<", "&lt;")
+                .replace(">", "&gt;").replace("\n", "<br>\n"))
+
+    return "\n".join(
+        f'<p style="margin:0 0 12px 0;">{esc(p.strip())}</p>'
+        for p in body.strip().split("\n\n") if p.strip()
+    )
+
+
+def load_eml_template(path: str | Path) -> tuple[str | None, list[dict]]:
+    """Load a branded sample .eml.
+
+    Returns (template_html, inline_images). `template_html` is the sample's HTML
+    part (should contain the {{BODY}} marker where the per-company message goes);
+    the surrounding banner/signature box is preserved as-is. `inline_images` are
+    the referenced Content-ID images (banner/logo) carried over so the box renders.
+    """
+    raw = Path(path).read_bytes()
+    msg = email.message_from_bytes(raw, policy=email.policy.default)
+    html: str | None = None
+    images: list[dict] = []
+    for part in msg.walk():
+        if part.get_content_type() == "text/html" and html is None:
+            html = part.get_content()
+        elif part.get_content_maintype() == "image":
+            cid = (part.get("Content-ID") or "").strip().strip("<>")
+            data = part.get_payload(decode=True)
+            if cid and data:
+                images.append({"cid": cid, "subtype": part.get_content_subtype(),
+                               "data": data})
+    return html, images
+
+
+def apply_template(template_html: str, body: str) -> str | None:
+    """Inject the body into the template's {{BODY}} marker. None if no marker."""
+    if BODY_MARKER not in template_html:
+        return None
+    return template_html.replace(BODY_MARKER, _body_to_html_paragraphs(body))
+
+
 def write_eml(
     path: str | Path,
     *,
@@ -49,8 +95,14 @@ def write_eml(
     from_email: str = "",
     from_name: str = "",
     html_body: str | None = None,
+    template_eml: str | Path | None = None,
 ) -> Path:
-    """Write one editable .eml draft. Returns the path."""
+    """Write one editable .eml draft. Returns the path.
+
+    When `template_eml` points to a branded sample (with a {{BODY}} marker), its
+    box + inline images are reused and the per-company body is injected; otherwise
+    the built-in branded box is used.
+    """
     msg = EmailMessage()
     msg["Subject"] = subject
     if from_email:
@@ -60,8 +112,26 @@ def write_eml(
     msg["Message-ID"] = make_msgid()
     msg["X-Unsent"] = "1"  # Outlook: open as editable draft
 
+    final_html = html_body
+    inline_images: list[dict] = []
+    if final_html is None and template_eml:
+        try:
+            tpl_html, imgs = load_eml_template(template_eml)
+            applied = apply_template(tpl_html, body) if tpl_html else None
+            if applied is not None:
+                final_html = applied
+                inline_images = imgs
+        except (OSError, ValueError):
+            final_html = None  # fall back to the built-in box
+
     msg.set_content(body)
-    msg.add_alternative(html_body or _plain_to_html(body), subtype="html")
+    msg.add_alternative(final_html or _plain_to_html(body), subtype="html")
+
+    if inline_images:
+        html_part = msg.get_payload()[-1]
+        for im in inline_images:
+            html_part.add_related(im["data"], maintype="image",
+                                  subtype=im["subtype"], cid=f"<{im['cid']}>")
 
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
