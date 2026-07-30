@@ -67,7 +67,7 @@ def _inject_body_marker(html: str) -> str:
             return m.group(1) + BODY_MARKER + m.group(3)
         return m.group(0)
 
-    tail = re.compile(r"(<td\b[^>]*padding:15[^>]*>)(.*?)(</td>)", re.I | re.S).sub(_once, tail)
+    tail = re.compile(r"(<td\b[^>]*padding:\s*15[^>]*>)(.*?)(</td>)", re.I | re.S).sub(_once, tail)
     if not injected["done"]:
         tail = f"<div>{BODY_MARKER}</div>" + tail
 
@@ -85,7 +85,7 @@ def _inject_body_marker(html: str) -> str:
 
         after = re.sub(r">([^<]+)<", _blank, html[cut:])
         # remove the signature cell's large padding + empty spacer paragraphs
-        after = re.sub(r"padding:15\.0pt 15\.0pt 15\.0pt 15\.0pt", "padding:0", after)
+        after = re.sub(r"padding:\s*15[.0]*pt(?:\s+15[.0]*pt){0,3}", "padding:0", after)
         after = after.replace("&nbsp;", " ")
         after = re.sub(r"(?is)<p\b[^>]*>(?:\s|<o:p>|</o:p>)*</p>", "", after)
         html = html[:cut] + after
