@@ -14,6 +14,9 @@ export default function Wizard({ onCreated }) {
   const [showRaw, setShowRaw] = useState(false);
   const [promptLoading, setPromptLoading] = useState(false);
   const [promptErr, setPromptErr] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState("");
+  const [listReport, setListReport] = useState(null);
   const [f, setF] = useState({
     name: "",
     target_type: "resellers",
@@ -21,6 +24,7 @@ export default function Wizard({ onCreated }) {
     country: "Spain",
     vendor: "",
     provided_list_path: "",
+    colMap: { company: "", website: "", country: "" },
     value_prop: "",
     fit_criteria: "",
     search_prompt: "",
@@ -42,6 +46,30 @@ export default function Wizard({ onCreated }) {
       tiers: f.tiers.includes(t) ? f.tiers.filter((x) => x !== t) : [...f.tiers, t],
     });
 
+  async function onUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadErr("");
+    try {
+      const rep = await api.uploadList(file);
+      // Invert the detected mapping (raw header -> canonical) into column pickers.
+      const inv = { company: "", website: "", country: "" };
+      for (const [hdr, canon] of Object.entries(rep.mapping || {})) {
+        if (canon in inv && !inv[canon]) inv[canon] = hdr;
+      }
+      setListReport(rep);
+      setF((prev) => ({ ...prev, provided_list_path: rep.path, colMap: inv }));
+    } catch (err) {
+      setUploadErr(String(err.message || err));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const setCol = (field) => (e) =>
+    setF({ ...f, colMap: { ...f.colMap, [field]: e.target.value } });
+
   // --- per-step validation (#7) ---
   function stepError(s) {
     const name = STEPS[s];
@@ -50,7 +78,9 @@ export default function Wizard({ onCreated }) {
       if (!f.vendor) return "Pick a vendor.";
       if (!f.country.trim()) return "Country is required.";
       if (f.mode === "provided" && !f.provided_list_path.trim())
-        return "Provide the list path (or upload the list).";
+        return "Upload the list (or enter a server path).";
+      if (f.mode === "provided" && listReport && !f.colMap.company)
+        return "Map the company column.";
     }
     if (name === "Details") {
       if (!f.value_prop.trim() && !f.fit_criteria.trim())
@@ -122,6 +152,12 @@ export default function Wizard({ onCreated }) {
       },
     };
     if (f.mode === "provided") cfg.provided_list_path = f.provided_list_path || "list.csv";
+    const overrides = {};
+    for (const [field, hdr] of Object.entries(f.colMap)) {
+      if (hdr) overrides[hdr.trim().toLowerCase()] = field;
+    }
+    if (f.mode === "provided" && Object.keys(overrides).length)
+      cfg.provided_column_overrides = overrides;
     return cfg;
   }
 
@@ -213,7 +249,45 @@ export default function Wizard({ onCreated }) {
             </select>
           </label>
           {f.mode === "provided" && (
-            <label>Provided list path<input value={f.provided_list_path} onChange={set("provided_list_path")} placeholder="campaigns/data/list.xlsx" /></label>
+            <div className="field">
+              <span className="lbl">Company list (.xlsx / .csv)</span>
+              <input type="file" accept=".csv,.xlsx,.xlsm" onChange={onUpload} />
+              {uploading && <small className="hint">Uploading & mapping columns…</small>}
+              {uploadErr && <p className="error">{uploadErr}</p>}
+              {f.provided_list_path && !uploading && !uploadErr && (
+                <small className="hint">Loaded: {f.provided_list_path.split(/[\\/]/).pop()}</small>
+              )}
+              {listReport && (
+                <div className="mapping">
+                  <div className="mapgrid">
+                    {["company", "website", "country"].map((field) => (
+                      <label key={field}>
+                        {field}{field === "company" ? " *" : ""}
+                        <select value={f.colMap[field]} onChange={setCol(field)}>
+                          <option value="">— none —</option>
+                          {(listReport.raw_headers || []).filter(Boolean).map((h) => (
+                            <option key={h} value={h}>{h}</option>
+                          ))}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                  <small className="hint">
+                    {listReport.with_company} companies · {listReport.with_website} with website
+                    {f.colMap.country
+                      ? " · per-row country detected (campaign country is the fallback)"
+                      : " · no country column — campaign country used for all rows"}
+                  </small>
+                  {(listReport.warnings || []).map((w, i) => (
+                    <div key={i} className="estimate warn">{w}</div>
+                  ))}
+                </div>
+              )}
+              <details>
+                <summary className="link">Or enter a server path manually</summary>
+                <input value={f.provided_list_path} onChange={set("provided_list_path")} placeholder="campaigns/data/list.xlsx" />
+              </details>
+            </div>
           )}
         </section>
       )}

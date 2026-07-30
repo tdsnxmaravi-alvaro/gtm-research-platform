@@ -172,7 +172,8 @@ def run_campaign(
     all_results: list[dict] = []
 
     if config.mode == Mode.provided:
-        rows = load_provided_list(config.provided_list_path)
+        rows = load_provided_list(config.provided_list_path,
+                                  config.provided_column_overrides or None)
         pending = [r for r in rows if r.get("company") not in done]
         if limit:
             pending = pending[:limit]

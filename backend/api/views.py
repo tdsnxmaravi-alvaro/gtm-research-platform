@@ -10,6 +10,9 @@ from .models import Campaign, Run
 from .serializers import CampaignSerializer, RunSerializer
 from .tasks import run_stage
 
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB cap for provided lists
+ALLOWED_LIST_EXT = (".csv", ".xlsx", ".xlsm")
+
 
 def _out_dir(name: str) -> Path:
     return Path(settings.GTM_DATA_ROOT) / name
@@ -60,6 +63,52 @@ class CampaignViewSet(viewsets.ModelViewSet):
         vert = config.verticals[0] if config.verticals else None
         prompt = build_prompt(config, product, vertical=vert)
         return Response({"prompt": prompt})
+
+    @action(detail=False, methods=["post"])
+    def upload_list(self, request):
+        """Accept a provided list (.csv/.xlsx), store it, and return a column-mapping
+        preview (AI schema-mapper when configured, else the deterministic mapping).
+
+        The response feeds the wizard's mapping step: detected company/website/country
+        columns, per-row country presence, data-quality warnings and a small sample.
+        """
+        import uuid
+
+        upload = request.FILES.get("file")
+        if not upload:
+            return Response({"error": "No file uploaded (field 'file')."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        ext = Path(upload.name).suffix.lower()
+        if ext not in ALLOWED_LIST_EXT:
+            return Response({"error": "Only .csv or .xlsx files are supported."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if upload.size and upload.size > MAX_UPLOAD_BYTES:
+            return Response({"error": "File exceeds the 10 MB limit."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        updir = Path(settings.GTM_DATA_ROOT) / "_uploads"
+        updir.mkdir(parents=True, exist_ok=True)
+        stem = "".join(c for c in Path(upload.name).stem if c.isalnum() or c in ("-", "_"))
+        dest = updir / f"{uuid.uuid4().hex[:8]}_{(stem or 'list')[:50]}{ext}"
+        with open(dest, "wb") as fh:
+            for chunk in upload.chunks():
+                fh.write(chunk)
+
+        from gtm.ingest.parser import inspect_provided_list, load_provided_list
+        from gtm.ingest.schema_ai import ai_available
+
+        try:
+            report = inspect_provided_list(dest, use_ai=ai_available())
+            report["path"] = str(dest)
+            rows = load_provided_list(dest)
+            report["sample"] = rows[:5]
+            report["has_country_col"] = any(
+                v == "country" for v in report.get("mapping", {}).values()
+            )
+        except Exception as exc:  # noqa: BLE001
+            return Response({"error": f"Could not read the list: {exc}"},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return Response(report)
 
     def _start(self, campaign, stage) -> Run:
         run = Run.objects.create(campaign=campaign, stage=stage, status="pending")

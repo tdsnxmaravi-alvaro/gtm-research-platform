@@ -58,3 +58,7 @@ td.tier.tD { color: #8a8f98; }
 .summary li { background: #f6f8fa; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
 .link { background: none; border: 0; color: var(--blue); cursor: pointer; padding: 4px 0; font-size: 13px; text-decoration: underline; }
 .prompt-area { font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; line-height: 1.5; white-space: pre; overflow-wrap: normal; }
+.mapping { display: grid; gap: 8px; background: #f6f8fa; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+.mapgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+details summary { list-style: none; }
+details summary::-webkit-details-marker { display: none; }

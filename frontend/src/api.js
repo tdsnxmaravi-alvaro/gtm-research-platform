@@ -20,6 +20,20 @@ export const api = {
     req("/campaigns/", { method: "POST", body: JSON.stringify({ name, config }) }),
   previewPrompt: (config) =>
     req("/campaigns/preview_prompt/", { method: "POST", body: JSON.stringify({ config }) }),
+  uploadList: (file) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return fetch(BASE + "/campaigns/upload_list/", { method: "POST", body: fd }).then(
+      async (res) => {
+        if (!res.ok) {
+          let d;
+          try { d = await res.json(); } catch { d = await res.text(); }
+          throw new Error(typeof d === "string" ? d : d.error || JSON.stringify(d));
+        }
+        return res.json();
+      }
+    );
+  },
   runStage: (id, stage) => req(`/campaigns/${id}/${stage}/`, { method: "POST" }),
   results: (id) => req(`/campaigns/${id}/results/`),
   getRun: (id) => req(`/runs/${id}/`),
