@@ -91,9 +91,12 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const setNum = (k) => (e) => setF({ ...f, [k]: Number(e.target.value) });
   const patch = (p) => setF({ ...f, ...p });
-  // Changing the vendor invalidates the vendor-driven prompt + preset fields.
-  const onVendor = (e) =>
+  // Changing the vendor invalidates the vendor-driven prompt, criteria + preview.
+  const onVendor = (e) => {
     setF({ ...f, vendor: e.target.value, search_prompt: "", value_prop: "", fit_criteria: "" });
+    setDims({ universal: [], specific: [] });
+    setEmailPreview({ html: "", source: "", loading: false });
+  };
   const toggleTier = (t) =>
     setF({
       ...f,
@@ -571,8 +574,6 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
                   ))}
                 </div>
               </div>
-              <label>Sender name (optional)<input value={f.sender_name} onChange={set("sender_name")} placeholder="Natalia Olarte" /></label>
-              <label>Sender email (optional)<input value={f.sender_email} onChange={set("sender_email")} placeholder="you@tdsynnex.com" /></label>
               <label>Email language
                 <select value={f.outreach_language} onChange={set("outreach_language")}>
                   <option value="">Auto (match each company's country)</option>
