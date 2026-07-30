@@ -20,7 +20,7 @@ class Run(models.Model):
     """One execution of a pipeline stage for a campaign."""
 
     STAGE = [(s, s) for s in ("research", "enrich", "consolidate", "outreach")]
-    STATUS = [(s, s) for s in ("pending", "running", "done", "error", "canceled")]
+    STATUS = [(s, s) for s in ("pending", "running", "done", "error", "canceled", "paused")]
 
     campaign = models.ForeignKey(Campaign, related_name="runs", on_delete=models.CASCADE)
     stage = models.CharField(max_length=20, choices=STAGE)

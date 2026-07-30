@@ -68,6 +68,7 @@ def run_enrichment(
     out_dir: str | Path | None = None,
     min_tier: str | None = None,
     should_cancel=None,
+    progress_cb=None,
 ) -> list[EnrichedContact]:
     """Enrich qualified companies. Returns the enriched contacts.
 
@@ -82,9 +83,11 @@ def run_enrichment(
 
     out = Path(out_dir or (Path("campaigns") / config.name))
     if rows is None:
-        rows = _load_rows(out / "results.csv")
+        # Prefer the consolidated shortlist (deduped + tier-filtered) so we only
+        # enrich companies worth contacting; fall back to raw results.
+        rows = _load_rows(out / "master.csv") or _load_rows(out / "results.csv")
     if not rows:
-        print("No qualified rows to enrich (run research first).")
+        print("No qualified rows to enrich (run research + consolidate first).")
         return []
 
     contacts_path = out / "contacts.csv"
@@ -128,10 +131,12 @@ def run_enrichment(
         if lara_provider is None:
             lara_provider = build_lara_enrichment_provider()
 
-    for r in pending:
+    for _i, r in enumerate(pending, 1):
         if should_cancel and should_cancel():
             print("  canceled — stopping enrichment (state saved)")
             break
+        if progress_cb:
+            progress_cb(_i, len(pending))
         company = r.get("company")
         domain = extract_domain(r.get("website") or "")
         cached = cache.get(domain) if domain else None

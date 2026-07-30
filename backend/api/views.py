@@ -2,6 +2,7 @@ import csv
 from pathlib import Path
 
 from django.conf import settings
+from django.http import FileResponse, HttpResponse
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -185,11 +186,19 @@ class CampaignViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def stop(self, request, pk=None):
-        """Request a graceful stop after the current batch/stage. State is saved,
-        so a later Start resumes where it left off."""
+        """Cancel the run. State is saved on disk, so nothing already spent is lost;
+        a later Start resumes (never re-charges cached companies)."""
         campaign = self.get_object()
-        request_cancel(campaign.name)
+        request_cancel(campaign.name, mode="stop")
         return Response({"stopping": True})
+
+    @action(detail=True, methods=["post"])
+    def pause(self, request, pk=None):
+        """Pause after the current batch/stage — meant to be resumed later (e.g. if
+        running low on Apollo credits). Start resumes from where it left off."""
+        campaign = self.get_object()
+        request_cancel(campaign.name, mode="pause")
+        return Response({"pausing": True})
 
     @action(detail=True, methods=["get"])
     def status(self, request, pk=None):
@@ -197,6 +206,41 @@ class CampaignViewSet(viewsets.ModelViewSet):
         campaign = self.get_object()
         run = campaign.runs.first()  # ordered by -created_at
         return Response(RunSerializer(run).data if run else {})
+
+    @action(detail=True, methods=["get"])
+    def download(self, request, pk=None):
+        """Download a campaign artifact (Excel/CSV)."""
+        campaign = self.get_object()
+        which = request.query_params.get("artifact", "master.xlsx")
+        allowed = {"master.xlsx", "master.csv", "results.csv", "contacts.csv"}
+        if which not in allowed:
+            return Response({"error": "unknown artifact"}, status=status.HTTP_400_BAD_REQUEST)
+        path = _out_dir(campaign.name) / which
+        if not path.exists():
+            return Response({"error": f"{which} not found — run the pipeline first."},
+                            status=status.HTTP_404_NOT_FOUND)
+        return FileResponse(open(path, "rb"), as_attachment=True,
+                            filename=f"{campaign.name}_{which}")
+
+    @action(detail=True, methods=["get"], url_path="download_eml")
+    def download_eml(self, request, pk=None):
+        """Download all generated .eml drafts as a single zip."""
+        import io
+        import zipfile
+
+        campaign = self.get_object()
+        eml_dir = _out_dir(campaign.name) / "eml"
+        files = sorted(eml_dir.glob("*.eml")) if eml_dir.exists() else []
+        if not files:
+            return Response({"error": "No .eml drafts — run outreach first."},
+                            status=status.HTTP_404_NOT_FOUND)
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            for p in files:
+                z.write(p, p.name)
+        resp = HttpResponse(buf.getvalue(), content_type="application/zip")
+        resp["Content-Disposition"] = f'attachment; filename="{campaign.name}_eml.zip"'
+        return resp
 
     @action(detail=True, methods=["post"])
     def research(self, request, pk=None):

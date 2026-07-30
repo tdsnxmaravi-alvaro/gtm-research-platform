@@ -25,10 +25,10 @@ def _control_path(name: str) -> Path:
     return _out_dir(name) / "control.json"
 
 
-def request_cancel(name: str) -> None:
+def request_cancel(name: str, mode: str = "stop") -> None:
     p = _control_path(name)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({"cancel": True}), encoding="utf-8")
+    p.write_text(json.dumps({"cancel": True, "mode": mode}), encoding="utf-8")
 
 
 def clear_cancel(name: str) -> None:
@@ -48,6 +48,16 @@ def is_canceled(name: str) -> bool:
         return bool(json.loads(p.read_text(encoding="utf-8")).get("cancel"))
     except (json.JSONDecodeError, OSError):
         return False
+
+
+def cancel_mode(name: str) -> str:
+    p = _control_path(name)
+    if not p.exists():
+        return "stop"
+    try:
+        return json.loads(p.read_text(encoding="utf-8")).get("mode", "stop")
+    except (json.JSONDecodeError, OSError):
+        return "stop"
 
 
 # --------------------------------------------------------------------------- #
@@ -81,13 +91,26 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str) -> str:
             summary = f"{count} companies" + (f" — {breakdown}" if breakdown else "")
         elif stage == "enrich":
             from gtm.enrichment import run_enrichment
-            contacts = run_enrichment(config, out_dir=out_dir, should_cancel=_should_cancel)
+            from gtm.consolidate import build_master
+            contacts = run_enrichment(config, out_dir=out_dir,
+                                      should_cancel=_should_cancel, progress_cb=_progress)
             count = len(contacts)
-            summary = f"{count} contacts"
+            emails = sum(1 for c in contacts if getattr(c, "email", ""))
+            phones = sum(1 for c in contacts if getattr(c, "direct_phone", ""))
+            enr = config.enrichment
+            if enr.provider.value == "apollo":
+                credits = emails * enr.credits_per_email + phones * enr.credits_per_phone
+                summary = (f"{count} contacts ({emails} emails, {phones} phones) "
+                           f"— ~{credits} Apollo credits")
+            else:
+                summary = f"{count} contacts ({emails} emails, {phones} phones) — LARA (no credits)"
+            # Refresh the master with the new contacts (join onto the shortlist).
+            build_master(config, out_dir=out_dir, min_tier=config.outreach.min_tier)
         elif stage == "consolidate":
             from gtm.consolidate import build_master
-            count = len(build_master(config, out_dir=out_dir))
-            summary = f"{count} master rows"
+            count = len(build_master(config, out_dir=out_dir,
+                                     min_tier=config.outreach.min_tier))
+            summary = f"{count} shortlist rows (tier ≥ {config.outreach.min_tier})"
         elif stage == "outreach":
             from gtm.outreach import run_outreach
             count = len(run_outreach(config, out_dir=out_dir))
@@ -96,8 +119,9 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str) -> str:
             raise ValueError(f"unknown stage: {stage}")
 
         if _should_cancel():
-            run.status = "canceled"
-            run.message = f"Stopped — {summary}"
+            run.status = "paused" if cancel_mode(name) == "pause" else "canceled"
+            verb = "Paused" if run.status == "paused" else "Stopped"
+            run.message = f"{verb} — {summary}"
         else:
             run.status = "done"
             run.message = summary
@@ -128,10 +152,11 @@ def run_pipeline(campaign_id: int) -> None:
 
     from gtm.config.schema import CampaignConfig
     config = CampaignConfig(**cfg)
-    stages = ["research"]
+    # consolidate BEFORE enrich: build the deduped, tier-filtered shortlist first,
+    # then enrich only that shortlist (saves credits), then refresh the master.
+    stages = ["research", "consolidate"]
     if config.enrichment.want.value != "none":
         stages.append("enrich")
-    stages.append("consolidate")
     if config.outreach.enabled:
         stages.append("outreach")
 
