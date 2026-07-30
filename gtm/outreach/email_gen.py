@@ -27,11 +27,13 @@ def _short(text: str, n: int = 220) -> str:
 def render_template(config: CampaignConfig, row: dict) -> tuple[str, str]:
     """Return (subject, body) from the built-in bilingual template.
 
-    Language is derived from the reseller's own country when available (e.g. a
-    Portuguese partner gets pt), else the campaign/outreach language.
+    Language precedence: an explicit outreach language wins (the user's choice);
+    otherwise it is auto-derived from the company's own country (e.g. a Portuguese
+    partner gets pt), then the campaign language, then English.
     """
-    lang = (language_for_country(row.get("country"))
-            or config.outreach.language or config.language or "en").lower()
+    lang = (config.outreach.language
+            or language_for_country(row.get("country"))
+            or config.language or "en").lower()
     product = row.get("product") or (config.products[0].name if config.products else "our solution")
     company = row.get("company", "")
     first = _first_name(row.get("contact_name", ""))
@@ -105,7 +107,9 @@ def generate_email(config: CampaignConfig, row: dict, use_agent: bool = False) -
 
 
 def _agent_email(prov, config: CampaignConfig, row: dict) -> tuple[str, str] | None:
-    lang = config.outreach.language or config.language or "en"
+    lang = (config.outreach.language
+            or language_for_country(row.get("country"))
+            or config.language or "en")
     product = row.get("product") or (config.products[0].name if config.products else "")
     prompt = (
         "Write a concise, warm B2B outreach email (no fluff) for a channel/reseller "

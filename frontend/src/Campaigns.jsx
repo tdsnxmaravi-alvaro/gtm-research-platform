@@ -27,7 +27,7 @@ function describe(cfg) {
   return parts.join(" · ");
 }
 
-export default function Campaigns() {
+export default function Campaigns({ onEdit }) {
   const [campaigns, setCampaigns] = useState([]);
   const [runs, setRuns] = useState({}); // campaignId -> latest run
   const [stageRuns, setStageRuns] = useState({}); // campaignId -> { stage: run }
@@ -155,6 +155,7 @@ export default function Campaigns() {
             }, {})
           : {};
         const running = run && (run.status === "running" || run.status === "pending");
+        const started = stageRuns[c.id] && Object.keys(stageRuns[c.id]).length > 0;
         return (
           <div className="card row" key={c.id}>
             <div>
@@ -169,6 +170,9 @@ export default function Campaigns() {
               <button onClick={() => stop(c.id)} disabled={!running}
                       title="Cancel the run. Saved progress is kept, so Start won't re-charge done companies">■ Stop</button>
               <button onClick={() => viewResults(c.id)} title="Show the scored companies (sorted by tier & score)">results</button>
+              {!started && onEdit && (
+                <button onClick={() => onEdit(c)} title="Edit this campaign (available until it first runs)">✎ Edit</button>
+              )}
               <a className="dl" href={`/api/campaigns/${c.id}/download/?artifact=master.xlsx`}
                  title="Download the consolidated list with contacts (Excel)">⬇ Excel</a>
               <a className="dl" href={`/api/campaigns/${c.id}/download_eml/`}

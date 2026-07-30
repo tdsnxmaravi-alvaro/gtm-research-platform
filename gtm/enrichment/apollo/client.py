@@ -57,8 +57,21 @@ class ApolloClient:
         ]
         self.locations = locations or []
         self.timeout = timeout
+        # Real credit accounting, tallied per billable Apollo action performed.
+        self.credits_used = 0
+        self.usage: dict = {}  # any credit/usage headers Apollo returns
         if not self.api_key:
             raise ValueError("APOLLO_API_KEY not set (env or constructor).")
+
+    def _capture_usage(self, resp) -> None:
+        """Record any credit/usage info Apollo returns in response headers."""
+        try:
+            for k, v in resp.headers.items():
+                lk = k.lower()
+                if "credit" in lk or "usage" in lk:
+                    self.usage[k] = v
+        except Exception:  # noqa: BLE001 - never fail on header capture
+            pass
 
     @property
     def _headers(self) -> dict:
@@ -94,6 +107,8 @@ class ApolloClient:
                                  json=payload, timeout=self.timeout)
             if resp.status_code != 200:
                 return None
+            self.credits_used += 1  # org search = 1 credit
+            self._capture_usage(resp)
             data = resp.json()
             orgs = data.get("organizations") or data.get("accounts") or []
             for org in orgs:
@@ -117,7 +132,11 @@ class ApolloClient:
             return None
         if resp.status_code != 200:
             return None
-        return resp.json().get("person")
+        self._capture_usage(resp)
+        person = resp.json().get("person")
+        if person and person.get("email"):
+            self.credits_used += 1  # email reveal = 1 credit
+        return person
 
     # ---------------------------------------------------------------- phones
     def fire_phone_reveal(self, person_id: str) -> tuple[int, str]:
@@ -135,6 +154,9 @@ class ApolloClient:
         }
         resp = requests.post(_MATCH_URL, headers=self._headers,
                              json=payload, timeout=self.timeout)
+        if resp.status_code == 200:
+            self.credits_used += 8  # phone reveal = ~8 credits
+            self._capture_usage(resp)
         request_id = ""
         try:
             request_id = ((resp.json().get("phone_enrichment") or {})

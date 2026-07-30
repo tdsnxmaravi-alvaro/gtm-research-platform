@@ -7,7 +7,47 @@ const ALL_TIERS = ["A", "B", "C", "D"];
 
 const emailOk = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((s || "").trim());
 
-export default function Wizard({ onCreated }) {
+function tiersFromMin(min) {
+  const i = ALL_TIERS.indexOf((min || "B").toUpperCase());
+  return i >= 0 ? ALL_TIERS.slice(0, i + 1) : ["A", "B"];
+}
+
+// Rebuild the wizard form state from a stored CampaignConfig (edit mode).
+function hydrate(cfg) {
+  const p0 = (cfg.products && cfg.products[0]) || {};
+  const o = cfg.outreach || {};
+  const enr = cfg.enrichment || {};
+  const colMap = { company: "", website: "", country: "" };
+  for (const [hdr, canon] of Object.entries(cfg.provided_column_overrides || {})) {
+    if (canon in colMap && !colMap[canon]) colMap[canon] = hdr;
+  }
+  const limit = cfg.process_limit || 0;
+  return {
+    name: cfg.name || "",
+    target_type: cfg.target_type || "resellers",
+    mode: cfg.mode || "provided",
+    country: cfg.country || "",
+    vendor: cfg.vendor || "",
+    provided_list_path: cfg.provided_list_path || "",
+    colMap,
+    value_prop: p0.value_prop || "",
+    fit_criteria: (p0.fit_criteria || []).join("\n"),
+    search_prompt: p0.search_prompt || "",
+    want: enr.want || "emails",
+    provider: enr.provider || "apollo",
+    max_contacts: enr.max_contacts || 3,
+    outreach_enabled: o.enabled !== undefined ? o.enabled : true,
+    tiers: o.tiers && o.tiers.length ? o.tiers : tiersFromMin(o.min_tier),
+    sender_name: o.sender_name || "",
+    sender_email: o.sender_email || "",
+    logo_path: o.logo_path || "",
+    outreach_language: o.language || "",
+    limit,
+    limitSel: limit ? "custom" : "all",
+  };
+}
+
+export default function Wizard({ onCreated, initialConfig = null, campaignId = null }) {
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -18,28 +58,33 @@ export default function Wizard({ onCreated }) {
   const [uploadErr, setUploadErr] = useState("");
   const [listReport, setListReport] = useState(null);
   const [logoUrl, setLogoUrl] = useState("");
-  const [f, setF] = useState({
-    name: "",
-    target_type: "resellers",
-    mode: "provided",
-    country: "Spain",
-    vendor: "",
-    provided_list_path: "",
-    colMap: { company: "", website: "", country: "" },
-    value_prop: "",
-    fit_criteria: "",
-    search_prompt: "",
-    want: "emails",
-    provider: "apollo",
-    max_contacts: 3,
-    outreach_enabled: true,
-    tiers: ["A", "B"],
-    sender_name: "",
-    sender_email: "",
-    logo_path: "",
-    limit: 0,
-    limitSel: "all",
-  });
+  const [f, setF] = useState(() =>
+    initialConfig
+      ? hydrate(initialConfig)
+      : {
+          name: "",
+          target_type: "resellers",
+          mode: "provided",
+          country: "Spain",
+          vendor: "",
+          provided_list_path: "",
+          colMap: { company: "", website: "", country: "" },
+          value_prop: "",
+          fit_criteria: "",
+          search_prompt: "",
+          want: "emails",
+          provider: "apollo",
+          max_contacts: 3,
+          outreach_enabled: true,
+          tiers: ["A", "B"],
+          sender_name: "",
+          sender_email: "",
+          logo_path: "",
+          outreach_language: "",
+          limit: 0,
+          limitSel: "all",
+        }
+  );
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const setNum = (k) => (e) => setF({ ...f, [k]: Number(e.target.value) });
@@ -196,6 +241,7 @@ export default function Wizard({ onCreated }) {
         sender_name: f.sender_name,
         sender_email: f.sender_email,
         ...(f.logo_path ? { logo_path: f.logo_path } : {}),
+        ...(f.outreach_language ? { language: f.outreach_language } : {}),
       },
     };
     if (f.mode === "provided") cfg.provided_list_path = f.provided_list_path || "list.csv";
@@ -217,7 +263,8 @@ export default function Wizard({ onCreated }) {
     setBusy(true);
     setError("");
     try {
-      await api.createCampaign(f.name, buildConfig());
+      if (campaignId) await api.updateCampaign(campaignId, f.name, buildConfig());
+      else await api.createCampaign(f.name, buildConfig());
       onCreated();
     } catch (e) {
       setError(String(e.message || e));
@@ -473,6 +520,18 @@ export default function Wizard({ onCreated }) {
               </div>
               <label>Sender name (optional)<input value={f.sender_name} onChange={set("sender_name")} placeholder="Natalia Olarte" /></label>
               <label>Sender email (optional)<input value={f.sender_email} onChange={set("sender_email")} placeholder="you@tdsynnex.com" /></label>
+              <label>Email language
+                <select value={f.outreach_language} onChange={set("outreach_language")}>
+                  <option value="">Auto (match each company's country)</option>
+                  <option value="en">English</option>
+                  <option value="es">Español</option>
+                  <option value="pt">Português</option>
+                  <option value="fr">Français</option>
+                  <option value="de">Deutsch</option>
+                  <option value="it">Italiano</option>
+                </select>
+                <small className="hint">Auto uses each company's country; pick one to force it for all drafts.</small>
+              </label>
               <div className="field">
                 <span className="lbl">Logo / banner (optional)</span>
                 <input type="file" accept=".png,.jpg,.jpeg,.gif,.webp" onChange={onLogoUpload} />
@@ -537,7 +596,7 @@ export default function Wizard({ onCreated }) {
           <button className="primary" onClick={next} disabled={!!curErr} title={curErr || ""}>Next</button>
         ) : (
           <button className="primary" onClick={submit} disabled={busy || !allValid}>
-            {busy ? "Creating…" : "Create campaign"}
+            {busy ? "Saving…" : campaignId ? "Save changes" : "Create campaign"}
           </button>
         )}
       </footer>

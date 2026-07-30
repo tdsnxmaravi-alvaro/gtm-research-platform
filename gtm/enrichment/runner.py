@@ -201,6 +201,18 @@ def run_enrichment(
         write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
                        columns=CONTACT_COLS)
 
+    # Persist the real Apollo credit tally (per billable action performed).
+    if apollo_client is not None:
+        try:
+            (out / "enrich_credits.json").write_text(
+                json.dumps({"apollo_credits": apollo_client.credits_used,
+                            "usage": apollo_client.usage,
+                            "updated": datetime.now().isoformat()},
+                           ensure_ascii=False, indent=2),
+                encoding="utf-8")
+        except OSError:
+            pass
+
     print(f"Done. {len(all_contacts)} contacts -> {contacts_path}"
           + (f" ({cache_hits} companies from cache)" if cache_hits else ""))
     return all_contacts

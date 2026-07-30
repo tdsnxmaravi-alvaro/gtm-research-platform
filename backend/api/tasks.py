@@ -99,9 +99,19 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str) -> str:
             phones = sum(1 for c in contacts if getattr(c, "direct_phone", ""))
             enr = config.enrichment
             if enr.provider.value == "apollo":
-                credits = emails * enr.credits_per_email + phones * enr.credits_per_phone
-                summary = (f"{count} contacts ({emails} emails, {phones} phones) "
-                           f"— ~{credits} Apollo credits")
+                real = None
+                try:
+                    real = json.loads((out_dir / "enrich_credits.json")
+                                      .read_text(encoding="utf-8")).get("apollo_credits")
+                except (OSError, ValueError):
+                    real = None
+                if real is not None:
+                    summary = (f"{count} contacts ({emails} emails, {phones} phones) "
+                               f"— {real} Apollo credits used")
+                else:
+                    est = emails * enr.credits_per_email + phones * enr.credits_per_phone
+                    summary = (f"{count} contacts ({emails} emails, {phones} phones) "
+                               f"— ~{est} Apollo credits (est.)")
             else:
                 summary = f"{count} contacts ({emails} emails, {phones} phones) — LARA (no credits)"
             # Refresh the master with the new contacts (join onto the shortlist).

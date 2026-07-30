@@ -18,6 +18,8 @@ export const api = {
   listCampaigns: () => req("/campaigns/"),
   createCampaign: (name, config) =>
     req("/campaigns/", { method: "POST", body: JSON.stringify({ name, config }) }),
+  updateCampaign: (id, name, config) =>
+    req(`/campaigns/${id}/`, { method: "PUT", body: JSON.stringify({ name, config }) }),
   previewPrompt: (config) =>
     req("/campaigns/preview_prompt/", { method: "POST", body: JSON.stringify({ config }) }),
   vendorPreset: (vendor, targetType) =>
