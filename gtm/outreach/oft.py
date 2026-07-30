@@ -23,6 +23,7 @@ VENDOR_TEMPLATE_KEY = {
     "Novade": "Novade",
     "Newforma": "Newforma",
     "Unity": "Unity",
+    "Trimble": "Trimble",
 }
 
 

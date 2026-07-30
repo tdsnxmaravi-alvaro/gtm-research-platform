@@ -530,10 +530,10 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
                 <small className="hint">Auto uses each company's country; pick one to force it for all drafts.</small>
               </label>
               <div className="field">
-                <span className="lbl">Logo / banner (optional)</span>
+                <span className="lbl">Custom header / logo (optional)</span>
                 <input type="file" accept=".png,.jpg,.jpeg,.gif,.webp" onChange={onLogoUpload} />
-                <small className="hint">Sits at the top of the branded frame; the body is the generated content.</small>
-                {f.logo_path && <small className="hint">Logo set: {f.logo_path.split(/[\\/]/).pop()}</small>}
+                <small className="hint">By default each vendor uses its own branded template. Upload here to override with your own header/banner.</small>
+                {f.logo_path && <small className="hint">Custom header set: {f.logo_path.split(/[\\/]/).pop()}</small>}
               </div>
               <div className="field">
                 <span className="lbl">Email preview</span>
