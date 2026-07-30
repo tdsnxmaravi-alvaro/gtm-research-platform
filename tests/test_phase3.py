@@ -109,3 +109,17 @@ def test_write_eml_uses_branded_template_and_carries_inline_image(tmp_path):
     assert "{{BODY}}" not in html and "Hola Acme." in html
     assert "border:1px solid #ccc" in html and "cid:banner1" in html  # box + ref kept
     assert len(imgs) == 1 and imgs[0]["Content-ID"] == "<banner1>"  # inline image carried
+
+
+def test_write_eml_with_logo_uses_frame_and_inline_banner(tmp_path):
+    logo = tmp_path / "logo.png"
+    logo.write_bytes(b"\x89PNG\r\n\x1a\n_fakelogo")
+    out = write_eml(tmp_path / "o.eml", to_email="x@y.com", subject="Hi",
+                    body="Hola Acme.\n\nSaludos", logo_path=str(logo))
+    msg = email.message_from_bytes(out.read_bytes(), policy=email.policy.default)
+    html = next(p.get_content() for p in msg.walk() if p.get_content_type() == "text/html")
+    imgs = [p for p in msg.walk() if p.get_content_maintype() == "image"]
+    assert "<img" in html and "cid:" in html and "Hola Acme." in html
+    assert "border:1px solid #e1e4e8" in html  # branded frame
+    assert len(imgs) == 1
+    assert imgs[0]["Content-ID"].strip("<>") in html  # banner cid matches

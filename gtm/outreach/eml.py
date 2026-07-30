@@ -43,6 +43,31 @@ def _plain_to_html(body: str) -> str:
 BODY_MARKER = "{{BODY}}"
 
 
+def _branded_html(body: str, logo_cid: str | None = None) -> str:
+    """Branded box with an optional top banner logo (inline CID) + the body.
+
+    The generated content sits inside a bordered card; when a logo is supplied it
+    spans the top like the sample outreach template, otherwise a thin brand bar is
+    used. The signature is expected to be part of `body`.
+    """
+    inner = _body_to_html_paragraphs(body)
+    banner = (
+        f'<img src="cid:{logo_cid}" alt="" '
+        'style="display:block; width:100%; max-width:640px; height:auto; border:0;">'
+        if logo_cid
+        else '<div style="height:6px; background:#0f4c81;"></div>'
+    )
+    return (
+        '<html><body style="margin:0; padding:24px; background:#f4f5f7; '
+        'font-family: Aptos, Calibri, Arial, sans-serif; font-size:11pt; color:#1a1a1a;">'
+        '<div style="max-width:640px; margin:0 auto; background:#ffffff; '
+        'border:1px solid #e1e4e8; border-radius:8px; overflow:hidden;">'
+        f'{banner}'
+        f'<div style="padding:28px 32px; line-height:1.5;">{inner}</div>'
+        '</div></body></html>'
+    )
+
+
 def _body_to_html_paragraphs(body: str) -> str:
     def esc(t: str) -> str:
         return (t.replace("&", "&amp;").replace("<", "&lt;")
@@ -96,12 +121,14 @@ def write_eml(
     from_name: str = "",
     html_body: str | None = None,
     template_eml: str | Path | None = None,
+    logo_path: str | Path | None = None,
 ) -> Path:
     """Write one editable .eml draft. Returns the path.
 
     When `template_eml` points to a branded sample (with a {{BODY}} marker), its
-    box + inline images are reused and the per-company body is injected; otherwise
-    the built-in branded box is used.
+    box + inline images are reused. Otherwise, when `logo_path` is set, the built-in
+    branded frame is used with that logo as the top banner. Falls back to the plain
+    branded box when neither is provided.
     """
     msg = EmailMessage()
     msg["Subject"] = subject
@@ -121,6 +148,18 @@ def write_eml(
             if applied is not None:
                 final_html = applied
                 inline_images = imgs
+        except (OSError, ValueError):
+            final_html = None  # fall back below
+
+    if final_html is None and logo_path:
+        try:
+            data = Path(logo_path).read_bytes()
+            subtype = (Path(logo_path).suffix.lstrip(".").lower() or "png")
+            if subtype == "jpg":
+                subtype = "jpeg"
+            cid = make_msgid()[1:-1]  # unique id, no angle brackets
+            final_html = _branded_html(body, logo_cid=cid)
+            inline_images = [{"cid": cid, "subtype": subtype, "data": data}]
         except (OSError, ValueError):
             final_html = None  # fall back to the built-in box
 

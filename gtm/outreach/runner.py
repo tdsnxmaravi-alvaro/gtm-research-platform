@@ -93,6 +93,7 @@ def run_outreach(
             from_email=config.outreach.sender_email,
             from_name=config.outreach.sender_name,
             template_eml=config.outreach.template_eml,
+            logo_path=config.outreach.logo_path,
         )
         drafts.append({"company": r.get("company"), "email": r["email"], "eml": str(path)})
 

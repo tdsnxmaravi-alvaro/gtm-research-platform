@@ -194,6 +194,7 @@ class Outreach(BaseModel):
     enabled: bool = False
     language: str | None = None          # default: campaign language
     template_eml: str | None = None       # path to a sample .eml (branded template)
+    logo_path: str | None = None          # path to a logo image (top banner in the frame)
     agent_assistant_id_env: str | None = None
     sender_name: str = ""                 # BDR name for the signature / From
     sender_email: str = ""               # BDR email for the From header

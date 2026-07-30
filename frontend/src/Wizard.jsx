@@ -35,6 +35,7 @@ export default function Wizard({ onCreated }) {
     tiers: ["A", "B"],
     sender_name: "",
     sender_email: "",
+    logo_path: "",
     limit: 0,
     limitSel: "all",
   });
@@ -71,6 +72,21 @@ export default function Wizard({ onCreated }) {
 
   const setCol = (field) => (e) =>
     setF({ ...f, colMap: { ...f.colMap, [field]: e.target.value } });
+
+  async function onLogoUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadErr("");
+    try {
+      const rep = await api.uploadLogo(file);
+      setF((prev) => ({ ...prev, logo_path: rep.path }));
+    } catch (err) {
+      setUploadErr(String(err.message || err));
+    } finally {
+      setUploading(false);
+    }
+  }
 
   // --- per-step validation (#7) ---
   function stepError(s) {
@@ -174,6 +190,7 @@ export default function Wizard({ onCreated }) {
         tiers: [...f.tiers].sort(),
         sender_name: f.sender_name,
         sender_email: f.sender_email,
+        ...(f.logo_path ? { logo_path: f.logo_path } : {}),
       },
     };
     if (f.mode === "provided") cfg.provided_list_path = f.provided_list_path || "list.csv";
@@ -451,6 +468,12 @@ export default function Wizard({ onCreated }) {
               </div>
               <label>Sender name (optional)<input value={f.sender_name} onChange={set("sender_name")} placeholder="Natalia Olarte" /></label>
               <label>Sender email (optional)<input value={f.sender_email} onChange={set("sender_email")} placeholder="you@tdsynnex.com" /></label>
+              <div className="field">
+                <span className="lbl">Logo / banner (optional)</span>
+                <input type="file" accept=".png,.jpg,.jpeg,.gif,.webp" onChange={onLogoUpload} />
+                <small className="hint">Sits at the top of the branded frame; the body is the generated content.</small>
+                {f.logo_path && <small className="hint">Logo set: {f.logo_path.split(/[\\/]/).pop()}</small>}
+              </div>
             </>
           )}
         </section>

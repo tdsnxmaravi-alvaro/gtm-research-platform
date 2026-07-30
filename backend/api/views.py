@@ -12,6 +12,7 @@ from .tasks import run_stage
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB cap for provided lists
 ALLOWED_LIST_EXT = (".csv", ".xlsx", ".xlsm")
+ALLOWED_IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp")
 
 
 def _out_dir(name: str) -> Path:
@@ -85,6 +86,30 @@ class CampaignViewSet(viewsets.ModelViewSet):
             "value_prop": preset["value_prop"],
             "fit_criteria": preset["fit_criteria"],
         })
+
+    @action(detail=False, methods=["post"])
+    def upload_logo(self, request):
+        """Store a logo image for the outreach frame; returns its server path."""
+        import uuid
+
+        upload = request.FILES.get("file")
+        if not upload:
+            return Response({"error": "No file uploaded (field 'file')."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        ext = Path(upload.name).suffix.lower()
+        if ext not in ALLOWED_IMAGE_EXT:
+            return Response({"error": "Only PNG/JPG/GIF/WEBP images are supported."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if upload.size and upload.size > MAX_UPLOAD_BYTES:
+            return Response({"error": "Image exceeds the 10 MB limit."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        updir = Path(settings.GTM_DATA_ROOT) / "_uploads"
+        updir.mkdir(parents=True, exist_ok=True)
+        dest = updir / f"logo_{uuid.uuid4().hex[:8]}{ext}"
+        with open(dest, "wb") as fh:
+            for chunk in upload.chunks():
+                fh.write(chunk)
+        return Response({"path": str(dest), "name": upload.name})
 
     @action(detail=False, methods=["post"])
     def upload_list(self, request):
