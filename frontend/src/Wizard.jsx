@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { api } from "./api.js";
 
 const STEPS = ["Target", "Setup", "Prompt", "Enrich", "Outreach", "Review"];
-const VENDORS = ["Bricsys", "DraftSight", "Novade", "Newforma", "Unity", "Trimble"];
+const VENDORS = ["Bricsys", "DraftSight", "Newforma", "Novade", "Trimble", "Unity"];
 const ALL_TIERS = ["A", "B", "C", "D"];
 
 const emailOk = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((s || "").trim());
@@ -91,6 +91,9 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const setNum = (k) => (e) => setF({ ...f, [k]: Number(e.target.value) });
   const patch = (p) => setF({ ...f, ...p });
+  // Changing the vendor invalidates the vendor-driven prompt + preset fields.
+  const onVendor = (e) =>
+    setF({ ...f, vendor: e.target.value, search_prompt: "", value_prop: "", fit_criteria: "" });
   const toggleTier = (t) =>
     setF({
       ...f,
@@ -369,7 +372,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
         <section className="grid">
           <label>Campaign name<input value={f.name} onChange={set("name")} placeholder="trimble-iberia" /></label>
           <label>Vendor
-            <select value={f.vendor} onChange={set("vendor")}>
+            <select value={f.vendor} onChange={onVendor}>
               <option value="">— select vendor —</option>
               {VENDORS.map((v) => <option key={v} value={v}>{v}</option>)}
             </select>

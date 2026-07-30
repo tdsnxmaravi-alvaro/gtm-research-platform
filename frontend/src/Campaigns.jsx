@@ -32,6 +32,8 @@ export default function Campaigns({ onEdit }) {
   const [runs, setRuns] = useState({}); // campaignId -> latest run
   const [stageRuns, setStageRuns] = useState({}); // campaignId -> { stage: run }
   const [results, setResults] = useState({}); // campaignId -> rows
+  const [resultsOpen, setResultsOpen] = useState({}); // campaignId -> bool
+  const [confirmDel, setConfirmDel] = useState(null); // campaign pending delete
   const [error, setError] = useState("");
 
   async function refreshStages(id) {
@@ -126,20 +128,30 @@ export default function Campaigns({ onEdit }) {
     }, 2000);
   }
 
-  async function viewResults(id) {
-    try {
-      const data = await api.results(id);
-      setResults((r) => ({ ...r, [id]: data.results || [] }));
-    } catch (e) {
-      setError(String(e.message || e));
+  async function toggleResults(id) {
+    if (resultsOpen[id]) {
+      setResultsOpen((o) => ({ ...o, [id]: false }));
+      return;
     }
+    if (!results[id]) {
+      try {
+        const data = await api.results(id);
+        setResults((r) => ({ ...r, [id]: data.results || [] }));
+      } catch (e) {
+        setError(String(e.message || e));
+        return;
+      }
+    }
+    setResultsOpen((o) => ({ ...o, [id]: true }));
   }
 
-  async function remove(id, name) {
-    if (!window.confirm(`Delete campaign "${name}"?\nIt is hidden but its results/contacts stay on disk for future campaigns.`)) return;
+  async function doDelete() {
+    const c = confirmDel;
+    setConfirmDel(null);
+    if (!c) return;
     try {
-      await api.deleteCampaign(id);
-      setCampaigns((cs) => cs.filter((c) => c.id !== id));
+      await api.deleteCampaign(c.id);
+      setCampaigns((cs) => cs.filter((x) => x.id !== c.id));
     } catch (e) {
       setError(String(e.message || e));
     }
@@ -194,14 +206,16 @@ export default function Campaigns({ onEdit }) {
                         title="Cancel the run. Saved progress is kept, so Start won't re-charge done companies">■ Stop</button>
               )}
               {started && (
-                <button onClick={() => viewResults(c.id)} disabled={running}
-                        title="Show the scored companies (sorted by tier & score)">results</button>
+                <button onClick={() => toggleResults(c.id)} disabled={running}
+                        title="Show/hide the scored companies (sorted by tier & score)">
+                  {resultsOpen[c.id] ? "results ▾" : "results ▸"}
+                </button>
               )}
               {!started && onEdit && (
                 <button onClick={() => onEdit(c)} title="Edit this campaign (available until it first runs)">✎ Edit</button>
               )}
               {!running && (
-                <button onClick={() => remove(c.id, c.name)}
+                <button onClick={() => setConfirmDel(c)}
                         title="Delete (logical): hides the campaign but keeps results/contacts for future reuse">🗑 Delete</button>
               )}
               {started &&
@@ -261,35 +275,53 @@ export default function Campaigns({ onEdit }) {
                 ))}
               </div>
             </details>
-            {rows && (
+            {resultsOpen[c.id] && rows && (
               <>
                 <div className="status">
                   <b>{rows.length}</b> companies —{" "}
                   {["A", "B", "C", "D"].map((t) => (counts[t] ? `${t}:${counts[t]} ` : "")).join("")}
+                  {rows.length > 50 ? "· showing top 50" : ""}
                 </div>
-                <table className="results">
-                  <thead>
-                    <tr><th>Tier</th><th>Score</th><th>Company</th><th>Evidence</th></tr>
-                  </thead>
-                  <tbody>
-                    {sorted.slice(0, 50).map((r, i) => (
-                      <tr key={i}>
-                        <td className={`tier t${(r.final_tier || r.tier || "").toUpperCase()}`}>{r.final_tier || r.tier}</td>
-                        <td>{r.score}</td>
-                        <td>{r.company}</td>
-                        <td>{r.evidence_count}</td>
-                      </tr>
-                    ))}
-                    {!rows.length && (
-                      <tr><td colSpan={4}>No results yet — run research first.</td></tr>
-                    )}
-                  </tbody>
-                </table>
+                <div className="results-scroll">
+                  <table className="results">
+                    <thead>
+                      <tr><th>Tier</th><th>Score</th><th>Company</th><th>Evidence</th></tr>
+                    </thead>
+                    <tbody>
+                      {sorted.slice(0, 50).map((r, i) => (
+                        <tr key={i}>
+                          <td className={`tier t${(r.final_tier || r.tier || "").toUpperCase()}`}>{r.final_tier || r.tier}</td>
+                          <td>{r.score}</td>
+                          <td>{r.company}</td>
+                          <td>{r.evidence_count}</td>
+                        </tr>
+                      ))}
+                      {!rows.length && (
+                        <tr><td colSpan={4}>No results yet — run research first.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </>
             )}
           </div>
         );
       })}
+      {confirmDel && (
+        <div className="modal-overlay" onClick={() => setConfirmDel(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete campaign</h3>
+            <p>
+              Delete <b>{confirmDel.name}</b>? It’s hidden from the list, but its results
+              and contacts stay on disk so future campaigns can reuse them.
+            </p>
+            <div className="modal-actions">
+              <button onClick={() => setConfirmDel(null)}>Cancel</button>
+              <button className="danger" onClick={doDelete}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

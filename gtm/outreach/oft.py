@@ -72,8 +72,9 @@ def _inject_body_marker(html: str) -> str:
         tail = f"<div>{BODY_MARKER}</div>" + tail
 
     html = head + tail
-    # Blank visible text nodes AFTER the marker (the placeholder signature); the
-    # branded footer bars are empty/colored cells and are preserved.
+    # Blank visible text nodes AFTER the marker (the placeholder signature) and
+    # collapse the now-empty padded cell so there is no gap before the branded
+    # footer bars (which are empty colored cells and are preserved).
     idx = html.find(BODY_MARKER)
     if idx >= 0:
         cut = idx + len(BODY_MARKER)
@@ -82,7 +83,12 @@ def _inject_body_marker(html: str) -> str:
             t = m.group(1)
             return "> <" if (t.strip() and t.strip() != "&nbsp;") else m.group(0)
 
-        html = html[:cut] + re.sub(r">([^<]+)<", _blank, html[cut:])
+        after = re.sub(r">([^<]+)<", _blank, html[cut:])
+        # remove the signature cell's large padding + empty spacer paragraphs
+        after = re.sub(r"padding:15\.0pt 15\.0pt 15\.0pt 15\.0pt", "padding:0", after)
+        after = after.replace("&nbsp;", " ")
+        after = re.sub(r"(?is)<p\b[^>]*>(?:\s|<o:p>|</o:p>)*</p>", "", after)
+        html = html[:cut] + after
     return html
 
 
