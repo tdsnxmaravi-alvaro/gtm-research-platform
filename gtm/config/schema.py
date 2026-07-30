@@ -218,6 +218,8 @@ class CampaignConfig(BaseModel):
     # Raw-header (lowercased) -> canonical field ("company"/"website"/"country").
     # Set by the wizard's upload + column-mapping step; applied when loading the list.
     provided_column_overrides: dict[str, str] = Field(default_factory=dict)
+    # Cap how many companies from the provided list to process (0 = all).
+    process_limit: int = 0
 
     scoring: Scoring = Field(default_factory=Scoring)
     enrichment: Enrichment = Field(default_factory=Enrichment)

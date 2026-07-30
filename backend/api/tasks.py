@@ -27,7 +27,8 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str) -> str:
         config = CampaignConfig(**cfg_dict)
         if stage == "research":
             from gtm.research import run_campaign
-            count = len(run_campaign(config, out_dir=out_dir))
+            count = len(run_campaign(config, out_dir=out_dir,
+                                     limit=config.process_limit))
         elif stage == "enrich":
             from gtm.enrichment import run_enrichment
             count = len(run_enrichment(config, out_dir=out_dir))

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { api } from "./api.js";
 
-const STEPS = ["Target", "Setup", "Details", "Prompt", "Enrich", "Outreach", "Review"];
+const STEPS = ["Target", "Setup", "Prompt", "Enrich", "Outreach", "Review"];
 const VENDORS = ["Bricsys", "DraftSight", "Novade", "Newforma", "Unity", "Trimble"];
 const ALL_TIERS = ["A", "B", "C", "D"];
 
@@ -35,6 +35,8 @@ export default function Wizard({ onCreated }) {
     tiers: ["A", "B"],
     sender_name: "",
     sender_email: "",
+    limit: 0,
+    limitSel: "all",
   });
 
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -76,15 +78,13 @@ export default function Wizard({ onCreated }) {
     if (name === "Setup") {
       if (!f.name.trim()) return "Campaign name is required.";
       if (!f.vendor) return "Pick a vendor.";
-      if (!f.country.trim()) return "Country is required.";
+      const hasRowCountry = f.mode === "provided" && !!f.colMap.country;
+      if (!hasRowCountry && !f.country.trim())
+        return "Country is required (used as the fallback when a row has none).";
       if (f.mode === "provided" && !f.provided_list_path.trim())
         return "Upload the list (or enter a server path).";
       if (f.mode === "provided" && listReport && !f.colMap.company)
         return "Map the company column.";
-    }
-    if (name === "Details") {
-      if (!f.value_prop.trim() && !f.fit_criteria.trim())
-        return "Add a value proposition or at least one fit criterion.";
     }
     if (name === "Prompt") {
       if (!f.search_prompt.trim()) return "The research prompt cannot be empty.";
@@ -93,15 +93,13 @@ export default function Wizard({ onCreated }) {
       return "Max contacts must be ≥ 1.";
     if (name === "Outreach" && f.outreach_enabled) {
       if (f.tiers.length === 0) return "Select at least one tier for outreach.";
-      if (!f.sender_name.trim()) return "Sender name is required for outreach.";
-      if (!emailOk(f.sender_email)) return "A valid sender email is required for outreach.";
+      if (f.sender_email.trim() && !emailOk(f.sender_email))
+        return "Sender email looks invalid.";
     }
     return "";
   }
 
   const curErr = stepError(step);
-  const enrichIdx = STEPS.indexOf("Enrich");
-  const priorValid = STEPS.slice(0, enrichIdx).every((_, i) => !stepError(i));
   const allValid = STEPS.every((_, i) => !stepError(i));
 
   const next = () => {
@@ -113,9 +111,36 @@ export default function Wizard({ onCreated }) {
     setError("");
     setStep((s) => Math.max(s - 1, 0));
   };
+  const goTo = (i) => {
+    if (i === step) return;
+    if (i < step) { setError(""); setStep(i); return; }      // back: always allowed
+    for (let k = step; k < i; k++) if (stepError(k)) return;  // forward: require valid
+    setError(""); setStep(i);
+  };
+  const onLimitSel = (e) => {
+    const v = e.target.value;
+    patch({ limitSel: v, limit: v === "custom" ? (f.limit || 20) : v === "all" ? 0 : Number(v) });
+  };
+
+  const wantEmail = f.want !== "none";
+  const wantPhone = f.want === "emails+phones";
+  const toggleEmail = (e) => {
+    const on = e.target.checked;
+    patch({ want: on ? (wantPhone ? "emails+phones" : "emails") : "none" });
+  };
+  const togglePhone = (e) => {
+    const on = e.target.checked;
+    patch({ want: on ? "emails+phones" : (wantEmail ? "emails" : "none") });
+  };
 
   const perCompany =
     f.want === "none" ? 0 : f.max_contacts * (1 + (f.want === "emails+phones" ? 8 : 0));
+
+  // Companies the run will actually process (respects the limit + the uploaded list).
+  const listCount = listReport?.with_company || 0;
+  const effectiveCount =
+    f.limit > 0 ? (listCount ? Math.min(f.limit, listCount) : f.limit) : listCount;
+  const totalCredits = perCompany * effectiveCount;
 
   const lowestTier = () => {
     const sel = ALL_TIERS.filter((t) => f.tiers.includes(t));
@@ -158,6 +183,7 @@ export default function Wizard({ onCreated }) {
     }
     if (f.mode === "provided" && Object.keys(overrides).length)
       cfg.provided_column_overrides = overrides;
+    if (f.mode === "provided" && f.limit > 0) cfg.process_limit = f.limit;
     return cfg;
   }
 
@@ -203,7 +229,8 @@ export default function Wizard({ onCreated }) {
     <div className="card">
       <ol className="steps">
         {STEPS.map((s, i) => (
-          <li key={s} className={i === step ? "on" : i < step ? "done" : ""}>{s}</li>
+          <li key={s} className={i === step ? "on" : i < step ? "done" : ""}
+              onClick={() => goTo(i)} role="button">{s}</li>
         ))}
       </ol>
 
@@ -289,24 +316,31 @@ export default function Wizard({ onCreated }) {
               </details>
             </div>
           )}
-        </section>
-      )}
-
-      {STEPS[step] === "Details" && (
-        <section className="grid">
-          <label>Value proposition<textarea value={f.value_prop} onChange={set("value_prop")} rows={3} placeholder="Why this vendor fits this audience…" /></label>
-          <label>Fit criteria (one per line)<textarea value={f.fit_criteria} onChange={set("fit_criteria")} rows={4} placeholder={"Sells CAD/design software\nActive construction projects"} /></label>
-          <small className="hint">These feed the research prompt on the next step.</small>
+          {f.mode === "provided" && listReport && (
+            <label>How many to process
+              <select value={f.limitSel} onChange={onLimitSel}>
+                <option value="all">All ({listReport.with_company})</option>
+                <option value="20">First 20</option>
+                <option value="50">First 50</option>
+                <option value="100">First 100</option>
+                <option value="custom">Custom…</option>
+              </select>
+              {f.limitSel === "custom" && (
+                <input type="number" min="1" value={f.limit} onChange={setNum("limit")} />
+              )}
+            </label>
+          )}
         </section>
       )}
 
       {STEPS[step] === "Prompt" && (
         <section className="grid">
           <h2>Research prompt</h2>
-          <small className="hint">
-            Assembled from the vendor, target, country, fit criteria and scoring. Edit it freely — this exact text drives qualification.
-            {f.mode === "provided" ? " The [[COMPANIES]] marker is replaced with your uploaded list at run time." : ""}
-          </small>
+          <ul className="summary">
+            <li>Researches each company and scores fit as a <b>{f.vendor || "vendor"}</b> {f.target_type === "resellers" ? "reseller" : "account"} in <b>{f.mode === "provided" && f.colMap.country ? "each row’s country" : (f.country || "—")}</b>.</li>
+            <li>Requires a source URL for every claim — without evidence a company can’t exceed the capped tier.</li>
+            <li>Edit the prompt directly, or tweak the value prop / fit criteria below and regenerate.</li>
+          </ul>
           {promptLoading ? (
             <div className="estimate">Building prompt…</div>
           ) : (
@@ -321,22 +355,35 @@ export default function Wizard({ onCreated }) {
           {promptErr && <p className="error">{promptErr}</p>}
           <div>
             <button type="button" className="link" onClick={regeneratePrompt} disabled={promptLoading}>
-              ↻ Regenerate from template (discards edits)
+              ↻ Regenerate prompt from fields (discards edits)
             </button>
           </div>
+          <details>
+            <summary className="link">Advanced: value proposition & fit criteria</summary>
+            <div className="grid" style={{ marginTop: 8 }}>
+              <label>Value proposition<textarea value={f.value_prop} onChange={set("value_prop")} rows={3} placeholder="Why this vendor fits this audience…" /></label>
+              <label>Fit criteria (one per line)<textarea value={f.fit_criteria} onChange={set("fit_criteria")} rows={4} placeholder={"Sells CAD/design software\nActive construction projects"} /></label>
+            </div>
+          </details>
+          {f.mode === "provided" && <small className="hint">The [[COMPANIES]] marker is replaced with your uploaded list at run time.</small>}
         </section>
       )}
 
       {STEPS[step] === "Enrich" && (
         <section className="grid">
           <h2>Enrichment</h2>
-          <label>What to find
-            <select value={f.want} onChange={set("want")}>
-              <option value="none">none (qualify only)</option>
-              <option value="emails">emails</option>
-              <option value="emails+phones">emails + phones</option>
-            </select>
-          </label>
+          <div className="field">
+            <span className="lbl">What to find</span>
+            <div className="checks">
+              <label className="chk">
+                <input type="checkbox" checked={wantEmail} onChange={toggleEmail} /> Emails
+              </label>
+              <label className="chk">
+                <input type="checkbox" checked={wantPhone} disabled={!wantEmail} onChange={togglePhone} /> Phones
+              </label>
+            </div>
+            <small className="hint">Phones require the contact’s email first. Uncheck both to qualify only.</small>
+          </div>
           {f.want !== "none" && (
             <div className="field">
               <span className="lbl">Provider</span>
@@ -349,16 +396,19 @@ export default function Wizard({ onCreated }) {
           {f.want !== "none" && (
             <label>Max contacts per company<input type="number" min="1" max="10" value={f.max_contacts} onChange={setNum("max_contacts")} /></label>
           )}
-          {priorValid ? (
-            <div className="estimate">
-              {f.want === "none"
-                ? "No enrichment."
-                : f.provider === "apollo"
-                ? `≈ ${perCompany} Apollo credits per company (${f.max_contacts} contacts${f.want === "emails+phones" ? " + phone reveals" : ""}).`
-                : "LARA web search — no Apollo credits."}
-            </div>
+          {f.want === "none" ? (
+            <div className="estimate">No enrichment (qualify only).</div>
+          ) : f.provider !== "apollo" ? (
+            <div className="estimate">LARA web search — no Apollo credits.</div>
           ) : (
-            <div className="estimate warn">Complete the earlier steps to see the credit estimate.</div>
+            <div className="estimate">
+              ≈ <b>{perCompany}</b> credits/company (1 × {f.max_contacts} email{f.max_contacts > 1 ? "s" : ""}{f.want === "emails+phones" ? ` + 8 × ${f.max_contacts} phone${f.max_contacts > 1 ? "s" : ""}` : ""})
+              {effectiveCount > 0 ? (
+                <> · <b>≈ {totalCredits.toLocaleString()}</b> credits total for {effectiveCount.toLocaleString()} compan{effectiveCount === 1 ? "y" : "ies"}{f.limit > 0 ? " (limited)" : ""}</>
+              ) : (
+                <> · upload a list in Setup to estimate the total</>
+              )}
+            </div>
           )}
         </section>
       )}
@@ -383,8 +433,8 @@ export default function Wizard({ onCreated }) {
                   ))}
                 </div>
               </div>
-              <label>Sender name<input value={f.sender_name} onChange={set("sender_name")} placeholder="Natalia Olarte" /></label>
-              <label>Sender email<input value={f.sender_email} onChange={set("sender_email")} placeholder="you@tdsynnex.com" /></label>
+              <label>Sender name (optional)<input value={f.sender_name} onChange={set("sender_name")} placeholder="Natalia Olarte" /></label>
+              <label>Sender email (optional)<input value={f.sender_email} onChange={set("sender_email")} placeholder="you@tdsynnex.com" /></label>
             </>
           )}
         </section>
@@ -394,8 +444,8 @@ export default function Wizard({ onCreated }) {
         <section>
           <h2>Review</h2>
           <ul className="summary">
-            <li>Targeting <b>{f.target_type}</b>{f.vendor ? <> for <b>{f.vendor}</b></> : null} in <b>{f.country}</b>.</li>
-            <li>Input: <b>{f.mode === "provided" ? "uploaded list" : "discover (find them)"}</b>.</li>
+            <li>Targeting <b>{f.target_type}</b>{f.vendor ? <> for <b>{f.vendor}</b></> : null} in <b>{f.mode === "provided" && f.colMap.country ? "per-row country" : (f.country || "—")}</b>{f.mode === "provided" && f.colMap.country && f.country ? <> (fallback {f.country})</> : null}.</li>
+            <li>Input: <b>{f.mode === "provided" ? "uploaded list" : "discover (find them)"}</b>{f.mode === "provided" && listReport ? <> — {effectiveCount.toLocaleString()} of {listReport.with_company.toLocaleString()} companies{f.limit > 0 ? " (limited)" : ""}</> : null}.</li>
             <li>
               Enrichment:{" "}
               {f.want === "none" ? (
@@ -403,14 +453,14 @@ export default function Wizard({ onCreated }) {
               ) : (
                 <>
                   <b>{f.provider === "apollo" ? "Apollo" : "LARA web search"}</b> — up to <b>{f.max_contacts}</b> contacts ({f.want})
-                  {f.provider === "apollo" ? <> ≈ <b>{perCompany}</b> credits/company</> : null}
+                  {f.provider === "apollo" ? <> ≈ <b>{perCompany}</b>/company{effectiveCount > 0 ? <>, <b>≈ {totalCredits.toLocaleString()}</b> total</> : null}</> : null}
                 </>
               )}.
             </li>
             <li>
               Outreach:{" "}
               {f.outreach_enabled ? (
-                <>.eml drafts for tiers <b>{[...f.tiers].sort().join(", ") || "—"}</b> — from <b>{f.sender_name || "—"}</b> ({f.sender_email || "—"})</>
+                <>.eml drafts for tiers <b>{[...f.tiers].sort().join(", ") || "—"}</b>{f.sender_name || f.sender_email ? <> — from <b>{f.sender_name || "—"}</b> ({f.sender_email || "—"})</> : null}</>
               ) : (
                 <b>off</b>
               )}.
