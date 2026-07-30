@@ -24,140 +24,162 @@ VENDOR_PRESETS: dict[str, dict] = {
         "domain": "design / CAD / BIM / civil software",
         "sectors": "architecture, engineering, construction, surveying, manufacturing",
         "value_prop": (
-            "Trimble's channel software for design and the built environment — Tekla "
-            "(structural BIM/analysis), SketchUp (3D modeling), Trimble Connect (common "
-            "data environment), Viewpoint/ProjectSight (construction management) and "
-            "Quadri/Novapoint (civil infrastructure). We recruit resellers who can ADD "
-            "this design software to their portfolio; they need not sell it today."
+            "Trimble's channel software for design and the built environment, sold through "
+            "TD SYNNEX / Datech: Tekla Structures, Tekla Structural Designer and Tekla Tedds "
+            "(structural BIM, analysis, steel & concrete detailing); SketchUp (3D modeling); "
+            "Trimble Connect (common data environment / cloud collaboration); Viewpoint and "
+            "ProjectSight (construction & project management); and Quadri & Novapoint (civil "
+            "infrastructure design). We recruit TD SYNNEX resellers who could ADD this design "
+            "software to their portfolio — they need not sell design software today; the "
+            "question is capability, services and customer base to do so successfully."
         ),
         "reseller_fit": [
-            "Is a software-selling VAR (licensing, renewals, services), not a pure box-mover",
+            "Is a software-selling VAR (licensing, renewals, services), not a pure hardware / box-mover",
             "Serves design-intensive sectors: architecture, engineering, construction, "
-            "manufacturing or creative/media",
-            "Shows adjacency to design/CAD/BIM/engineering software (Autodesk, Bentley, "
-            "Nemetschek, PTC, Dassault…) — a plus, not a gate",
-            "Provides value-added services (training, support, implementation, certified staff)",
-            "Has an established commercial presence and delivery capability in the target country",
+            "manufacturing, industrial or creative/media",
+            "Shows adjacency to design/CAD/BIM/engineering/creative software (Autodesk, Bentley, "
+            "Nemetschek, PTC, Dassault, Adobe) — a strong plus, not a gate",
+            "Provides value-added services a design line requires: training, technical support, "
+            "implementation, certified staff",
+            "Has established commercial presence and delivery capability in the target country",
+            "Bonus: existing surveying / geospatial / civil-field footprint (Trimble Field Systems adjacency)",
         ],
         "account_fit": [
-            "Runs active AEC/engineering/construction or civil projects that need BIM, 3D or CDE",
-            "Shows demand triggers: new projects, hiring of designers/engineers, expansion, M&A",
-            "Uses (or is replacing) competing CAD/BIM tools",
+            "Runs active AEC / engineering / construction or civil-infrastructure projects that need BIM, 3D or a CDE",
+            "Demand triggers: new project wins, hiring of designers/engineers/BIM staff, expansion, M&A",
+            "Uses or is actively replacing competing CAD/BIM tools (Autodesk, Bentley, Nemetschek)",
+            "Structural, civil or construction workflows that fit Tekla / Trimble Connect / Viewpoint",
         ],
     },
     "Bricsys": {
         "product_name": "BricsCAD",
-        "domain": "DWG-native CAD (2D/3D, BIM, mechanical)",
-        "sectors": "architecture, engineering, construction, manufacturing",
+        "domain": "DWG-native CAD (2D drafting, 3D, BIM, mechanical)",
+        "sectors": "architecture, engineering, construction, manufacturing, industrial",
         "value_prop": (
-            "BricsCAD is a DWG-native CAD platform — full .dwg compatibility with familiar "
-            "commands, 2D drafting, 3D direct modeling, BIM and mechanical modules, at a "
-            "lower total cost and with a perpetual-license option versus subscription-only "
-            "AutoCAD. A credible AutoCAD alternative resellers can add without disrupting "
-            "their customers' CAD workflows."
+            "BricsCAD (Bricsys, a Hexagon company) is a DWG-native CAD platform with full .dwg "
+            "compatibility and familiar commands, offered in editions: BricsCAD Lite (2D drafting), "
+            "Pro (2D + 3D modeling, LISP/BLADE automation and APIs), Mechanical (3D parts & assemblies), "
+            "BIM (DWG-based building information modeling) and Ultimate (all combined) — plus Bricsys 24/7 "
+            "for document/project collaboration. It runs on Windows, macOS and Linux, offers a "
+            "perpetual-license option versus subscription-only AutoCAD, and delivers lower total cost — a "
+            "credible AutoCAD alternative resellers can add without disrupting customers' CAD workflows."
         ),
         "reseller_fit": [
-            "Sells CAD/design or engineering software (licensing + services), not hardware only",
-            "Has customers in AEC, manufacturing or industrial design that run DWG workflows",
-            "Existing AutoCAD/Autodesk or CAD adjacency (migrations, training) — a strong plus",
-            "Provides training, implementation and technical support for design software",
-            "Established presence and delivery capability in the target country",
+            "Sells CAD / design / engineering software with services (licensing + renewals + implementation), not hardware only",
+            "Has customers in AEC, manufacturing or industrial design that work in DWG day to day",
+            "Existing AutoCAD / Autodesk (or other CAD) footprint — a strong migration & cross-sell opportunity",
+            "Provides training, deployment, LISP/API customization and technical support for CAD",
+            "Can position perpetual-licensing / cost-savings and BIM or mechanical modules, not just 2D drafting",
+            "Established commercial presence and delivery capability in the target country",
         ],
         "account_fit": [
-            "Relies on DWG/CAD for drafting, design or documentation and faces AutoCAD cost pressure",
-            "Shows triggers: CAD license renewals, standardization projects, hiring of drafters/engineers",
-            "Runs manufacturing/AEC workflows that need 2D drafting or mechanical/BIM modeling",
+            "Relies on DWG/CAD for drafting, design or documentation and faces AutoCAD subscription-cost pressure",
+            "Demand triggers: CAD license renewals, drawing-standardization projects, hiring of drafters/engineers",
+            "Runs manufacturing or AEC workflows needing 2D drafting, mechanical modeling or DWG-based BIM",
+            "Manages large legacy DWG libraries that need cleanup / standardization",
         ],
     },
     "DraftSight": {
         "product_name": "DraftSight",
         "domain": "professional 2D/3D DWG CAD software",
-        "sectors": "engineering, manufacturing, construction, AEC",
+        "sectors": "engineering, manufacturing, construction, AEC, facilities",
         "value_prop": (
-            "DraftSight (Dassault Systèmes) is professional 2D drafting and 3D design on the "
-            "native DWG format, with flexible perpetual and subscription licensing — a "
-            "cost-effective alternative to AutoCAD LT for professional CAD users, easy for "
-            "resellers to position into engineering and manufacturing accounts."
+            "DraftSight (Dassault Systèmes) is professional 2D drafting and 3D design on the native DWG "
+            "format, in editions DraftSight Standard, Professional, Premium and Enterprise / Enterprise Plus "
+            "(with network/flexible licensing and deployment tools), plus DraftSight Mechanical. It offers "
+            "APIs and scripting (LISP, C++, .NET), perpetual and subscription options, and a cost-effective, "
+            "familiar alternative to AutoCAD LT / AutoCAD for professional CAD users — easy for resellers to "
+            "position into engineering, manufacturing and construction accounts."
         ),
         "reseller_fit": [
-            "Sells CAD/design or engineering software with services, not a pure box-mover",
-            "Serves engineering, manufacturing, construction or AEC customers using DWG",
-            "CAD/AutoCAD-adjacent footprint (drafting, design tools) — a plus",
+            "Sells CAD / design / engineering software with services, not a pure box-mover",
+            "Serves engineering, manufacturing, construction or AEC customers who work in DWG",
+            "CAD / AutoCAD-adjacent footprint (drafting, design tools, migrations) — a plus",
+            "Can manage volume/network (Enterprise) licensing, deployment and standardization for larger accounts",
             "Offers training, deployment and support for professional CAD",
             "Established commercial presence in the target country",
         ],
         "account_fit": [
-            "Uses professional 2D/3D CAD for drafting/design and is cost-sensitive on licensing",
-            "Demand triggers: CAD renewals, new design headcount, standardization initiatives",
-            "Runs engineering/manufacturing documentation workflows on DWG",
+            "Uses professional 2D/3D CAD for drafting/design and is cost-sensitive on AutoCAD licensing",
+            "Demand triggers: CAD renewals, new design headcount, drawing-standardization or fleet-deployment initiatives",
+            "Runs engineering / manufacturing documentation workflows on DWG",
         ],
     },
     "Novade": {
         "product_name": "Novade",
-        "domain": "construction field-operations / site management SaaS",
-        "sectors": "construction contractors, AEC, facilities and infrastructure",
+        "domain": "construction & facilities field-operations SaaS",
+        "sectors": "construction contractors, subcontractors, developers, facilities and infrastructure operators",
         "value_prop": (
-            "Novade is a cloud platform that digitizes construction site operations — quality "
-            "inspections, safety, site diary, defects and workforce management on mobile. It "
-            "opens a recurring SaaS revenue line for resellers serving contractors and AEC firms."
+            "Novade is a mobile-first cloud platform that digitizes construction and facilities site "
+            "operations — Novade Quality (inspections, snagging/defects, ITPs), Safety (permits, "
+            "toolbox, incidents), Progress / Site Diary (daily reports, labour & plant tracking), "
+            "Maintenance and Activity/Workflow apps, with Novade Analytics dashboards and a lighter "
+            "Novade Lite for SMEs. It replaces paper and WhatsApp on site and opens a recurring SaaS "
+            "revenue line for resellers serving contractors and AEC/FM firms."
         ),
         "reseller_fit": [
-            "Sells SaaS/cloud software with onboarding and support (recurring-revenue capable)",
-            "Serves construction contractors, AEC firms, facilities or infrastructure operators",
-            "Adjacency to construction tech / field apps / project management software — a plus",
-            "Provides implementation, training and customer-success services",
+            "Sells SaaS / cloud software with onboarding, configuration and customer success (recurring-revenue capable)",
+            "Serves construction contractors, subcontractors, developers, facilities or infrastructure operators",
+            "Adjacency to construction tech, field/mobile apps, BIM or project-management software — a plus",
+            "Provides implementation, training, integration and ongoing customer-success services",
             "Established presence and delivery capability in the target country",
         ],
         "account_fit": [
-            "Is a contractor/AEC firm running active site operations that are still paper/manual",
-            "Demand triggers: new projects, safety/quality compliance pressure, digitization drive",
-            "Has field teams that would adopt mobile inspections, defects or site-diary workflows",
+            "Is a contractor / AEC / FM firm running active site operations still on paper, spreadsheets or WhatsApp",
+            "Demand triggers: new project wins, safety/quality compliance pressure, ISO audits, digitization mandates",
+            "Has field teams that would adopt mobile inspections, permits, defects/snagging or site-diary workflows",
         ],
     },
     "Newforma": {
         "product_name": "Newforma",
         "domain": "AEC project information management (PIM) software",
-        "sectors": "architecture and engineering firms, construction",
+        "sectors": "architecture and engineering firms, general contractors, owners/operators",
         "value_prop": (
-            "Newforma is project information management for AEC — it organizes project email, "
-            "documents, RFIs, submittals and markups so architecture, engineering and "
-            "construction teams find information fast and reduce risk. A sticky software line "
-            "for resellers who serve design firms."
+            "Newforma is project information management for AEC — Newforma Konekt (cloud information "
+            "management and BIM issue/model coordination, the 'golden thread'), Newforma Project Center "
+            "(email, documents, RFIs, submittals, transmittals and markups with Outlook/Revit/Bentley "
+            "connectors) and Newforma ConstructEx (cloud construction administration & document control). "
+            "It helps architecture, engineering and construction teams find project information fast, "
+            "control RFIs/submittals and reduce liability — a sticky software line for resellers who serve design firms."
         ),
         "reseller_fit": [
-            "Sells software and services to AEC firms (architects, engineers, construction)",
+            "Sells software and services to AEC firms (architects, engineers, general contractors, owners)",
             "Has a customer base of design/engineering firms or construction companies",
-            "Adjacency to AEC/BIM/CAD or document-management software — a plus",
-            "Provides implementation, training and support for professional software",
+            "Adjacency to AEC/BIM/CAD (Revit, Bentley), document management or Outlook/M365 workflows — a plus",
+            "Provides implementation, data migration, training and support for professional software",
+            "Can sell both cloud (Konekt/ConstructEx) and hybrid/on-prem (Project Center)",
             "Established commercial presence in the target country",
         ],
         "account_fit": [
-            "Is an architecture/engineering/construction firm managing many projects and documents",
-            "Demand triggers: growth in project volume, RFI/submittal overload, risk/compliance needs",
-            "Collaborates across teams and needs email/document/project information control",
+            "Is an architecture / engineering / construction firm managing many concurrent projects and documents",
+            "Demand triggers: growth in project volume, RFI/submittal overload, BIM coordination needs, risk/liability or claims exposure",
+            "Collaborates across disciplines and needs email/document/model information control and an audit trail",
         ],
     },
     "Unity": {
         "product_name": "Unity",
-        "domain": "real-time 3D / visualization / AR-VR software",
-        "sectors": "manufacturing, AEC visualization, automotive, media, training",
+        "domain": "real-time 3D (RT3D) / visualization / digital-twin / AR-VR software",
+        "sectors": "manufacturing, automotive, AEC visualization, media & entertainment, training/simulation",
         "value_prop": (
-            "Unity is a real-time 3D platform for interactive experiences — industrial digital "
-            "twins, AEC and product visualization, AR/VR, simulation and training. Resellers "
-            "can attach development services and licensing across manufacturing, automotive, "
-            "AEC and media accounts."
+            "Unity is a real-time 3D platform for interactive experiences. Beyond games, Unity Industry "
+            "(built on Unity Pro/Enterprise) targets non-game applications — industrial digital twins, "
+            "product and AEC visualization, HMI, AR/VR, simulation and training — with Unity Cloud for "
+            "build/asset management, Pixyz to import and optimize CAD/BIM/3D data for real-time, and Unity "
+            "AI (Muse/Sentis). It publishes across desktop, mobile, web, AR and VR. Resellers can attach "
+            "licensing plus 3D/development and integration services across manufacturing, automotive, AEC and media accounts."
         ),
         "reseller_fit": [
-            "Sells software and/or 3D/development services (not hardware only)",
-            "Serves customers needing 3D visualization, simulation, AR/VR or digital twins",
-            "Adjacency to 3D/CAD/creative/real-time or game-engine tooling — a plus",
-            "Provides development, integration, training and support capabilities",
+            "Sells software and/or 3D / application-development / integration services (not hardware only)",
+            "Serves customers needing real-time 3D: digital twins, product/AEC visualization, AR/VR, HMI, simulation or training",
+            "Adjacency to 3D / CAD / creative / real-time / game-engine tooling or Pixyz-style CAD data prep — a plus",
+            "Provides development, integration, training and support capability (RT3D is services-led)",
+            "Can engage industrial / enterprise accounts (Unity Industry) beyond individual creators",
             "Established commercial presence in the target country",
         ],
         "account_fit": [
-            "Needs real-time 3D: digital twins, product/AEC viz, AR/VR, simulation or training",
-            "Demand triggers: new visualization/immersive initiatives, 3D/dev hiring, R&D projects",
-            "Owns 3D/CAD data that would benefit from interactive, real-time experiences",
+            "Needs real-time 3D: digital twins, product/AEC viz, AR/VR, HMI, simulation or immersive training",
+            "Demand triggers: new visualization/immersive/Industry-4.0 initiatives, 3D/XR hiring, R&D or innovation projects",
+            "Owns CAD/BIM/3D data (Pixyz) that would benefit from interactive, real-time experiences",
         ],
     },
 }
