@@ -233,19 +233,17 @@ export default function Campaigns({ onEdit }) {
                      title="Download all outreach .eml drafts as a zip">⬇ Emails</a>
                 ))}
             </div>
-            {run && (
+            {running && (
               <div className={`status ${run.status}`}>
                 {run.stage}: <b>{run.status}</b>
-                {run.total ? ` — ${run.processed}/${run.total}` : run.result_count ? ` (${run.result_count})` : ""}
-                {run.message ? ` — ${run.message}` : ""}
-                {running &&
-                  (run.total > 0 ? (
-                    <div className="progress">
-                      <div className="bar" style={{ width: `${Math.round((run.processed / run.total) * 100)}%` }} />
-                    </div>
-                  ) : (
-                    <div className="progress indeterminate"><div className="bar" /></div>
-                  ))}
+                {run.total ? ` — ${run.processed}/${run.total}` : ""}
+                {run.total > 0 ? (
+                  <div className="progress">
+                    <div className="bar" style={{ width: `${Math.round((run.processed / run.total) * 100)}%` }} />
+                  </div>
+                ) : (
+                  <div className="progress indeterminate"><div className="bar" /></div>
+                )}
               </div>
             )}
             {stageRuns[c.id] && (
@@ -278,7 +276,7 @@ export default function Campaigns({ onEdit }) {
             {resultsOpen[c.id] && rows && (
               <>
                 <div className="status">
-                  <b>{rows.length}</b> companies —{" "}
+                  <b>{c.name}</b> — <b>{rows.length}</b> companies —{" "}
                   {["A", "B", "C", "D"].map((t) => (counts[t] ? `${t}:${counts[t]} ` : "")).join("")}
                   {rows.length > 50 ? "· showing top 50" : ""}
                 </div>

@@ -38,10 +38,12 @@ class CampaignViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         """Soft-delete: hide the campaign but keep its results/contacts on disk so a
-        future campaign can reuse the shared caches (research/outreach already done)."""
+        future campaign can reuse the shared caches (research/outreach already done).
+        The unique name is freed so it can be reused."""
         campaign = self.get_object()
         campaign.deleted = True
-        campaign.save(update_fields=["deleted"])
+        campaign.name = f"{campaign.name}__deleted{campaign.id}"[:120]
+        campaign.save(update_fields=["deleted", "name"])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"])

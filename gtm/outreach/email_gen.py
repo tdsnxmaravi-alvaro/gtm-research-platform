@@ -94,16 +94,31 @@ def _lara_agent():
     return LaraProvider("lara-outreach", api_url, api_key, assistant, web_search=False)
 
 
+def _clean_body(body: str) -> str:
+    """Tidy generated copy: unwrap markdown links and collapse duplicate lines
+    (the LARA agent sometimes emits '[TD SYNNEX]()' or a doubled sign-off)."""
+    body = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", body or "")  # [text](url) -> text
+    out: list[str] = []
+    for line in body.split("\n"):
+        if out and line.strip() and line.strip() == out[-1].strip():
+            continue  # drop consecutive duplicate lines
+        out.append(line)
+    return "\n".join(out).strip()
+
+
 def generate_email(config: CampaignConfig, row: dict, use_agent: bool = False) -> tuple[str, str]:
     """Return (subject, body). Uses the LARA agent when requested + configured,
-    else the deterministic template."""
+    else the deterministic template. Body is tidied either way."""
+    subject = body = None
     if use_agent:
         prov = _lara_agent()
         if prov is not None:
             out = _agent_email(prov, config, row)
             if out:
-                return out
-    return render_template(config, row)
+                subject, body = out
+    if subject is None:
+        subject, body = render_template(config, row)
+    return subject, _clean_body(body)
 
 
 def _agent_email(prov, config: CampaignConfig, row: dict) -> tuple[str, str] | None:
