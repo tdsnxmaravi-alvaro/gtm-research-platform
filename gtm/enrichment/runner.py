@@ -66,6 +66,8 @@ def run_enrichment(
     use_webhook: bool = False,
     use_cache: bool = True,
     out_dir: str | Path | None = None,
+    min_tier: str | None = None,
+    should_cancel=None,
 ) -> list[EnrichedContact]:
     """Enrich qualified companies. Returns the enriched contacts.
 
@@ -89,12 +91,21 @@ def run_enrichment(
     state_path = out / "enrich_state.json"
     done = _load_done(state_path) if resume else set()
 
+    # Only enrich the shortlist worth contacting (tier >= min_tier) so we never
+    # spend Apollo credits / LLM tokens on low-tier companies.
+    _TIER_ORDER = {"A": 0, "B": 1, "C": 2, "D": 3, "": 9}
+    cap = _TIER_ORDER.get((min_tier or config.outreach.min_tier or "D").upper(), 9)
+
+    def _row_tier(r: dict) -> str:
+        return (r.get("final_tier") or r.get("tier") or "").upper()
+
     pending = [r for r in rows if (r.get("company") or "").strip()
-               and r.get("company") not in done]
+               and r.get("company") not in done
+               and _TIER_ORDER.get(_row_tier(r), 9) <= cap]
     if limit:
         pending = pending[:limit]
-    print(f"Enrich: {len(rows)} companies | pending {len(pending)} | "
-          f"provider={enr.provider.value} | want={enr.want.value}")
+    print(f"Enrich: {len(rows)} companies | tier>={(min_tier or config.outreach.min_tier)} "
+          f"| pending {len(pending)} | provider={enr.provider.value} | want={enr.want.value}")
 
     all_contacts: list[EnrichedContact] = []
 
@@ -118,6 +129,9 @@ def run_enrichment(
             lara_provider = build_lara_enrichment_provider()
 
     for r in pending:
+        if should_cancel and should_cancel():
+            print("  canceled — stopping enrichment (state saved)")
+            break
         company = r.get("company")
         domain = extract_domain(r.get("website") or "")
         cached = cache.get(domain) if domain else None

@@ -19,7 +19,45 @@ export default function Campaigns() {
   }
   useEffect(() => { load(); }, []);
 
-  async function start(id, stage) {
+  async function start(id, config) {
+    try {
+      await api.start(id);
+      pollPipeline(id, config);
+    } catch (e) {
+      setError(String(e.message || e));
+    }
+  }
+
+  async function stop(id) {
+    try {
+      await api.stop(id);
+    } catch (e) {
+      setError(String(e.message || e));
+    }
+  }
+
+  function lastStage(config) {
+    return config?.outreach?.enabled ? "outreach" : "consolidate";
+  }
+
+  function pollPipeline(id, config) {
+    const last = lastStage(config);
+    const t = setInterval(async () => {
+      try {
+        const run = await api.campaignStatus(id);
+        setRuns((r) => ({ ...r, [id]: run }));
+        const terminal =
+          run.status === "error" ||
+          run.status === "canceled" ||
+          (run.stage === last && run.status === "done");
+        if (terminal) clearInterval(t);
+      } catch {
+        clearInterval(t);
+      }
+    }, 2000);
+  }
+
+  async function startStage(id, stage) {
     try {
       const run = await api.runStage(id, stage);
       setRuns((r) => ({ ...r, [id]: run }));
@@ -64,9 +102,8 @@ export default function Campaigns() {
               <small>{c.config.target_type} · {c.config.mode} · {c.config.country} · {c.config.vendor}</small>
             </div>
             <div className="stages">
-              {STAGES.map((s) => (
-                <button key={s} onClick={() => start(c.id, s)}>{s}</button>
-              ))}
+              <button className="primary" onClick={() => start(c.id, c.config)}>▶ Start</button>
+              <button onClick={() => stop(c.id)}>■ Stop</button>
               <button onClick={() => viewResults(c.id)}>results</button>
             </div>
             {run && (
@@ -85,6 +122,14 @@ export default function Campaigns() {
                 )}
               </div>
             )}
+            <details>
+              <summary className="link">Run a single stage (manual)</summary>
+              <div className="stages" style={{ marginTop: 8 }}>
+                {STAGES.map((s) => (
+                  <button key={s} onClick={() => startStage(c.id, s)}>{s}</button>
+                ))}
+              </div>
+            </details>
             {results[c.id] && (
               <table className="results">
                 <thead>

@@ -158,6 +158,7 @@ def run_campaign(
     passes: int = 1,
     out_dir: str | Path | None = None,
     progress_cb=None,
+    should_cancel=None,
 ) -> list[dict]:
     out = Path(out_dir or (Path("campaigns") / config.name))
     logs = out / "logs"
@@ -186,6 +187,9 @@ def run_campaign(
             progress_cb(0, total)
         for product in config.products:
             for i in range(0, len(pending), batch_size):
+                if should_cancel and should_cancel():
+                    print("  canceled — stopping after saved progress")
+                    return all_results
                 batch = pending[i:i + batch_size]
                 prompt = build_prompt(config, product,
                                       company_input=format_companies(batch))
@@ -221,6 +225,9 @@ def run_campaign(
             progress_cb(0, total)
         for product in config.products:
             for vert in targets:
+                if should_cancel and should_cancel():
+                    print("  canceled — stopping after saved progress")
+                    return all_results
                 key = f"{product.name}|{vert.slug if vert else 'broad'}"
                 if key in done:
                     step_n += 1

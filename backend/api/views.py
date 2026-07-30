@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 from .models import Campaign, Run
 from .serializers import CampaignSerializer, RunSerializer
-from .tasks import run_stage
+from .tasks import run_stage, run_pipeline, request_cancel, clear_cancel
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB cap for provided lists
 ALLOWED_LIST_EXT = (".csv", ".xlsx", ".xlsm")
@@ -159,6 +159,7 @@ class CampaignViewSet(viewsets.ModelViewSet):
 
     def _start(self, campaign, stage) -> Run:
         run = Run.objects.create(campaign=campaign, stage=stage, status="pending")
+        clear_cancel(campaign.name)
         # With a real broker, dispatch to a worker. In local eager mode, run in a
         # background thread so the request returns immediately and progress (%) is
         # pollable while the stage executes.
@@ -172,6 +173,30 @@ class CampaignViewSet(viewsets.ModelViewSet):
         else:
             run_stage.delay(run.id, campaign.config, stage, campaign.name)
         return run
+
+    @action(detail=True, methods=["post"])
+    def start(self, request, pk=None):
+        """Run the whole pipeline (research -> enrich -> consolidate -> outreach)
+        phase by phase, stopping on error or when stopped. Resumable."""
+        campaign = self.get_object()
+        import threading
+        threading.Thread(target=run_pipeline, args=(campaign.id,), daemon=True).start()
+        return Response({"started": True}, status=status.HTTP_202_ACCEPTED)
+
+    @action(detail=True, methods=["post"])
+    def stop(self, request, pk=None):
+        """Request a graceful stop after the current batch/stage. State is saved,
+        so a later Start resumes where it left off."""
+        campaign = self.get_object()
+        request_cancel(campaign.name)
+        return Response({"stopping": True})
+
+    @action(detail=True, methods=["get"])
+    def status(self, request, pk=None):
+        """Latest run for this campaign (drives the pipeline progress UI)."""
+        campaign = self.get_object()
+        run = campaign.runs.first()  # ordered by -created_at
+        return Response(RunSerializer(run).data if run else {})
 
     @action(detail=True, methods=["post"])
     def research(self, request, pk=None):
