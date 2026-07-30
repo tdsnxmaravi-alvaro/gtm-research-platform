@@ -33,8 +33,16 @@ def _read_csv(path: Path) -> list[dict]:
 
 
 class CampaignViewSet(viewsets.ModelViewSet):
-    queryset = Campaign.objects.all()
+    queryset = Campaign.objects.filter(deleted=False)
     serializer_class = CampaignSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        """Soft-delete: hide the campaign but keep its results/contacts on disk so a
+        future campaign can reuse the shared caches (research/outreach already done)."""
+        campaign = self.get_object()
+        campaign.deleted = True
+        campaign.save(update_fields=["deleted"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"])
     def validate(self, request, pk=None):

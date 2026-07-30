@@ -73,7 +73,9 @@ def test_research_provider_must_exist():
 def test_language_derived_from_country():
     c = CampaignConfig(**_base(country="Spain"))
     assert c.language == "es"
-    assert c.outreach.language == "es"
+    # outreach.language stays None (= "auto") so outreach localizes per each
+    # company's own country; an explicit choice would win.
+    assert c.outreach.language is None
 
 
 def test_credit_estimate():

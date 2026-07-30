@@ -6,6 +6,7 @@ class Campaign(models.Model):
 
     name = models.SlugField(max_length=120, unique=True)
     config = models.JSONField(help_text="CampaignConfig as JSON")
+    deleted = models.BooleanField(default=False)  # soft-delete: hide but keep data
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

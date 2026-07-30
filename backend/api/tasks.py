@@ -124,8 +124,12 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str) -> str:
             summary = f"{count} qualified companies (tier ≥ {config.outreach.min_tier})"
         elif stage == "outreach":
             from gtm.outreach import run_outreach
+            from gtm.outreach.email_gen import _lara_agent
             count = len(run_outreach(config, out_dir=out_dir, progress_cb=_progress))
-            summary = f"{count} .eml drafts"
+            ai = _lara_agent() is not None
+            summary = (f"{count} .eml drafts — "
+                       + ("AI-personalized (LARA)" if ai
+                          else "template (set LARA_OUTREACH_ASSISTANT_ID for AI)"))
         else:
             raise ValueError(f"unknown stage: {stage}")
 

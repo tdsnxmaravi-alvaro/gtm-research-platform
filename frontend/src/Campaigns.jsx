@@ -132,6 +132,16 @@ export default function Campaigns({ onEdit }) {
     }
   }
 
+  async function remove(id, name) {
+    if (!window.confirm(`Delete campaign "${name}"?\nIt is hidden but its results/contacts stay on disk for future campaigns.`)) return;
+    try {
+      await api.deleteCampaign(id);
+      setCampaigns((cs) => cs.filter((c) => c.id !== id));
+    } catch (e) {
+      setError(String(e.message || e));
+    }
+  }
+
   if (error) return <p className="error">{error}</p>;
   if (!campaigns.length) return <p>No campaigns yet. Create one from “New campaign”.</p>;
 
@@ -186,6 +196,10 @@ export default function Campaigns({ onEdit }) {
               )}
               {!started && onEdit && (
                 <button onClick={() => onEdit(c)} title="Edit this campaign (available until it first runs)">✎ Edit</button>
+              )}
+              {!running && (
+                <button onClick={() => remove(c.id, c.name)}
+                        title="Delete (logical): hides the campaign but keeps results/contacts for future reuse">🗑 Delete</button>
               )}
               {started &&
                 (running ? (

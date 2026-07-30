@@ -269,8 +269,9 @@ class CampaignConfig(BaseModel):
         default_lang = COUNTRY_LANGUAGE.get(self.country.strip().lower(), "en")
         if self.language is None:
             self.language = default_lang
-        if self.outreach.language is None:
-            self.outreach.language = self.language
+        # NOTE: do NOT auto-fill outreach.language — leaving it None means "auto",
+        # so outreach localizes per each company's own country (falling back to the
+        # campaign language). An explicit outreach.language (user choice) still wins.
 
         # Prepend reusable universal scoring dimensions when requested.
         if self.scoring.use_universal:

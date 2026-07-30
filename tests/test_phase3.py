@@ -50,6 +50,19 @@ def test_build_master_joins_results_and_contacts(tmp_path):
     assert (out / "master.xlsx").exists()
 
 
+def test_outreach_auto_localizes_per_row_country():
+    # No explicit outreach language + empty campaign country => auto per-row country.
+    c = CampaignConfig(name="loc", target_type="resellers", mode="provided",
+                       country="", vendor="Trimble",
+                       products=[{"name": "Trimble", "value_prop": "AEC"}],
+                       provided_list_path="x.csv", outreach={"enabled": True})
+    assert c.outreach.language is None
+    _, es = render_template(c, {"company": "A", "contact_name": "Pablo", "country": "Spain"})
+    _, pt = render_template(c, {"company": "A", "contact_name": "Pablo", "country": "Portugal"})
+    _, en = render_template(c, {"company": "A", "contact_name": "Pablo", "country": ""})
+    assert es.startswith("Hola") and pt.startswith("Olá") and en.startswith("Hi")
+
+
 def test_render_template_es():
     c = _cfg()
     subj, body = render_template(c, {"company": "Acme SA", "contact_name": "Ana Ruiz",
