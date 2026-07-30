@@ -65,7 +65,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
           name: "",
           target_type: "resellers",
           mode: "provided",
-          country: "Spain",
+          country: "",
           vendor: "",
           provided_list_path: "",
           colMap: { company: "", website: "", country: "" },
@@ -526,9 +526,6 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
                   <option value="en">English</option>
                   <option value="es">Español</option>
                   <option value="pt">Português</option>
-                  <option value="fr">Français</option>
-                  <option value="de">Deutsch</option>
-                  <option value="it">Italiano</option>
                 </select>
                 <small className="hint">Auto uses each company's country; pick one to force it for all drafts.</small>
               </label>
@@ -544,9 +541,9 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
                   {logoUrl ? <img src={logoUrl} alt="" className="banner" /> : <div className="brandbar" />}
                   <div className="mailbody">
                     <p>Hi {"{first name}"},</p>
-                    <p>TD SYNNEX is a distribution partner actively adding reseller partners for <b>{f.vendor || "the vendor"}</b>.</p>
-                    <p style={{ color: "#8a8f98" }}>[… AI-generated, per-company body based on the qualification evidence …]</p>
-                    <p style={{ marginTop: 16 }}>{f.sender_name || "Your name"}<br />TD SYNNEX</p>
+                    <p>TD SYNNEX is actively recruiting resellers for <b>{f.vendor || "the vendor"}</b>.</p>
+                    <p style={{ color: "#8a8f98" }}>[… AI-personalized body per company, in {f.outreach_language ? ({ en: "English", es: "Spanish", pt: "Portuguese" }[f.outreach_language]) : "each company's language"}, based on its qualification evidence …]</p>
+                    <p style={{ marginTop: 16, color: "#8a8f98" }}>[Signature comes from each BDM's own template]</p>
                   </div>
                 </div>
               </div>

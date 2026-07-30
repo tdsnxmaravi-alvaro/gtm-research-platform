@@ -156,6 +156,9 @@ export default function Campaigns({ onEdit }) {
           : {};
         const running = run && (run.status === "running" || run.status === "pending");
         const started = stageRuns[c.id] && Object.keys(stageRuns[c.id]).length > 0;
+        const last = lastStage(c.config);
+        const complete = started && stageRuns[c.id][last] && stageRuns[c.id][last].status === "done";
+        const resumable = started && !running && !complete;
         return (
           <div className="card row" key={c.id}>
             <div>
@@ -163,20 +166,41 @@ export default function Campaigns({ onEdit }) {
               <small>{describe(c.config)}</small>
             </div>
             <div className="stages">
-              <button className="primary" onClick={() => start(c.id, c.config)} disabled={running}
-                      title="Run all phases in order: research → consolidate → enrich → outreach">▶ Start</button>
-              <button onClick={() => pause(c.id)} disabled={!running}
-                      title="Pause after the current step — resume later with Start (e.g. if low on Apollo credits)">⏸ Pause</button>
-              <button onClick={() => stop(c.id)} disabled={!running}
-                      title="Cancel the run. Saved progress is kept, so Start won't re-charge done companies">■ Stop</button>
-              <button onClick={() => viewResults(c.id)} title="Show the scored companies (sorted by tier & score)">results</button>
+              {!complete && (
+                <button className="primary" onClick={() => start(c.id, c.config)} disabled={running}
+                        title={resumable ? "Resume the pipeline where it left off" : "Run all phases in order: research → consolidate → enrich → outreach"}>
+                  {resumable ? "▶ Resume" : "▶ Start"}
+                </button>
+              )}
+              {running && (
+                <button onClick={() => pause(c.id)}
+                        title="Pause after the current step — resume later with Start (e.g. if low on Apollo credits)">⏸ Pause</button>
+              )}
+              {running && (
+                <button onClick={() => stop(c.id)}
+                        title="Cancel the run. Saved progress is kept, so Start won't re-charge done companies">■ Stop</button>
+              )}
+              {started && (
+                <button onClick={() => viewResults(c.id)} disabled={running}
+                        title="Show the scored companies (sorted by tier & score)">results</button>
+              )}
               {!started && onEdit && (
                 <button onClick={() => onEdit(c)} title="Edit this campaign (available until it first runs)">✎ Edit</button>
               )}
-              <a className="dl" href={`/api/campaigns/${c.id}/download/?artifact=master.xlsx`}
-                 title="Download the consolidated list with contacts (Excel)">⬇ Excel</a>
-              <a className="dl" href={`/api/campaigns/${c.id}/download_eml/`}
-                 title="Download all outreach .eml drafts as a zip">⬇ Emails</a>
+              {started &&
+                (running ? (
+                  <span className="dl disabled" title="Available when the run finishes">⬇ Excel</span>
+                ) : (
+                  <a className="dl" href={`/api/campaigns/${c.id}/download/?artifact=master.xlsx`}
+                     title="Download the consolidated list with contacts (Excel)">⬇ Excel</a>
+                ))}
+              {started &&
+                (running ? (
+                  <span className="dl disabled" title="Available when the run finishes">⬇ Emails</span>
+                ) : (
+                  <a className="dl" href={`/api/campaigns/${c.id}/download_eml/`}
+                     title="Download all outreach .eml drafts as a zip">⬇ Emails</a>
+                ))}
             </div>
             {run && (
               <div className={`status ${run.status}`}>

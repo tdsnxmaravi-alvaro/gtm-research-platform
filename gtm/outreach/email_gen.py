@@ -110,10 +110,14 @@ def _agent_email(prov, config: CampaignConfig, row: dict) -> tuple[str, str] | N
     lang = (config.outreach.language
             or language_for_country(row.get("country"))
             or config.language or "en")
+    lang_names = {"en": "English", "es": "Spanish", "pt": "Portuguese",
+                  "fr": "French", "de": "German", "it": "Italian"}
+    lang_name = lang_names.get(lang, lang)
     product = row.get("product") or (config.products[0].name if config.products else "")
     prompt = (
         "Write a concise, warm B2B outreach email (no fluff) for a channel/reseller "
-        f"recruitment motion. Language: {lang}. Product: {product}. "
+        f"recruitment motion. Write the ENTIRE email — subject AND body — in {lang_name} "
+        f"({lang}); do NOT use English unless the language is English. Product: {product}. "
         f"Company: {row.get('company','')}. Contact: {row.get('contact_name','')} "
         f"({row.get('title','')}). Why they fit: {row.get('fit_summary','')}. "
         f"Recommended products: {row.get('recommended_products','')}. "

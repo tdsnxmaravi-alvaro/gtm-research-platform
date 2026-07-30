@@ -44,7 +44,7 @@ def _read_csv(path: Path) -> list[dict]:
 
 
 def build_master(config: CampaignConfig, out_dir: str | Path | None = None,
-                 min_tier: str | None = None) -> list[dict]:
+                 min_tier: str | None = None, progress_cb=None) -> list[dict]:
     """Join results.csv + contacts.csv into a master list. Returns master rows."""
     out = Path(out_dir or (Path("campaigns") / config.name))
     results = _read_csv(out / "results.csv")
@@ -83,6 +83,8 @@ def build_master(config: CampaignConfig, out_dir: str | Path | None = None,
     rows.sort(key=lambda x: (_TIER_ORDER.get(x["tier"], 9), -_num(x["score"])))
     _write_csv(rows, out / "master.csv")
     _write_xlsx(rows, out / "master.xlsx")
+    if progress_cb:
+        progress_cb(len(rows), len(rows) or 1)
     print(f"Master: {len(rows)} rows -> {out / 'master.csv'} (+ .xlsx)")
     return rows
 

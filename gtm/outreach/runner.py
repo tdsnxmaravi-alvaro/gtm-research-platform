@@ -31,6 +31,7 @@ def run_outreach(
     limit: int = 0,
     use_agent: bool = True,
     out_dir: str | Path | None = None,
+    progress_cb=None,
 ) -> list[dict]:
     """Generate .eml drafts for master contacts with an email at/above min_tier.
 
@@ -83,7 +84,7 @@ def run_outreach(
     print(f"Outreach generator: {mode}")
 
     drafts: list[dict] = []
-    for r in targets:
+    for i, r in enumerate(targets, 1):
         subject, body = generate_email(config, r, use_agent=use_agent)
         fname = f"{r.get('tier','')}_{_safe(r.get('company',''))}_{_safe(r.get('contact_name',''))}.eml"
         path = write_eml(
@@ -96,6 +97,8 @@ def run_outreach(
             logo_path=config.outreach.logo_path,
         )
         drafts.append({"company": r.get("company"), "email": r["email"], "eml": str(path)})
+        if progress_cb:
+            progress_cb(i, len(targets))
 
     print(f"Outreach: {len(drafts)} .eml drafts -> {eml_dir}")
     return drafts

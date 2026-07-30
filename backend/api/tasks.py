@@ -119,11 +119,12 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str) -> str:
         elif stage == "consolidate":
             from gtm.consolidate import build_master
             count = len(build_master(config, out_dir=out_dir,
-                                     min_tier=config.outreach.min_tier))
+                                     min_tier=config.outreach.min_tier,
+                                     progress_cb=_progress))
             summary = f"{count} qualified companies (tier ≥ {config.outreach.min_tier})"
         elif stage == "outreach":
             from gtm.outreach import run_outreach
-            count = len(run_outreach(config, out_dir=out_dir))
+            count = len(run_outreach(config, out_dir=out_dir, progress_cb=_progress))
             summary = f"{count} .eml drafts"
         else:
             raise ValueError(f"unknown stage: {stage}")

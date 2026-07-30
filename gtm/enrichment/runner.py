@@ -111,10 +111,20 @@ def run_enrichment(
           f"| pending {len(pending)} | provider={enr.provider.value} | want={enr.want.value}")
 
     all_contacts: list[EnrichedContact] = []
+    # Resume must ACCUMULATE: reload prior contacts so we append instead of
+    # overwriting contacts.csv with only the current batch.
+    if resume and contacts_path.exists():
+        for row in _load_rows(contacts_path):
+            all_contacts.append(
+                EnrichedContact(**{k: row.get(k, "") for k in CONTACT_COLS}))
 
     from .cache import ContactCache
     from .domains import extract_domain
-    cache = ContactCache(enabled=use_cache)
+    # Anchor the cross-run cache to the data root (out.parent) so it is stable
+    # regardless of the process CWD and shared across campaigns (never re-charge
+    # Apollo for a domain already enriched).
+    cache = ContactCache(path=out.parent / ".gtm_cache" / "contacts.json",
+                         enabled=use_cache)
     cache_hits = 0
 
     # Build the provider once (lazily — skip if everything is cached).

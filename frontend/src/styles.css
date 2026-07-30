@@ -36,6 +36,7 @@ input, select, textarea { font: inherit; padding: 8px; border: 1px solid var(--l
 .status.canceled { background: #eef1f4; }
 .status.paused { background: #fff7e6; }
 .dl { display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 6px; font-size: 12px; text-decoration: none; color: var(--blue); border: 1px solid var(--line); background: #fff; }
+.dl.disabled { opacity: .45; pointer-events: none; }
 .phases { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; grid-column: 1 / -1; }
 .phase { font-size: 12px; padding: 4px 10px; border-radius: 12px; background: #eef1f4; color: #6b7280; border: 1px solid var(--line); }
 .phase.done { background: #e6f4ea; color: #1e7d34; }

@@ -49,6 +49,15 @@ def _providers_for(config: CampaignConfig) -> list:
     return [build_provider(by_name[n]) for n in names if n in by_name]
 
 
+def _read_existing_rows(path: Path) -> list[dict]:
+    """Load previously written result rows so resumed runs accumulate."""
+    if not path.exists():
+        return []
+    import csv
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        return list(csv.DictReader(f))
+
+
 def _load_state(path: Path) -> set:
     if path.exists():
         try:
@@ -171,7 +180,9 @@ def run_campaign(
         providers = provider if isinstance(provider, (list, tuple)) else [provider]
 
     done = _load_state(state_path) if resume else set()
-    all_results: list[dict] = []
+    # Resume must ACCUMULATE: load prior results so a limited/partial run appends
+    # instead of overwriting results.csv with only the current batch.
+    all_results: list[dict] = _read_existing_rows(results_path) if resume else []
 
     if config.mode == Mode.provided:
         rows = load_provided_list(config.provided_list_path,
