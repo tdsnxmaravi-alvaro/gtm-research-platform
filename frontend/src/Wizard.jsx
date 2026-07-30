@@ -17,6 +17,7 @@ export default function Wizard({ onCreated }) {
   const [uploading, setUploading] = useState(false);
   const [uploadErr, setUploadErr] = useState("");
   const [listReport, setListReport] = useState(null);
+  const [logoUrl, setLogoUrl] = useState("");
   const [f, setF] = useState({
     name: "",
     target_type: "resellers",
@@ -76,6 +77,10 @@ export default function Wizard({ onCreated }) {
   async function onLogoUpload(e) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setLogoUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
     setUploading(true);
     setUploadErr("");
     try {
@@ -473,6 +478,18 @@ export default function Wizard({ onCreated }) {
                 <input type="file" accept=".png,.jpg,.jpeg,.gif,.webp" onChange={onLogoUpload} />
                 <small className="hint">Sits at the top of the branded frame; the body is the generated content.</small>
                 {f.logo_path && <small className="hint">Logo set: {f.logo_path.split(/[\\/]/).pop()}</small>}
+              </div>
+              <div className="field">
+                <span className="lbl">Email preview</span>
+                <div className="mailframe">
+                  {logoUrl ? <img src={logoUrl} alt="" className="banner" /> : <div className="brandbar" />}
+                  <div className="mailbody">
+                    <p>Hi {"{first name}"},</p>
+                    <p>TD SYNNEX is a distribution partner actively adding reseller partners for <b>{f.vendor || "the vendor"}</b>.</p>
+                    <p style={{ color: "#8a8f98" }}>[… AI-generated, per-company body based on the qualification evidence …]</p>
+                    <p style={{ marginTop: 16 }}>{f.sender_name || "Your name"}<br />TD SYNNEX</p>
+                  </div>
+                </div>
               </div>
             </>
           )}

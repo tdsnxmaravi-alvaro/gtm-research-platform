@@ -159,7 +159,18 @@ class CampaignViewSet(viewsets.ModelViewSet):
 
     def _start(self, campaign, stage) -> Run:
         run = Run.objects.create(campaign=campaign, stage=stage, status="pending")
-        run_stage.delay(run.id, campaign.config, stage, campaign.name)
+        # With a real broker, dispatch to a worker. In local eager mode, run in a
+        # background thread so the request returns immediately and progress (%) is
+        # pollable while the stage executes.
+        if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+            import threading
+            threading.Thread(
+                target=run_stage,
+                args=(run.id, campaign.config, stage, campaign.name),
+                daemon=True,
+            ).start()
+        else:
+            run_stage.delay(run.id, campaign.config, stage, campaign.name)
         return run
 
     @action(detail=True, methods=["post"])

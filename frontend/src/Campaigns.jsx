@@ -72,8 +72,17 @@ export default function Campaigns() {
             {run && (
               <div className={`status ${run.status}`}>
                 {run.stage}: <b>{run.status}</b>
-                {run.result_count ? ` (${run.result_count})` : ""}
+                {run.total ? ` — ${run.processed}/${run.total}` : run.result_count ? ` (${run.result_count})` : ""}
                 {run.message ? ` — ${run.message}` : ""}
+                {(run.status === "running" || run.status === "pending") && (
+                  run.total > 0 ? (
+                    <div className="progress">
+                      <div className="bar" style={{ width: `${Math.round((run.processed / run.total) * 100)}%` }} />
+                    </div>
+                  ) : (
+                    <div className="progress indeterminate"><div className="bar" /></div>
+                  )
+                )}
               </div>
             )}
             {results[c.id] && (

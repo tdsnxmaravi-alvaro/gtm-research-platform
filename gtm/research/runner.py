@@ -157,6 +157,7 @@ def run_campaign(
     resume: bool = True,
     passes: int = 1,
     out_dir: str | Path | None = None,
+    progress_cb=None,
 ) -> list[dict]:
     out = Path(out_dir or (Path("campaigns") / config.name))
     logs = out / "logs"
@@ -179,6 +180,10 @@ def run_campaign(
             pending = pending[:limit]
         print(f"Provided: {len(rows)} companies | pending {len(pending)} | batch {batch_size}")
 
+        total = len(pending)
+        processed = 0
+        if progress_cb:
+            progress_cb(0, total)
         for product in config.products:
             for i in range(0, len(pending), batch_size):
                 batch = pending[i:i + batch_size]
@@ -202,15 +207,25 @@ def run_campaign(
                         done.add(r.get("company"))
                     _save_state(state_path, done)
                     write_rows_csv(all_results, results_path, columns=OUT_COLS)
+                processed += len(batch)
+                if progress_cb:
+                    progress_cb(min(processed, total), total)
                 print(f"  batch {i//batch_size+1}: +{len(scored)} results")
                 time.sleep(delay)
 
     else:  # discover
         targets = config.verticals or [None]
+        total = len(config.products) * len(targets)
+        step_n = 0
+        if progress_cb:
+            progress_cb(0, total)
         for product in config.products:
             for vert in targets:
                 key = f"{product.name}|{vert.slug if vert else 'broad'}"
                 if key in done:
+                    step_n += 1
+                    if progress_cb:
+                        progress_cb(step_n, total)
                     continue
                 prompt = build_prompt(config, product, vertical=vert)
                 scored = _run_batch(config, providers, prompt, logs,
@@ -222,6 +237,9 @@ def run_campaign(
                 done.add(key)
                 _save_state(state_path, done)
                 write_rows_csv(all_results, results_path, columns=OUT_COLS)
+                step_n += 1
+                if progress_cb:
+                    progress_cb(step_n, total)
                 print(f"  {key}: +{len(scored)} results")
                 time.sleep(delay)
 

@@ -7,7 +7,7 @@ class RunSerializer(serializers.ModelSerializer):
     class Meta:
         model = Run
         fields = ["id", "campaign", "stage", "status", "message",
-                  "result_count", "created_at", "finished_at"]
+                  "result_count", "processed", "total", "created_at", "finished_at"]
         read_only_fields = fields
 
 

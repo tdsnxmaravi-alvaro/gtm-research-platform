@@ -27,6 +27,8 @@ class Run(models.Model):
     status = models.CharField(max_length=20, choices=STATUS, default="pending")
     message = models.TextField(blank=True, default="")
     result_count = models.IntegerField(default=0)
+    processed = models.IntegerField(default=0)   # items processed so far (progress)
+    total = models.IntegerField(default=0)        # total items to process (progress)
     created_at = models.DateTimeField(auto_now_add=True)
     finished_at = models.DateTimeField(null=True, blank=True)
 

@@ -22,13 +22,19 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str) -> str:
     run.status = "running"
     run.save(update_fields=["status"])
     out_dir = _out_dir(name)
+
+    def _progress(done: int, total: int) -> None:
+        # Update progress without touching the whole row (avoids clobbering status).
+        Run.objects.filter(pk=run_id).update(processed=done, total=total)
+
     try:
         from gtm.config.schema import CampaignConfig
         config = CampaignConfig(**cfg_dict)
         if stage == "research":
             from gtm.research import run_campaign
             count = len(run_campaign(config, out_dir=out_dir,
-                                     limit=config.process_limit))
+                                     limit=config.process_limit,
+                                     progress_cb=_progress))
         elif stage == "enrich":
             from gtm.enrichment import run_enrichment
             count = len(run_enrichment(config, out_dir=out_dir))
