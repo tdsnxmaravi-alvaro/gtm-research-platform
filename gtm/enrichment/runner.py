@@ -201,7 +201,8 @@ def run_enrichment(
                 got = enrich_company(apollo_client, r,
                                      max_contacts=enr.max_contacts, delay=delay)
             else:
-                got = enrich_company_lara(lara_provider, r, country=config.country,
+                got = enrich_company_lara(lara_provider, r,
+                                          country=(r.get("country") or config.country),
                                           max_contacts=enr.max_contacts,
                                           language=config.language or "en")
         except Exception as exc:  # noqa: BLE001 - log & continue
