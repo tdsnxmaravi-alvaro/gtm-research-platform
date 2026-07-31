@@ -16,6 +16,8 @@ Return ONLY a JSON object, no prose, with this exact shape:
       "contact_name": "Full Name",
       "title": "Job title",
       "email": "name@company.com or empty string if not found",
+      "phone": "public phone in international format (+countrycode...) or empty string",
+      "phone_type": "direct | corporate | empty (empty if no phone)",
       "linkedin": "https://linkedin.com/in/... or empty string",
       "source_url": "URL where you found this contact"
     }
@@ -24,7 +26,10 @@ Return ONLY a JSON object, no prose, with this exact shape:
 Rules:
 - Only include real, decision-maker contacts (owner, founder, C-suite, VP, head,
   director, sales/channel manager). Prefer the most senior/relevant first.
-- NEVER invent an email. If you cannot verify one, use an empty string.
+- NEVER invent an email or a phone. If you cannot verify one from a public source,
+  use an empty string. Do NOT guess personal mobile numbers.
+- "phone_type" is "direct" only for a personal/direct line, "corporate" for a main
+  or department line; empty when there is no phone.
 - Every contact MUST have a source_url you actually consulted.
 - If you find no contacts, return {"contacts": []}.
 """

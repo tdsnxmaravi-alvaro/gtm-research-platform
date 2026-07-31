@@ -80,12 +80,20 @@ def enrich_company_lara(
     for c in _parse_contacts(resp.text)[:max_contacts]:
         if not isinstance(c, dict):
             continue
+        phone = str(c.get("phone", "")).strip()
+        ptype = str(c.get("phone_type", "")).strip().lower()
+        # LARA finds public numbers (usually a corporate/main line); only treat as
+        # a direct dial when the agent explicitly says so.
+        direct = phone if (phone and ptype == "direct") else ""
+        corporate = phone if (phone and ptype != "direct") else ""
         contacts.append(EnrichedContact(
             company=company, domain=domain, tier=tier, score=score,
             contact_name=str(c.get("contact_name", "")).strip(),
             title=str(c.get("title", "")).strip(),
             email=str(c.get("email", "")).strip(),
             email_status="lara_web" if c.get("email") else "",
+            direct_phone=direct, corporate_phone=corporate,
+            phone_reveal_status="lara_web" if phone else "",
             linkedin=str(c.get("linkedin", "")).strip(),
             source="lara",
         ))
