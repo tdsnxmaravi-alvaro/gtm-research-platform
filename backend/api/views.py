@@ -264,6 +264,8 @@ class CampaignViewSet(viewsets.ModelViewSet):
             return Response({"error": f"Could not read the list: {exc}"},
                             status=status.HTTP_400_BAD_REQUEST)
         return Response(report)
+
+    def _start(self, campaign, stage) -> Run:
         run = Run.objects.create(campaign=campaign, stage=stage, status="pending")
         clear_cancel(campaign.name)
         # In local dev (no broker) run in a background thread so the request returns
