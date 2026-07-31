@@ -144,9 +144,15 @@ def normalize_result(r: dict) -> dict:
     rec = r.get("recommended_products") or []
     if isinstance(rec, str):
         rec = [rec]
+    sw = r.get("software_resold") or ""
+    if isinstance(sw, list):
+        sw = ", ".join(str(x) for x in sw if x)
     return {
         "company": str(r.get("company", "")).strip(),
         "website": str(r.get("website", "")).strip(),
+        "employees": str(r.get("employees", "")).strip(),
+        "software_resold": str(sw).strip(),
+        "independence": str(r.get("independence", "")).strip(),
         "fit_summary": str(r.get("fit_summary", "")).strip(),
         "score": score,
         "tier": str(r.get("tier", "")).strip().upper(),

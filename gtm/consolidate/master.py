@@ -121,6 +121,8 @@ def build_master(config: CampaignConfig, out_dir: str | Path | None = None,
 
     rows.sort(key=lambda x: (_TIER_ORDER.get(x["tier"], 9), -_num(x["score"])))
     summary.sort(key=lambda x: (_TIER_ORDER.get(x["tier"], 9), -_num(x["score"])))
+    contact_rows.sort(key=lambda c: (_TIER_ORDER.get((c.get("tier") or "").upper(), 9),
+                                     -_num(c.get("score"))))
     _write_csv(rows, out / "master.csv")
     _write_xlsx(summary, contact_rows, out / "master.xlsx")
     if progress_cb:

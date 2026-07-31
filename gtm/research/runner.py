@@ -26,6 +26,7 @@ from .cache import ResearchCache, _domain_or_name
 
 OUT_COLS = [
     "product", "vertical", "company", "website", "country", "employees", "software_resold",
+    "independence",
     "final_tier", "tier", "score",
     "tier_capped", "tier_cap_reason", "fit_summary", "recommended_products",
     "evidence_count", "has_verified_url", "evidence_urls", "notes", "passes", "evidence",
@@ -229,8 +230,8 @@ def run_campaign(
                     row["product"] = product.name
                     row["vertical"] = ""
                     row["country"] = r.get("country") or config.country
-                    row["employees"] = _ctx_val(r, _EMP_KEYS)
-                    row["software_resold"] = _ctx_val(r, _SW_KEYS)
+                    row["employees"] = _ctx_val(r, _EMP_KEYS) or row.get("employees", "")
+                    row["software_resold"] = _ctx_val(r, _SW_KEYS) or row.get("software_resold", "")
                     all_results.append(row)
                     done.add(r.get("company"))
                     hits += 1
@@ -267,8 +268,8 @@ def run_campaign(
                     r["product"] = product.name
                     r["vertical"] = ""
                     r["country"] = country_by.get(comp, config.country)
-                    r["employees"] = emp_by.get(comp, "")
-                    r["software_resold"] = sw_by.get(comp, "")
+                    r["employees"] = emp_by.get(comp) or r.get("employees", "")
+                    r["software_resold"] = sw_by.get(comp) or r.get("software_resold", "")
                     cache.put(ResearchCache.key(config.vendor, config.target_type.value,
                                                 product.name, domain_by.get(comp, comp)), r)
                 all_results.extend(scored)

@@ -23,6 +23,9 @@ OUTPUT — return STRICT JSON only (no prose, no markdown fences), one object pe
   {
     "company": "...",
     "website": "...",
+    "employees": "approx. headcount or size band if verifiable (e.g. '51-200'), else empty",
+    "software_resold": "key software brands/products they sell or resell, comma-separated, else empty",
+    "independence": "Independent | Subsidiary | Acquired | empty (ownership status, only if verifiable)",
     "fit_summary": "1-3 sentences on why it does / does not fit",
     "dimension_scores": [
       {"name": "<exact dimension name>", "points": <int>, "max": <int>,
