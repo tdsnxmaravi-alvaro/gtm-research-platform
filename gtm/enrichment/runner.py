@@ -102,14 +102,6 @@ def run_enrichment(
     def _row_tier(r: dict) -> str:
         return (r.get("final_tier") or r.get("tier") or "").upper()
 
-    pending = [r for r in rows if (r.get("company") or "").strip()
-               and r.get("company") not in done
-               and _TIER_ORDER.get(_row_tier(r), 9) <= cap]
-    if limit:
-        pending = pending[:limit]
-    print(f"Enrich: {len(rows)} companies | tier>={(min_tier or config.outreach.min_tier)} "
-          f"| pending {len(pending)} | provider={enr.provider.value} | want={enr.want.value}")
-
     all_contacts: list[EnrichedContact] = []
     # Resume must ACCUMULATE: reload prior contacts so we append instead of
     # overwriting contacts.csv with only the current batch.
@@ -126,6 +118,44 @@ def run_enrichment(
     cache = ContactCache(path=out.parent / ".gtm_cache" / "contacts.json",
                          enabled=use_cache)
     cache_hits = 0
+
+    # Provider priority: a higher-priority provider "upgrades" a company already
+    # enriched by a lower-priority one — but ONLY if it actually finds contacts.
+    # Apollo (verified emails/phones) supersedes LARA; if Apollo finds nothing we
+    # KEEP the LARA contacts. Same-or-lower priority just reuses the cache, so we
+    # never downgrade or re-charge for data we already have.
+    _PROVIDER_RANK = {"lara": 0, "webhook": 0, "apollo": 1}
+    cur_provider = enr.provider.value
+    cur_rank = _PROVIDER_RANK.get(cur_provider, 0)
+
+    def _rank_of(cs: list[EnrichedContact]) -> int:
+        return max((_PROVIDER_RANK.get((c.source or "").lower(), 0) for c in cs),
+                   default=-1)
+
+    def _norm(s: str) -> str:
+        return (s or "").strip().lower()
+
+    def _drop_company(lst: list[EnrichedContact], company: str) -> list[EnrichedContact]:
+        cl = _norm(company)
+        return [c for c in lst if _norm(c.company) != cl]
+
+    def _eligible(r: dict) -> bool:
+        if _TIER_ORDER.get(_row_tier(r), 9) > cap:
+            return False
+        company = r.get("company")
+        if company not in done:
+            return True
+        # Already enriched: revisit only to upgrade with a higher-priority provider
+        # that might now find contacts the previous (lower-priority) provider missed.
+        domain = extract_domain(r.get("website") or "")
+        cached = cache.get(domain) if domain else None
+        return bool(cached) and _rank_of(cached) < cur_rank
+
+    pending = [r for r in rows if (r.get("company") or "").strip() and _eligible(r)]
+    if limit:
+        pending = pending[:limit]
+    print(f"Enrich: {len(rows)} companies | tier>={(min_tier or config.outreach.min_tier)} "
+          f"| pending {len(pending)} | provider={cur_provider} | want={enr.want.value}")
 
     # Build the provider once (lazily — skip if everything is cached).
     apollo_client = None
@@ -150,7 +180,11 @@ def run_enrichment(
         company = r.get("company")
         domain = extract_domain(r.get("website") or "")
         cached = cache.get(domain) if domain else None
-        if cached is not None:
+        cached_src = (cached[0].source if cached else "") or "previous"
+
+        # Reuse the cache when it already holds same-or-higher-priority contacts.
+        if cached is not None and _rank_of(cached) >= cur_rank:
+            all_contacts = _drop_company(all_contacts, company)
             all_contacts.extend(cached)
             done.add(company)
             _save_done(state_path, done)
@@ -159,6 +193,8 @@ def run_enrichment(
             cache_hits += 1
             print(f"  {company}: {len(cached)} contacts (cache)")
             continue
+
+        # Fetch with the current provider (a fresh company, or an upgrade attempt).
         try:
             _ensure_provider()
             if enr.provider == EnrichProvider.apollo:
@@ -171,14 +207,24 @@ def run_enrichment(
         except Exception as exc:  # noqa: BLE001 - log & continue
             print(f"  !! enrich error for {company}: {exc}")
             continue
-        all_contacts.extend(got)
-        if domain:
-            cache.put(domain, got)
+
+        all_contacts = _drop_company(all_contacts, company)
+        if got:
+            all_contacts.extend(got)
+            if domain:
+                cache.put(domain, got)
+            print(f"  {company}: +{len(got)} contacts"
+                  + (f" (upgraded from {cached_src})" if cached is not None else ""))
+        elif cached is not None:
+            # Upgrade attempt found nothing — keep the existing (lower-priority)
+            # contacts rather than losing them.
+            all_contacts.extend(cached)
+            print(f"  {company}: kept {len(cached)} {cached_src} contacts "
+                  f"(no {cur_provider} contacts found)")
         done.add(company)
         _save_done(state_path, done)
         write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
                        columns=CONTACT_COLS)
-        print(f"  {company}: +{len(got)} contacts")
 
     # Phone reveals (Apollo only, when requested).
     if (apollo_client is not None and enr.want == EnrichWant.emails_phones
