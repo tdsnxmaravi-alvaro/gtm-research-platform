@@ -67,7 +67,7 @@ def ai_available() -> bool:
     return _build_provider() is not None
 
 
-def _safe_samples(headers: list[str], rows: list[dict], per_col: int = 3) -> dict:
+def _safe_samples(headers: list[str], rows: list[dict], per_col: int = 5) -> dict:
     """Collect a few sample values per NON-sensitive column."""
     out: dict[str, list[str]] = {}
     for h in headers:

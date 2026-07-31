@@ -25,10 +25,44 @@ _HEADER_MAP = {
     "company": "company", "company name": "company", "name": "company",
     "account": "company", "reseller": "company",
     "reseller name": "company", "resellername": "company", "partner name": "company",
+    "sold to name": "company", "sold to": "company", "account name": "company",
+    "customer name": "company", "end customer": "company", "dealer name": "company",
     "website": "website", "url": "website", "domain": "website", "web": "website",
+    "company website": "website", "web site": "website", "homepage": "website",
     "country": "country", "end customer country": "country", "pais": "country",
-    "país": "country",
+    "país": "country", "office hq": "country", "hq country": "country",
 }
+
+# Substring heuristics used only when a header isn't an exact match above — lets
+# non-standard stakeholder exports (e.g. "Sold To Name", "Company Website",
+# "Office HQ") map without needing the optional AI schema-mapper. Order matters:
+# website is checked before country before company so "Company Website" -> website.
+_WEBSITE_RE = re.compile(r"web\s*-?\s*site|website|\burl\b|domain|home\s*page|web\s*address|\bwww\b", re.I)
+_COUNTRY_RE = re.compile(r"\bcountry\b|country\s*/?\s*region|\bnation\b|hq\s*country|office\s*hq", re.I)
+_COMPANY_RE = re.compile(
+    r"(company|reseller|partner|account|customer|business|organi[sz]ation|dealer|client)\s*name"
+    r"|^(company|reseller|partner|account|customer|dealer|client)$"
+    r"|sold[\s-]*to|ship[\s-]*to", re.I)
+
+
+def _guess_canonical(header: str) -> str | None:
+    """Best-effort canonical name for a non-standard header, or None."""
+    low = (header or "").strip().lower()
+    if not low:
+        return None
+    if low in _HEADER_MAP:
+        return _HEADER_MAP[low]
+    if low == "id" or low.endswith(" id") or "identifier" in low:
+        return None  # partner id / customer id are identifiers, not the name
+    if _WEBSITE_RE.search(low):
+        return "website"
+    if _COUNTRY_RE.search(low):
+        return "country"
+    if "contact" in low:
+        return None  # contact columns are for enrichment, not the company name
+    if _COMPANY_RE.search(low):
+        return "company"
+    return None
 
 
 def _extract_json(text: str) -> dict | list | None:
@@ -154,7 +188,7 @@ def load_provided_list(path: str | Path,
         row: dict = {}
         for k, v in raw.items():
             low = (k or "").strip().lower()
-            key = overrides.get(low) or _HEADER_MAP.get(low, low)
+            key = overrides.get(low) or _HEADER_MAP.get(low) or _guess_canonical(k) or low
             row[key] = ("" if v is None else str(v)).strip()
         if row.get("company"):
             rows.append(row)
@@ -248,7 +282,7 @@ def inspect_provided_list(path: str | Path, use_ai: bool = False,
 
     def _canonical(h: str) -> str:
         low = h.strip().lower()
-        return merged.get(low) or _HEADER_MAP.get(low, low)
+        return merged.get(low) or _HEADER_MAP.get(low) or _guess_canonical(h) or low
 
     mapped = {h: _canonical(h) for h in headers if h}
 
