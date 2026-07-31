@@ -191,8 +191,8 @@ export default function Campaigns({ onEdit }) {
               <small>{describe(c.config)}</small>
             </div>
             <div className="stages">
-              {!complete && (
-                <button className="primary" onClick={() => start(c.id, c.config)} disabled={running}
+              {!complete && !running && (
+                <button className="primary" onClick={() => start(c.id, c.config)}
                         title={resumable ? "Resume the pipeline where it left off" : "Run all phases in order: research → consolidate → enrich → outreach"}>
                   {resumable ? "▶ Resume" : "▶ Start"}
                 </button>
