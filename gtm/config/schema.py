@@ -224,6 +224,9 @@ class CampaignConfig(BaseModel):
     # Reuse a company's scored analysis for the same vendor/product across runs and
     # campaigns (saves LLM tokens). Disable to force fresh research.
     research_cache: bool = True
+    # Research batches to run concurrently (provided mode). >1 sends parallel LLM
+    # requests so a large list finishes far faster; keep modest to respect rate limits.
+    research_concurrency: int = 3
 
     scoring: Scoring = Field(default_factory=Scoring)
     enrichment: Enrichment = Field(default_factory=Enrichment)

@@ -245,16 +245,11 @@ def run_campaign(
                 write_rows_csv(all_results, results_path, columns=OUT_COLS)
                 print(f"  {product.name}: {hits} reused from research cache")
 
-            for i in range(0, len(to_research), batch_size):
-                if should_cancel and should_cancel():
-                    print("  canceled — stopping after saved progress")
-                    return all_results
-                batch = to_research[i:i + batch_size]
+            def _process_batch(batch: list[dict], idx: int):
                 prompt = build_prompt(config, product,
                                       company_input=format_companies(batch))
-                tag = f"{product.name}_batch{i//batch_size+1}"
+                tag = f"{product.name}_batch{idx + 1}"
                 scored = _run_batch(config, providers, prompt, logs, tag, passes, delay)
-                # Attach each company's country (from the provided list) to its result.
                 country_by = {(b.get("company") or "").strip().lower(): b.get("country", "")
                               for b in batch}
                 domain_by = {(b.get("company") or "").strip().lower(): _domain_or_name(b)
@@ -263,6 +258,7 @@ def run_campaign(
                           for b in batch}
                 sw_by = {(b.get("company") or "").strip().lower(): _ctx_val(b, _SW_KEYS)
                          for b in batch}
+                cache_items = []
                 for r in scored:
                     comp = (r.get("company") or "").strip().lower()
                     r["product"] = product.name
@@ -270,8 +266,14 @@ def run_campaign(
                     r["country"] = country_by.get(comp, config.country)
                     r["employees"] = emp_by.get(comp) or r.get("employees", "")
                     r["software_resold"] = sw_by.get(comp) or r.get("software_resold", "")
-                    cache.put(ResearchCache.key(config.vendor, config.target_type.value,
-                                                product.name, domain_by.get(comp, comp)), r)
+                    cache_items.append((ResearchCache.key(
+                        config.vendor, config.target_type.value, product.name,
+                        domain_by.get(comp, comp)), r))
+                return batch, scored, cache_items
+
+            def _accept(batch, scored, cache_items) -> None:
+                for ck, r in cache_items:
+                    cache.put(ck, r)
                 all_results.extend(scored)
                 # Only mark companies done when the batch produced results, so a
                 # transient provider error (e.g. HTTP 499) is retried on resume.
@@ -280,11 +282,42 @@ def run_campaign(
                         done.add(r.get("company"))
                     _save_state(state_path, done)
                     write_rows_csv(all_results, results_path, columns=OUT_COLS)
-                processed += len(batch)
-                if progress_cb:
-                    progress_cb(min(processed, total), total)
-                print(f"  batch {i//batch_size+1}: +{len(scored)} results")
-                time.sleep(delay)
+
+            batches = [to_research[i:i + batch_size]
+                       for i in range(0, len(to_research), batch_size)]
+            concurrency = max(1, getattr(config, "research_concurrency", 1) or 1)
+
+            if concurrency <= 1 or len(batches) <= 1:
+                for idx, batch in enumerate(batches):
+                    if should_cancel and should_cancel():
+                        print("  canceled — stopping after saved progress")
+                        return all_results
+                    _accept(*_process_batch(batch, idx))
+                    processed += len(batch)
+                    if progress_cb:
+                        progress_cb(min(processed, total), total)
+                    print(f"  batch {idx + 1}: results saved")
+                    time.sleep(delay)
+            else:
+                # Run batches in concurrent waves — parallel LLM requests so a large
+                # list finishes far faster. State is saved after each completed batch.
+                from concurrent.futures import ThreadPoolExecutor, as_completed
+                w = 0
+                while w < len(batches):
+                    if should_cancel and should_cancel():
+                        print("  canceled — stopping after saved progress")
+                        return all_results
+                    wave = list(enumerate(batches))[w:w + concurrency]
+                    with ThreadPoolExecutor(max_workers=concurrency) as ex:
+                        futs = [ex.submit(_process_batch, b, idx) for idx, b in wave]
+                        for fut in as_completed(futs):
+                            batch, scored, cache_items = fut.result()
+                            _accept(batch, scored, cache_items)
+                            processed += len(batch)
+                            if progress_cb:
+                                progress_cb(min(processed, total), total)
+                            print(f"  batch: +{len(scored)} results")
+                    w += concurrency
 
     else:  # discover
         targets = config.verticals or [None]
