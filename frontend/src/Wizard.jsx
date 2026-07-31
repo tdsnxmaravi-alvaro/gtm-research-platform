@@ -57,6 +57,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
   const [uploading, setUploading] = useState(false);
   const [uploadErr, setUploadErr] = useState("");
   const [listReport, setListReport] = useState(null);
+  const [remapping, setRemapping] = useState(false);
   const [logoUrl, setLogoUrl] = useState("");
   const [dims, setDims] = useState({ universal: [], specific: [] });
   const [emailPreview, setEmailPreview] = useState({ html: "", source: "", loading: false });
@@ -124,8 +125,20 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
     }
   }
 
-  const setCol = (field) => (e) =>
-    setF({ ...f, colMap: { ...f.colMap, [field]: e.target.value } });
+  const setCol = (field) => (e) => {
+    const colMap = { ...f.colMap, [field]: e.target.value };
+    setF({ ...f, colMap });
+    // Re-inspect the list with the manual picks so the company/website counts
+    // and warnings update live (the auto/AI mapping may have missed the columns).
+    if (f.provided_list_path) {
+      setRemapping(true);
+      api
+        .remapList(f.provided_list_path, colMap)
+        .then((rep) => setListReport(rep))
+        .catch((err) => setUploadErr(String(err.message || err)))
+        .finally(() => setRemapping(false));
+    }
+  };
 
   async function onLogoUpload(e) {
     const file = e.target.files?.[0];
@@ -416,6 +429,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
                   </div>
                   <small className="hint">
                     {listReport.with_company} companies · {listReport.with_website} with website
+                    {remapping ? " · re-analyzing…" : ""}
                     {f.colMap.country
                       ? " · per-row country detected (campaign country is the fallback)"
                       : " · no country column — campaign country used for all rows"}

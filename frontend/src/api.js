@@ -27,6 +27,8 @@ export const api = {
     req(`/campaigns/vendor_preset/?vendor=${encodeURIComponent(vendor)}&target_type=${encodeURIComponent(targetType)}`),
   outreachPreview: (config) =>
     req("/campaigns/outreach_preview/", { method: "POST", body: JSON.stringify({ config }) }),
+  remapList: (path, mapping) =>
+    req("/campaigns/remap_list/", { method: "POST", body: JSON.stringify({ path, mapping }) }),
   uploadList: (file) => {
     const fd = new FormData();
     fd.append("file", file);

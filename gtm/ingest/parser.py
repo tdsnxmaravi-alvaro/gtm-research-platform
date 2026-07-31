@@ -211,7 +211,8 @@ def _raw_headers(path: Path) -> list[str]:
         return next(csv.reader(f), [])
 
 
-def inspect_provided_list(path: str | Path, use_ai: bool = False) -> dict:
+def inspect_provided_list(path: str | Path, use_ai: bool = False,
+                          overrides: dict[str, str] | None = None) -> dict:
     """Pre-flight a provided list: detect columns, header mapping, and data quality.
 
     Returns a report dict (headers, mapping, counts, context fields, warnings, ok).
@@ -220,7 +221,9 @@ def inspect_provided_list(path: str | Path, use_ai: bool = False) -> dict:
     When `use_ai` is True and a schema-mapper agent is configured, an AI mapping
     is added (and applied for column detection) — useful for non-standard files
     whose headers aren't in the built-in map. Only headers + non-PII samples are
-    sent to the AI.
+    sent to the AI. `overrides` (raw-header-lowercased -> canonical name) are the
+    user's manual column picks and take precedence over both AI and built-in maps —
+    this is what lets the wizard re-count after a manual remap.
     """
     path = Path(path)
     fmt = "xlsx" if path.suffix.lower() in (".xlsx", ".xlsm") else "csv"
@@ -228,22 +231,28 @@ def inspect_provided_list(path: str | Path, use_ai: bool = False) -> dict:
     raw = _read_xlsx(path) if fmt == "xlsx" else _read_csv(path)
     raw_total = len(raw)
 
-    # Optional AI-assisted mapping (PII-minimized); falls back silently.
+    user_overrides = {(k or "").strip().lower(): v
+                      for k, v in (overrides or {}).items() if v}
+
+    # Optional AI-assisted mapping (PII-minimized); falls back silently. User
+    # overrides win, so skip the AI call entirely when the user already remapped.
     ai_mapping = None
-    overrides: dict[str, str] = {}
-    if use_ai:
+    ai_overrides: dict[str, str] = {}
+    if use_ai and not user_overrides:
         from .schema_ai import ai_map_columns, overrides_from_ai
         ai_mapping = ai_map_columns(headers, raw)
         if ai_mapping:
-            overrides = overrides_from_ai(ai_mapping)
+            ai_overrides = overrides_from_ai(ai_mapping)
+
+    merged = {**ai_overrides, **user_overrides}  # manual picks take precedence
 
     def _canonical(h: str) -> str:
         low = h.strip().lower()
-        return overrides.get(low) or _HEADER_MAP.get(low, low)
+        return merged.get(low) or _HEADER_MAP.get(low, low)
 
     mapped = {h: _canonical(h) for h in headers if h}
 
-    rows = load_provided_list(path, column_overrides=overrides)  # only rows with a company
+    rows = load_provided_list(path, column_overrides=merged)  # only rows with a company
     with_company = len(rows)
     with_website = sum(1 for r in rows if r.get("website"))
 

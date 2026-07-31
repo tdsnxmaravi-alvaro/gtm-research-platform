@@ -221,7 +221,49 @@ class CampaignViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST)
         return Response(report)
 
-    def _start(self, campaign, stage) -> Run:
+    @action(detail=False, methods=["post"])
+    def remap_list(self, request):
+        """Re-inspect an already-uploaded list with the user's manual column picks.
+
+        The wizard sends the file `path` (from upload_list) and a `mapping` of
+        canonical -> raw header ({"company": "Sold To Name", ...}); we recount
+        companies/websites with those overrides so the preview updates live.
+        """
+        path = (request.data.get("path") or "").strip()
+        mapping = request.data.get("mapping") or {}
+        if not path:
+            return Response({"error": "No path provided."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        # Confine reads to the data root (avoid arbitrary file access).
+        root = Path(settings.GTM_DATA_ROOT).resolve()
+        try:
+            dest = Path(path).resolve()
+            dest.relative_to(root)
+        except (ValueError, OSError):
+            return Response({"error": "Path is outside the data directory."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if not dest.is_file():
+            return Response({"error": "File not found."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Invert the wizard's canonical->header map into header-lowercased->canonical.
+        overrides = {str(hdr).strip().lower(): canon
+                     for canon, hdr in mapping.items() if hdr}
+
+        from gtm.ingest.parser import inspect_provided_list, load_provided_list
+
+        try:
+            report = inspect_provided_list(dest, use_ai=False, overrides=overrides)
+            report["path"] = str(dest)
+            rows = load_provided_list(dest, column_overrides=overrides)
+            report["sample"] = rows[:5]
+            report["has_country_col"] = any(
+                v == "country" for v in report.get("mapping", {}).values()
+            )
+        except Exception as exc:  # noqa: BLE001
+            return Response({"error": f"Could not read the list: {exc}"},
+                            status=status.HTTP_400_BAD_REQUEST)
+        return Response(report)
         run = Run.objects.create(campaign=campaign, stage=stage, status="pending")
         clear_cancel(campaign.name)
         # In local dev (no broker) run in a background thread so the request returns
