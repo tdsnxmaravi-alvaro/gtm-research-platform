@@ -11,6 +11,14 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load the repo-root .env for local dev so config (data root, LARA/Apollo keys)
+# is consistent regardless of how the server is launched. No-op if absent.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR.parent / ".env")
+except ImportError:
+    pass
+
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-change-me")
 DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
@@ -62,8 +70,10 @@ DATABASES = {
     )
 }
 
-# Where campaign run artifacts (results/contacts/master/eml) are written.
-GTM_DATA_ROOT = Path(os.getenv("GTM_DATA_ROOT", BASE_DIR / "data"))
+# Where campaign run artifacts (results/contacts/master/eml) are written. Defaults
+# to the repo-root campaigns/ folder (same place the engine/CLI uses) so downloads
+# work out of the box; override with GTM_DATA_ROOT in prod (e.g. a /data volume).
+GTM_DATA_ROOT = Path(os.getenv("GTM_DATA_ROOT", BASE_DIR.parent / "campaigns"))
 # Vendor .oft outreach templates live at the repo root /templates.
 os.environ.setdefault("GTM_TEMPLATES_DIR", str(BASE_DIR.parent / "templates"))
 
