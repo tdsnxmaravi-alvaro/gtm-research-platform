@@ -551,6 +551,27 @@ def exclusion_note(vendor: str) -> str:
             + ", ".join(parts) + ".")
 
 
+def discover_verticals(vendor: str, slugs: list[str] | None = None,
+                       tiers: tuple[str, ...] = (CORE, SECONDARY)) -> list[dict]:
+    """Build Vertical-ready dicts for a discover campaign.
+
+    If `slugs` is given, keep exactly those (in the vendor's catalogue order);
+    otherwise take the vendor's verticals in `tiers`. Maps the preset's
+    ``example_reseller_software`` to the Vertical model's ``example_software``.
+    """
+    if slugs is not None:
+        wanted = set(slugs)
+        picked = [v for v in verticals_for(vendor, tiers=TIERS) if v["slug"] in wanted]
+    else:
+        picked = verticals_for(vendor, tiers=tiers)
+    return [{
+        "name": v["name"],
+        "slug": v["slug"],
+        "focus": v["focus"],
+        "example_software": list(v["example_reseller_software"]),
+    } for v in picked]
+
+
 # --------------------------------------------------------------------------- #
 # Import-time validation — cheap O(n) integrity check.
 # --------------------------------------------------------------------------- #

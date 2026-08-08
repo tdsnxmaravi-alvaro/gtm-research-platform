@@ -122,6 +122,10 @@ class Vertical(BaseModel):
     slug: str
     prompt: str | None = None
     dimensions: list[ScoringDimension] = Field(default_factory=list)
+    # Discover-mode context (from gtm.prompts.vertical_presets): why this reseller
+    # pool fits the vendor, and the software brands whose resellers we recruit.
+    focus: str = ""
+    example_software: list[str] = Field(default_factory=list)
 
 
 class ScoringDimension(BaseModel):
@@ -146,6 +150,11 @@ class Scoring(BaseModel):
     )
     # URL gate: with ZERO verified source URLs, the account cannot exceed this tier.
     unverified_tier_cap: str = "C"
+    # Discover-mode gates (safety nets on top of the prompt's exclusions):
+    # a competitor-locked partner cannot exceed this tier.
+    excluded_partner_tier_cap: str = "D"
+    # a captive/subsidiary (non-independent) reseller cannot exceed this tier.
+    captive_tier_cap: str = "C"
 
     def total_max_points(self) -> int:
         return sum(d.max_points for d in self.dimensions)

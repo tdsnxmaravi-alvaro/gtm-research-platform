@@ -11,7 +11,7 @@ Two paths:
 
 from __future__ import annotations
 
-from ..config.schema import CampaignConfig
+from ..config.schema import CampaignConfig, Mode
 
 
 def tier_order(config: CampaignConfig) -> list[str]:
@@ -60,9 +60,71 @@ def apply_url_gate(config: CampaignConfig, result: dict) -> dict:
     return result
 
 
+def _is_captive(result: dict) -> bool:
+    """A reseller flagged Subsidiary/Acquired is not an independent channel partner."""
+    return str(result.get("independence") or "").strip().lower() in ("subsidiary", "acquired")
+
+
+def _excluded_partner(config: CampaignConfig, result: dict) -> str:
+    """Return the competitor name if the reseller looks locked to an excluded competitor.
+
+    Safety net for the prompt's EXCLUSIONS: scans the reseller's resold-software /
+    notes / fit text for a competitor from VENDOR_EXCLUSIONS together with one of its
+    locked tier keywords (e.g. 'Autodesk' + 'Gold', or an 'exclusive' lock cue).
+    """
+    from ..prompts.vertical_presets import VENDOR_EXCLUSIONS
+    ex = VENDOR_EXCLUSIONS.get((config.vendor or "").strip())
+    if not ex:
+        return ""
+    hay = " ".join(str(result.get(f, "")) for f in
+                   ("software_resold", "notes", "fit_summary")).lower()
+    for competitor, levels in ex.items():
+        if competitor.lower() not in hay:
+            continue
+        if levels == ["exclusive"]:
+            cues = ("exclusive", "exclusively", "locked", "only reseller", "sole reseller")
+        else:
+            cues = tuple(l.lower() for l in levels)
+        if any(c in hay for c in cues):
+            return competitor
+    return ""
+
+
+def apply_discover_gates(config: CampaignConfig, result: dict) -> dict:
+    """Cap final_tier for non-independent or competitor-locked resellers (discover)."""
+    order = tier_order(config)
+    final = (result.get("final_tier") or result.get("tier")
+             or tier_from_score(config, result.get("score")))
+    reasons = []
+
+    if _is_captive(result):
+        capped = _cap_tier(final, config.scoring.captive_tier_cap, order)
+        if capped != final:
+            reasons.append(f"non-independent -> capped at {config.scoring.captive_tier_cap}")
+            final = capped
+
+    competitor = _excluded_partner(config, result)
+    if competitor:
+        capped = _cap_tier(final, config.scoring.excluded_partner_tier_cap, order)
+        if capped != final:
+            reasons.append(f"{competitor}-locked partner -> capped at "
+                           f"{config.scoring.excluded_partner_tier_cap}")
+            final = capped
+
+    if reasons:
+        result["final_tier"] = final
+        result["tier_capped"] = True
+        prev = result.get("tier_cap_reason") or ""
+        result["tier_cap_reason"] = "; ".join([r for r in (prev,) if r] + reasons)
+    return result
+
+
 def score_results(config: CampaignConfig, results: list[dict]) -> list[dict]:
-    """Apply the LLM-evidence scoring (URL gate) to all results."""
-    return [apply_url_gate(config, r) for r in results]
+    """Apply the LLM-evidence scoring (URL gate), plus discover gates in discover mode."""
+    out = [apply_url_gate(config, r) for r in results]
+    if config.mode == Mode.discover:
+        out = [apply_discover_gates(config, r) for r in out]
+    return out
 
 
 def deterministic_score(config: CampaignConfig, row: dict):

@@ -9,12 +9,43 @@ from __future__ import annotations
 
 from ..config.schema import CampaignConfig, Product, Vertical
 from . import templates
+from .vertical_presets import exclusions_for
+
+
+# Exclusions that apply to ANY vendor discover run (independent of the competitor
+# lock list). Kept terse; the per-vendor locked-partner exclusions are prepended.
+_GENERAL_EXCLUSIONS = [
+    "Direct subsidiaries or wholly-owned offices of a software vendor",
+    "Companies acquired by a major vendor in the last 24 months (still note them as intel)",
+    "Pure referral / affiliate partners with no resale license",
+]
 
 
 def _fit_criteria_block(product: Product) -> str:
     if product.fit_criteria:
         return "\n".join(f"- {c}" for c in product.fit_criteria)
     return "- General fit for the product (assess capability/demand as relevant)."
+
+
+def _exclusion_block(config: CampaignConfig) -> str:
+    """Locked competitor partners (per vendor) + general exclusions, as bullets."""
+    lines = []
+    for competitor, levels in exclusions_for(config.vendor).items():
+        if levels == ["exclusive"]:
+            lines.append(f"- {competitor}-exclusive partners (locked to {competitor})")
+        else:
+            lines.append(f"- {competitor} {'/'.join(levels)} partners (locked to {competitor})")
+    lines += [f"- {x}" for x in _GENERAL_EXCLUSIONS]
+    return "\n".join(lines)
+
+
+def _vendor_landscape_block(vertical: Vertical | None) -> str:
+    """Software brands whose resellers we recruit, from the vertical preset."""
+    software = list(vertical.example_software) if vertical else []
+    if not software:
+        return "- (no preset brand list — infer the leading software brands in this vertical)"
+    return "\n".join(f"- {s}" for s in software)
+
 
 
 def _scoring_block(config: CampaignConfig) -> str:
@@ -98,11 +129,17 @@ def build_prompt(
         "value_prop": product.value_prop or product.name,
         "country": config.country,
         "language": config.language or "en",
+        "vendor": config.vendor or product.name,
         "fit_criteria": _fit_criteria_block(product),
         "evidence_rules": _evidence_block(config),
+        "discover_rules": templates.DISCOVER_RULES,
         "scoring": _scoring_block(config),
         "output_schema": templates.OUTPUT_SCHEMA,
         "vertical_name": vertical.name if vertical else "",
+        "vertical_focus": (vertical.focus if vertical and vertical.focus
+                           else "General adjacency between this vertical and the product."),
+        "vendor_landscape": _vendor_landscape_block(vertical),
+        "exclusion_rules": _exclusion_block(config),
         "company_input": company_input if company_input is not None else COMPANIES_TOKEN,
     }
     return template.format(**ctx)

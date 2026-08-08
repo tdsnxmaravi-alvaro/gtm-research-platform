@@ -42,6 +42,30 @@ lowest band SHOULD carry an evidence_url; without verifiable evidence, keep it i
 the lowest band."""
 
 
+# Extra rules for DISCOVER mode: the model is finding NEW companies from scratch,
+# so it needs channel-partner discrimination + gap-intelligence expectations on top
+# of the shared anti-hallucination rules.
+DISCOVER_RULES = """\
+DISCOVERY RULES (in addition to the evidence rules above):
+- Independence FIRST: include only INDEPENDENT resellers. Exclude direct subsidiaries,
+  wholly-owned offices, or captive channels of a software vendor. Flag any company
+  acquired by a major vendor in the last 24 months (note acquirer + date) and treat it
+  as non-independent.
+- Distinguish partner types and prefer resale-capable ones: authorized reseller
+  (contractual resale) and solution partner / system integrator (services + resale) are
+  IN; pure referral / affiliate partners with no resale license are OUT.
+- Work in TWO parts:
+  PART 1 — for each software brand in VENDOR LANDSCAPE below, find its independent
+  resellers in the target geography (check partner/dealer locators, trade-show exhibitor
+  lists, LinkedIn "authorized dealer / reseller" searches, industry directories).
+  PART 2 — identify ADDITIONAL software brands in this vertical not listed, and find
+  their independent resellers too.
+- Gap intelligence is valuable: if a brand appears to have a direct-only or very limited
+  channel in the geography, say so explicitly instead of padding with weak entries.
+- Prefer FEWER verified entries over MANY unverifiable ones. Every company needs a working
+  website (mark "NO WEBSITE" if none found). Never guess contact details — leave blank."""
+
+
 # --------------------------------------------------------------------------- #
 # Templates keyed by CampaignConfig.prompt_template_key()
 # --------------------------------------------------------------------------- #
@@ -104,22 +128,36 @@ FIT CRITERIA:
 
 {evidence_rules}
 
+{discover_rules}
+
 SCORING:
 {scoring}
 
 {output_schema}"""
 
 RESELLER_DISCOVER_VERTICAL = """\
-You are a senior channel-strategy analyst for TD SYNNEX.
-Find independent RESELLERS in the {vertical_name} vertical operating in {country} that could
-add {product_name} to their portfolio (fit to SELL this product to their customers).
+You are a senior channel-strategy analyst for TD SYNNEX running a {vendor} channel-expansion
+project. Your task is to identify EVERY independent reseller in the {vertical_name} vertical
+operating in {country} that could ADD {product_name} to their portfolio (fit to SELL this
+product to their customers) and is NOT a subsidiary of a software vendor.
 
 PRODUCT: {product_name} — {value_prop}
 
-FIT CRITERIA:
+WHY THIS VERTICAL FITS {vendor}:
+{vertical_focus}
+
+VENDOR LANDSCAPE — software brands whose independent resellers we want to find:
+{vendor_landscape}
+
+EXCLUSIONS — DO NOT INCLUDE:
+{exclusion_rules}
+
+FIT CRITERIA (fit to SELL the product):
 {fit_criteria}
 
 {evidence_rules}
+
+{discover_rules}
 
 SCORING:
 {scoring}
