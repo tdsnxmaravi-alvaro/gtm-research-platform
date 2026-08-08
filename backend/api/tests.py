@@ -46,6 +46,24 @@ class CampaignApiTests(APITestCase):
                                 {"name": "bad", "config": bad}, format="json")
         self.assertEqual(resp.status_code, 400)
 
+    def test_vendor_verticals_grouped_by_tier(self):
+        resp = self.client.get("/api/campaigns/vendor_verticals/?vendor=Trimble")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        data = resp.json()
+        self.assertTrue(data["known"])
+        self.assertEqual(data["default_checked"], ["core", "secondary"])
+        self.assertTrue(data["tiers"]["core"])
+        # Each item is Vertical-constructible (name/slug/focus/example_software).
+        item = data["tiers"]["core"][0]
+        for key in ("slug", "name", "focus", "example_software", "tier"):
+            self.assertIn(key, item)
+        self.assertIn("Autodesk", data["exclusion_note"])
+
+    def test_vendor_verticals_unknown_vendor(self):
+        resp = self.client.get("/api/campaigns/vendor_verticals/?vendor=Nope")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["known"])
+
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
 class ResearchTaskTests(APITestCase):

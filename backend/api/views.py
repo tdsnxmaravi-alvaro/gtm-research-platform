@@ -106,6 +106,35 @@ class CampaignViewSet(viewsets.ModelViewSet):
             "specific_dimensions": [_dim(d) for d in preset["dimensions"]],
         })
 
+    @action(detail=False, methods=["get"])
+    def vendor_verticals(self, request):
+        """Return the vendor's discover verticals grouped by tier + exclusion note.
+
+        Feeds the wizard's discover step: Core/Secondary are checked by default,
+        Defer is shown unchecked. Each item is Vertical-constructible.
+        """
+        from gtm.prompts.vertical_presets import (
+            VENDOR_VERTICALS, verticals_for, exclusion_note, TIERS,
+        )
+        vendor = request.query_params.get("vendor", "")
+        if (vendor or "").strip() not in VENDOR_VERTICALS:
+            return Response({"vendor": vendor, "known": False,
+                             "vendors": sorted(VENDOR_VERTICALS)})
+
+        grouped = {t: [] for t in TIERS}
+        for v in verticals_for(vendor, tiers=TIERS):
+            grouped[v["tier"]].append({
+                "slug": v["slug"], "name": v["name"], "focus": v["focus"],
+                "tier": v["tier"],
+                "example_software": list(v["example_reseller_software"]),
+            })
+        return Response({
+            "vendor": vendor, "known": True,
+            "tiers": grouped,
+            "default_checked": ["core", "secondary"],
+            "exclusion_note": exclusion_note(vendor),
+        })
+
     @action(detail=False, methods=["post"])
     def outreach_preview(self, request):
         """Render the outreach email HTML (vendor branded template + sample body in

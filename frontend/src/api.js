@@ -25,6 +25,8 @@ export const api = {
     req("/campaigns/preview_prompt/", { method: "POST", body: JSON.stringify({ config }) }),
   vendorPreset: (vendor, targetType) =>
     req(`/campaigns/vendor_preset/?vendor=${encodeURIComponent(vendor)}&target_type=${encodeURIComponent(targetType)}`),
+  vendorVerticals: (vendor) =>
+    req(`/campaigns/vendor_verticals/?vendor=${encodeURIComponent(vendor)}`),
   outreachPreview: (config) =>
     req("/campaigns/outreach_preview/", { method: "POST", body: JSON.stringify({ config }) }),
   remapList: (path, mapping) =>

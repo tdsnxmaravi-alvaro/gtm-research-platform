@@ -28,6 +28,7 @@ function hydrate(cfg) {
     mode: cfg.mode || "provided",
     country: cfg.country || "",
     vendor: cfg.vendor || "",
+    verticals: (cfg.verticals || []).map((v) => v.slug).filter(Boolean),
     provided_list_path: cfg.provided_list_path || "",
     colMap,
     value_prop: p0.value_prop || "",
@@ -60,6 +61,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
   const [remapping, setRemapping] = useState(false);
   const [logoUrl, setLogoUrl] = useState("");
   const [dims, setDims] = useState({ universal: [], specific: [] });
+  const [vtree, setVtree] = useState(null);
   const [emailPreview, setEmailPreview] = useState({ html: "", source: "", loading: false });
   const [f, setF] = useState(() =>
     initialConfig
@@ -70,6 +72,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
           mode: "provided",
           country: "",
           vendor: "",
+          verticals: [],
           provided_list_path: "",
           colMap: { company: "", website: "", country: "" },
           value_prop: "",
@@ -94,10 +97,18 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
   const patch = (p) => setF({ ...f, ...p });
   // Changing the vendor invalidates the vendor-driven prompt, criteria + preview.
   const onVendor = (e) => {
-    setF({ ...f, vendor: e.target.value, search_prompt: "", value_prop: "", fit_criteria: "" });
+    setF({ ...f, vendor: e.target.value, search_prompt: "", value_prop: "", fit_criteria: "", verticals: [] });
     setDims({ universal: [], specific: [] });
+    setVtree(null);
     setEmailPreview({ html: "", source: "", loading: false });
   };
+  const toggleVertical = (slug) =>
+    setF((prev) => ({
+      ...prev,
+      verticals: prev.verticals.includes(slug)
+        ? prev.verticals.filter((x) => x !== slug)
+        : [...prev.verticals, slug],
+    }));
   const toggleTier = (t) =>
     setF({
       ...f,
@@ -168,10 +179,12 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
       const hasRowCountry = f.mode === "provided" && !!f.colMap.country;
       if (!hasRowCountry && !f.country.trim())
         return "Country is required (used as the fallback when a row has none).";
-      if (f.mode === "provided" && !f.provided_list_path.trim())
+      if (f.mode === "provided" && f.provided_list_path.trim() === "")
         return "Upload the list (or enter a server path).";
       if (f.mode === "provided" && listReport && !f.colMap.company)
         return "Map the company column.";
+      if (f.mode === "discover" && vtree && f.verticals.length === 0)
+        return "Select at least one reseller vertical.";
     }
     if (name === "Prompt") {
       if (!f.search_prompt.trim()) return "The research prompt cannot be empty.";
@@ -266,6 +279,22 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
       },
     };
     if (f.mode === "provided") cfg.provided_list_path = f.provided_list_path || "list.csv";
+    if (f.mode === "discover" && vtree && vtree.tiers) {
+      const all = [
+        ...(vtree.tiers.core || []),
+        ...(vtree.tiers.secondary || []),
+        ...(vtree.tiers.defer || []),
+      ];
+      const bySlug = Object.fromEntries(all.map((v) => [v.slug, v]));
+      const picked = f.verticals.map((s) => bySlug[s]).filter(Boolean);
+      if (picked.length)
+        cfg.verticals = picked.map((v) => ({
+          name: v.name,
+          slug: v.slug,
+          focus: v.focus,
+          example_software: v.example_software || [],
+        }));
+    }
     const overrides = {};
     for (const [field, hdr] of Object.entries(f.colMap)) {
       if (hdr) overrides[hdr.trim().toLowerCase()] = field;
@@ -352,6 +381,24 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
       .catch(() => setEmailPreview({ html: "", source: "", loading: false }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, f.vendor, f.outreach_language, f.logo_path]);
+
+  // Load discover verticals (grouped by tier) when the vendor is set in discover
+  // mode; default-check Core+Secondary the first time (Defer stays unchecked).
+  useEffect(() => {
+    if (STEPS[step] !== "Setup" || f.mode !== "discover" || !f.vendor) return;
+    api.vendorVerticals(f.vendor)
+      .then((r) => {
+        if (!r.known) { setVtree({ tiers: { core: [], secondary: [], defer: [] }, exclusion_note: "" }); return; }
+        setVtree(r);
+        setF((prev) => {
+          if (prev.verticals && prev.verticals.length) return prev;
+          const def = [...(r.tiers.core || []), ...(r.tiers.secondary || [])].map((v) => v.slug);
+          return { ...prev, verticals: def };
+        });
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, f.mode, f.vendor]);
 
   return (
     <div className="card">
@@ -458,6 +505,44 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
                 <input type="number" min="1" value={f.limit} onChange={setNum("limit")} />
               )}
             </label>
+          )}
+          {f.mode === "discover" && f.vendor && (
+            <div className="field">
+              <span className="lbl">Reseller verticals to recruit from</span>
+              {!vtree ? (
+                <small className="hint">Loading verticals…</small>
+              ) : (
+                <>
+                  {["core", "secondary", "defer"].map((tier) => {
+                    const items = (vtree.tiers && vtree.tiers[tier]) || [];
+                    if (!items.length) return null;
+                    const label =
+                      tier === "core" ? "Core" : tier === "secondary" ? "Secondary" : "Defer (off by default)";
+                    return (
+                      <div key={tier} className="vtier">
+                        <h4 className="vtier-h">{label} <span className="hint">{items.length}</span></h4>
+                        <div className="vgrid">
+                          {items.map((v) => (
+                            <label key={v.slug} className="vchk" title={v.focus}>
+                              <input
+                                type="checkbox"
+                                checked={f.verticals.includes(v.slug)}
+                                onChange={() => toggleVertical(v.slug)}
+                              />
+                              <span>{v.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {vtree.exclusion_note && <div className="estimate warn">⛔ {vtree.exclusion_note}</div>}
+                  <small className="hint">
+                    {f.verticals.length} vertical(s) selected · one research pass per vertical.
+                  </small>
+                </>
+              )}
+            </div>
           )}
         </section>
       )}
