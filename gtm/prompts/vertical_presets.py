@@ -337,10 +337,12 @@ VERTICAL_PRESETS: dict[str, dict] = {
     },
 
     # --- Real-time 3D / XR / digital twin (Unity) -------------------------- #
-    "cad-dataprep-pixyz": {
-        "name": "CAD / PLM / industrial 3D-visualization & data-prep resellers (Pixyz / Asset Transformer)",
-        "focus": "CAD/PLM resellers whose industrial customers need CAD-to-real-time data prep.",
-        "example_reseller_software": ["SOLIDWORKS", "Siemens NX", "CATIA", "PTC Creo"],
+    "asset-transformer": {
+        "name": "Industrial 3D-visualization / CAD-data-prep resellers (Unity Asset Transformer)",
+        "focus": "Resellers of industrial 3D-visualization & CAD-data-exchange tools whose "
+                 "manufacturing customers need CAD-to-real-time prep for Unity Asset Transformer.",
+        "example_reseller_software": ["Theorem Solutions", "NVIDIA Omniverse", "TechViz",
+                                      "Anark", "CAD Exchanger"],
     },
     "xr-arvr": {
         "name": "XR / AR-VR hardware & immersive-systems integrators",
@@ -479,7 +481,7 @@ VENDOR_VERTICALS: dict[str, list[tuple[str, str]]] = {
         ("scheduling-estimating", DEFER),
     ],
     "Unity": [
-        ("cad-dataprep-pixyz", CORE),
+        ("asset-transformer", CORE),
         ("xr-arvr", CORE),
         ("digital-twin-iot", CORE),
         ("immersive-training", CORE),

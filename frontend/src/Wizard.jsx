@@ -469,18 +469,18 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
               {VENDORS.map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
           </label>
-          {f.mode === "provided" && (
-            <label>Country (fallback)
-              <input value={f.country} onChange={set("country")} placeholder="Spain" />
-              <small className="hint">Used when a row has no country. Per-row country comes from the uploaded list.</small>
-            </label>
-          )}
           <label>Mode
             <select value={f.mode} onChange={set("mode")}>
               <option value="provided">provided (I have a list)</option>
               <option value="discover">discover (find them)</option>
             </select>
           </label>
+          {f.mode === "provided" && (
+            <label>Country (fallback)
+              <input value={f.country} onChange={set("country")} placeholder="Spain" />
+              <small className="hint">Used when a row has no country. Per-row country comes from the uploaded list.</small>
+            </label>
+          )}
           {f.mode === "discover" && (
             <div className="field">
               <span className="lbl">Markets — one research pass per country per vertical</span>
