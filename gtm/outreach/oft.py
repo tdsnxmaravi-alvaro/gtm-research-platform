@@ -89,6 +89,13 @@ def _inject_body_marker(html: str) -> str:
         after = after.replace("&nbsp;", " ")
         after = re.sub(r"(?is)<p\b[^>]*>(?:\s|<o:p>|</o:p>)*</p>", "", after)
         html = html[:cut] + after
+    # Trailing editable line at the very bottom so Outlook rests the cursor there
+    # (and drops the user's auto-signature below the banner, not above it).
+    tail_p = '<p style="margin:0;">&nbsp;</p>'
+    if re.search(r"</body>", html, re.I):
+        html = re.sub(r"</body>", tail_p + "</body>", html, count=1, flags=re.I)
+    else:
+        html = html + tail_p
     return html
 
 
