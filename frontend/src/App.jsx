@@ -14,7 +14,10 @@ export default function App() {
   return (
     <div className="app">
       <header>
-        <h1>GTM Research Platform</h1>
+        <div className="brand">
+          <span className="brand-eyebrow">TD SYNNEX · Datech</span>
+          <h1>GTM <span className="accent">Research Platform</span></h1>
+        </div>
         <nav>
           <button className={tab === "new" ? "on" : ""} onClick={newCampaign}>
             {editing ? "Edit campaign" : "New campaign"}

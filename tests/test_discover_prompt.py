@@ -109,3 +109,52 @@ def test_gates_do_not_apply_in_provided_mode():
     out = score_results(c, [_row(independence="Subsidiary",
                                  software_resold="Autodesk Gold Partner")])
     assert out[0]["final_tier"] == "A"  # discover gates skipped
+
+
+# --- multi-country discover (Phase D) ------------------------------------ #
+def test_datech_countries_constant():
+    from gtm.config.schema import DATECH_COUNTRIES
+    assert set(DATECH_COUNTRIES) == {"North America", "Caribbean & Central America", "EMEA", "APJ"}
+    flat = [c for lst in DATECH_COUNTRIES.values() for c in lst]
+    assert len(flat) == len(set(flat))  # no duplicate countries across regions
+    assert "United States" in DATECH_COUNTRIES["North America"]
+    assert "Hong Kong" in DATECH_COUNTRIES["APJ"]
+
+
+def test_countries_anchors_country_and_language():
+    v = discover_verticals("Trimble", slugs=["structural-steel-detailing"])[0]
+    c = _discover_cfg(country="", countries=["United States", "Canada"], verticals=[v])
+    assert c.country == "United States"  # anchored to first
+    assert c.language == "en"
+
+
+def test_build_prompt_country_override():
+    v = discover_verticals("Trimble", slugs=["structural-steel-detailing"])[0]
+    c = _discover_cfg(countries=["United States", "Canada"], verticals=[v])
+    p = build_prompt(c, c.products[0], vertical=c.verticals[0], country="Canada")
+    assert "Canada" in p
+
+
+class _FakeProvider:
+    name = "fake"
+
+    def __init__(self):
+        self.prompts = []
+
+    def send(self, prompt):
+        import types
+        self.prompts.append(prompt)
+        return types.SimpleNamespace(
+            text='{"results":[{"company":"Acme","website":"https://a.com","dimension_scores":[]}]}')
+
+
+def test_discover_runs_one_pass_per_country(tmp_path):
+    from gtm.research.runner import run_campaign
+    v = discover_verticals("Trimble", slugs=["structural-steel-detailing"])[0]
+    c = _discover_cfg(country="", countries=["United States", "Canada"], verticals=[v])
+    fake = _FakeProvider()
+    rows = run_campaign(c, provider=fake, out_dir=tmp_path, delay=0, resume=False)
+    assert len(fake.prompts) == 2  # one pass per country (1 vertical x 1 product)
+    assert {r["country"] for r in rows} == {"United States", "Canada"}
+    assert any("United States" in p for p in fake.prompts)
+    assert any("Canada" in p for p in fake.prompts)

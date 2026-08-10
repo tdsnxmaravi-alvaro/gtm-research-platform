@@ -113,6 +113,7 @@ def build_prompt(
     *,
     company_input: str | None = None,
     vertical: Vertical | None = None,
+    country: str | None = None,
 ) -> str:
     """Build the final research prompt string for a campaign + product."""
     # Explicit user-edited prompt (from the wizard prompt builder) wins over the
@@ -127,7 +128,7 @@ def build_prompt(
     ctx = {
         "product_name": product.name,
         "value_prop": product.value_prop or product.name,
-        "country": config.country,
+        "country": country or config.country,
         "language": config.language or "en",
         "vendor": config.vendor or product.name,
         "fit_criteria": _fit_criteria_block(product),

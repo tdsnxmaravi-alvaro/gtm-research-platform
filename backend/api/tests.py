@@ -64,6 +64,13 @@ class CampaignApiTests(APITestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(resp.json()["known"])
 
+    def test_datech_countries(self):
+        resp = self.client.get("/api/campaigns/datech_countries/")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        regions = resp.json()["regions"]
+        self.assertIn("EMEA", regions)
+        self.assertIn("United States", regions["North America"])
+
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
 class ResearchTaskTests(APITestCase):

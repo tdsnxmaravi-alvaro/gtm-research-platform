@@ -135,6 +135,16 @@ class CampaignViewSet(viewsets.ModelViewSet):
             "exclusion_note": exclusion_note(vendor),
         })
 
+    @action(detail=False, methods=["get"])
+    def datech_countries(self, request):
+        """Return the curated Datech go-to-market countries grouped by region.
+
+        Feeds the discover wizard's country selector (region quick-pick + per-country
+        toggle). Discover runs one research pass per selected country per vertical.
+        """
+        from gtm.config.schema import DATECH_COUNTRIES
+        return Response({"regions": DATECH_COUNTRIES})
+
     @action(detail=False, methods=["post"])
     def outreach_preview(self, request):
         """Render the outreach email HTML (vendor branded template + sample body in

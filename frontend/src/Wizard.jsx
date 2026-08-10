@@ -27,6 +27,7 @@ function hydrate(cfg) {
     target_type: cfg.target_type || "resellers",
     mode: cfg.mode || "provided",
     country: cfg.country || "",
+    countries: cfg.countries || [],
     vendor: cfg.vendor || "",
     verticals: (cfg.verticals || []).map((v) => v.slug).filter(Boolean),
     provided_list_path: cfg.provided_list_path || "",
@@ -62,6 +63,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
   const [logoUrl, setLogoUrl] = useState("");
   const [dims, setDims] = useState({ universal: [], specific: [] });
   const [vtree, setVtree] = useState(null);
+  const [ctree, setCtree] = useState(null);
   const [emailPreview, setEmailPreview] = useState({ html: "", source: "", loading: false });
   const [f, setF] = useState(() =>
     initialConfig
@@ -71,6 +73,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
           target_type: "resellers",
           mode: "provided",
           country: "",
+          countries: [],
           vendor: "",
           verticals: [],
           provided_list_path: "",
@@ -109,6 +112,20 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
         ? prev.verticals.filter((x) => x !== slug)
         : [...prev.verticals, slug],
     }));
+  const toggleCountry = (c) =>
+    setF((prev) => ({
+      ...prev,
+      countries: prev.countries.includes(c)
+        ? prev.countries.filter((x) => x !== c)
+        : [...prev.countries, c],
+    }));
+  const toggleRegion = (list) =>
+    setF((prev) => {
+      const allOn = list.every((c) => prev.countries.includes(c));
+      const set = new Set(prev.countries);
+      list.forEach((c) => (allOn ? set.delete(c) : set.add(c)));
+      return { ...prev, countries: [...set] };
+    });
   const toggleTier = (t) =>
     setF({
       ...f,
@@ -177,7 +194,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
       if (!f.name.trim()) return "Campaign name is required.";
       if (!f.vendor) return "Pick a vendor.";
       const hasRowCountry = f.mode === "provided" && !!f.colMap.country;
-      if (!hasRowCountry && !f.country.trim())
+      if (f.mode === "provided" && !hasRowCountry && !f.country.trim())
         return "Country is required (used as the fallback when a row has none).";
       if (f.mode === "provided" && f.provided_list_path.trim() === "")
         return "Upload the list (or enter a server path).";
@@ -185,6 +202,8 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
         return "Map the company column.";
       if (f.mode === "discover" && vtree && f.verticals.length === 0)
         return "Select at least one reseller vertical.";
+      if (f.mode === "discover" && ctree && f.countries.length === 0)
+        return "Select at least one country.";
     }
     if (name === "Prompt") {
       if (!f.search_prompt.trim()) return "The research prompt cannot be empty.";
@@ -279,6 +298,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
       },
     };
     if (f.mode === "provided") cfg.provided_list_path = f.provided_list_path || "list.csv";
+    if (f.mode === "discover" && f.countries.length) cfg.countries = f.countries;
     if (f.mode === "discover" && vtree && vtree.tiers) {
       const all = [
         ...(vtree.tiers.core || []),
@@ -400,6 +420,15 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, f.mode, f.vendor]);
 
+  // Load the curated Datech country list (grouped by region) for discover mode.
+  useEffect(() => {
+    if (STEPS[step] !== "Setup" || f.mode !== "discover" || ctree) return;
+    api.datechCountries()
+      .then((r) => setCtree(r.regions || {}))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, f.mode]);
+
   return (
     <div className="card">
       <ol className="steps">
@@ -440,16 +469,55 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
               {VENDORS.map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
           </label>
-          <label>Country (fallback)
-            <input value={f.country} onChange={set("country")} placeholder="Spain" />
-            <small className="hint">Used when a row has no country. Per-row country comes from the uploaded list.</small>
-          </label>
+          {f.mode === "provided" && (
+            <label>Country (fallback)
+              <input value={f.country} onChange={set("country")} placeholder="Spain" />
+              <small className="hint">Used when a row has no country. Per-row country comes from the uploaded list.</small>
+            </label>
+          )}
           <label>Mode
             <select value={f.mode} onChange={set("mode")}>
               <option value="provided">provided (I have a list)</option>
               <option value="discover">discover (find them)</option>
             </select>
           </label>
+          {f.mode === "discover" && (
+            <div className="field">
+              <span className="lbl">Markets — one research pass per country per vertical</span>
+              {!ctree ? (
+                <small className="hint">Loading countries…</small>
+              ) : (
+                <>
+                  {Object.entries(ctree).map(([region, list]) => {
+                    const on = list.filter((c) => f.countries.includes(c)).length;
+                    return (
+                      <div key={region} className="vtier">
+                        <h4 className="vtier-h">
+                          {region} <span className="hint">{on}/{list.length}</span>
+                          <button type="button" className="link region-pick" onClick={() => toggleRegion(list)}>
+                            {list.every((c) => f.countries.includes(c)) ? "clear" : "all"}
+                          </button>
+                        </h4>
+                        <div className="vgrid">
+                          {list.map((c) => (
+                            <label key={c} className="vchk">
+                              <input
+                                type="checkbox"
+                                checked={f.countries.includes(c)}
+                                onChange={() => toggleCountry(c)}
+                              />
+                              <span>{c}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <small className="hint">{f.countries.length} country(ies) selected.</small>
+                </>
+              )}
+            </div>
+          )}
           {f.mode === "provided" && (
             <div className="field">
               <span className="lbl">Company list (.xlsx / .csv)</span>

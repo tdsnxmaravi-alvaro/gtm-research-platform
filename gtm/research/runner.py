@@ -321,36 +321,39 @@ def run_campaign(
 
     else:  # discover
         targets = config.verticals or [None]
-        total = len(config.products) * len(targets)
+        run_countries = config.countries or [config.country]
+        total = len(config.products) * len(targets) * len(run_countries)
         step_n = 0
         if progress_cb:
             progress_cb(0, total)
-        for product in config.products:
-            for vert in targets:
-                if should_cancel and should_cancel():
-                    print("  canceled — stopping after saved progress")
-                    return all_results
-                key = f"{product.name}|{vert.slug if vert else 'broad'}"
-                if key in done:
+        for country in run_countries:
+            for product in config.products:
+                for vert in targets:
+                    if should_cancel and should_cancel():
+                        print("  canceled — stopping after saved progress")
+                        return all_results
+                    key = f"{country}|{product.name}|{vert.slug if vert else 'broad'}"
+                    if key in done:
+                        step_n += 1
+                        if progress_cb:
+                            progress_cb(step_n, total)
+                        continue
+                    prompt = build_prompt(config, product, vertical=vert, country=country)
+                    scored = _run_batch(config, providers, prompt, logs,
+                                        key.replace("|", "_").replace(" ", ""), passes, delay)
+                    for r in scored:
+                        r["product"] = product.name
+                        r["vertical"] = vert.name if vert else ""
+                        r["country"] = country
+                    all_results.extend(scored)
+                    done.add(key)
+                    _save_state(state_path, done)
+                    write_rows_csv(all_results, results_path, columns=OUT_COLS)
                     step_n += 1
                     if progress_cb:
                         progress_cb(step_n, total)
-                    continue
-                prompt = build_prompt(config, product, vertical=vert)
-                scored = _run_batch(config, providers, prompt, logs,
-                                    key.replace("|", "_"), passes, delay)
-                for r in scored:
-                    r["product"] = product.name
-                    r["vertical"] = vert.name if vert else ""
-                all_results.extend(scored)
-                done.add(key)
-                _save_state(state_path, done)
-                write_rows_csv(all_results, results_path, columns=OUT_COLS)
-                step_n += 1
-                if progress_cb:
-                    progress_cb(step_n, total)
-                print(f"  {key}: +{len(scored)} results")
-                time.sleep(delay)
+                    print(f"  {key}: +{len(scored)} results")
+                    time.sleep(delay)
 
     print(f"Done. {len(all_results)} results -> {results_path}")
     return all_results

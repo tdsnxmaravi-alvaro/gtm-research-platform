@@ -27,6 +27,7 @@ export const api = {
     req(`/campaigns/vendor_preset/?vendor=${encodeURIComponent(vendor)}&target_type=${encodeURIComponent(targetType)}`),
   vendorVerticals: (vendor) =>
     req(`/campaigns/vendor_verticals/?vendor=${encodeURIComponent(vendor)}`),
+  datechCountries: () => req("/campaigns/datech_countries/"),
   outreachPreview: (config) =>
     req("/campaigns/outreach_preview/", { method: "POST", body: JSON.stringify({ config }) }),
   remapList: (path, mapping) =>

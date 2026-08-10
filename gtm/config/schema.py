@@ -100,6 +100,28 @@ def apollo_locations_for(country: str) -> list[str]:
     return COUNTRY_APOLLO_LOCATIONS.get(key, [country.strip()] if country else [])
 
 
+# Curated TD SYNNEX / Datech go-to-market countries, grouped by region. Used by
+# the discover wizard's country selector; discover runs one research pass per
+# selected country per vertical.
+DATECH_COUNTRIES: dict[str, list[str]] = {
+    "North America": ["United States", "Canada"],
+    "Caribbean & Central America": [
+        "Guatemala", "El Salvador", "Honduras", "Costa Rica", "Panama",
+        "Dominican Republic", "Jamaica", "Trinidad & Tobago", "Barbados", "Puerto Rico",
+    ],
+    "EMEA": [
+        "United Kingdom", "Ireland", "France", "Germany", "Netherlands", "Belgium",
+        "Luxembourg", "Spain", "Portugal", "Italy", "Switzerland", "Austria", "Poland",
+        "Czech Republic", "Slovakia", "Hungary", "Romania", "Bulgaria", "Greece",
+        "Sweden", "Norway", "Denmark", "Finland", "South Africa",
+    ],
+    "APJ": [
+        "Brunei", "India", "Indonesia", "Malaysia", "Singapore", "Thailand",
+        "Vietnam", "Cambodia", "Hong Kong", "Japan",
+    ],
+}
+
+
 def language_for_country(country: str) -> str | None:
     """Map a country to its default language, or None if unknown."""
     return COUNTRY_LANGUAGE.get((country or "").strip().lower())
@@ -218,8 +240,11 @@ class CampaignConfig(BaseModel):
     name: str
     target_type: TargetType
     mode: Mode
-    country: str
+    country: str = ""
     vendor: str = ""                       # the vendor being sold (e.g. "Trimble")
+    # Discover multi-country: run one research pass per country per vertical. When
+    # empty, the single `country` is used. `country` also stays the language anchor.
+    countries: list[str] = Field(default_factory=list)
     language: str | None = None           # default derived from country
 
     products: list[Product] = Field(min_length=1)
@@ -280,7 +305,11 @@ class CampaignConfig(BaseModel):
                     f"research_providers {missing} not in llm_providers {sorted(names)}."
                 )
 
-        # Derive language defaults from country
+        # Derive language defaults from country. Multi-country discover: anchor the
+        # campaign country/language to the first selected country when only
+        # `countries` was provided.
+        if not self.country.strip() and self.countries:
+            self.country = self.countries[0]
         default_lang = COUNTRY_LANGUAGE.get(self.country.strip().lower(), "en")
         if self.language is None:
             self.language = default_lang
