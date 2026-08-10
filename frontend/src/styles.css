@@ -10,12 +10,20 @@
   --muted: #63666a;          /* Cool Gray 10 */
   --tint: #e4efef;           /* teal tint for selected / hover surfaces */
   --tint-line: #cfe3e3;
+  /* Corporate type: Arial = secondary headline / daily use (TWK Everett is
+     design-team only); Georgia Pro = serif subheads + body copy. */
+  --font-ui: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  --font-body: "Georgia Pro", Georgia, "Times New Roman", serif;
 }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: Aptos, Calibri, Segoe UI, Arial, sans-serif; background: var(--bg); color: #1a1a1a; }
+body { margin: 0; font-family: var(--font-ui); background: var(--bg); color: #1a1a1a; }
+h1, h2, h3, h4 { font-family: var(--font-ui); font-weight: 700; }
+p, .summary li, .choice span, .crit-card small, .modal p { font-family: var(--font-body); }
 .app { max-width: 900px; margin: 0 auto; padding: 24px; }
 header { display: flex; align-items: center; justify-content: space-between; gap: 16px; background: var(--deep-teal); color: #fff; padding: 14px 20px; border-radius: 12px; }
-.brand { display: flex; flex-direction: column; gap: 2px; }
+.brand { display: flex; flex-direction: row; align-items: center; gap: 14px; }
+.brand-logo { height: 30px; width: auto; display: block; }
+.brand-divider { width: 1px; height: 26px; background: rgba(255,255,255,.28); }
 .brand-eyebrow { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--aqua); font-weight: 700; }
 header h1 { font-size: 20px; margin: 0; color: #fff; font-weight: 700; }
 header h1 .accent { color: var(--aqua); }

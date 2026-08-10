@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import Wizard from "./Wizard.jsx";
 import Campaigns from "./Campaigns.jsx";
+import logoWhite from "./assets/datech-logo-white.png";
 
 export default function App() {
   const [tab, setTab] = useState("new");
@@ -15,7 +16,8 @@ export default function App() {
     <div className="app">
       <header>
         <div className="brand">
-          <span className="brand-eyebrow">TD SYNNEX · Datech</span>
+          <img className="brand-logo" src={logoWhite} alt="TD SYNNEX Datech" />
+          <span className="brand-divider" aria-hidden="true" />
           <h1>GTM <span className="accent">Research Platform</span></h1>
         </div>
         <nav>
