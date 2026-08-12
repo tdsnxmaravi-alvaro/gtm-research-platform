@@ -64,6 +64,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
   const [dims, setDims] = useState({ universal: [], specific: [] });
   const [vtree, setVtree] = useState(null);
   const [ctree, setCtree] = useState(null);
+  const [previewVertical, setPreviewVertical] = useState("");
   const [emailPreview, setEmailPreview] = useState({ html: "", source: "", loading: false });
   const [f, setF] = useState(() =>
     initialConfig
@@ -278,7 +279,9 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
           name: f.vendor || "Product",
           value_prop: f.value_prop,
           fit_criteria: f.fit_criteria.split("\n").map((s) => s.trim()).filter(Boolean),
-          ...(f.search_prompt.trim() ? { search_prompt: f.search_prompt } : {}),
+          ...(f.search_prompt.trim() && !(f.mode === "discover" && f.verticals.length > 0)
+            ? { search_prompt: f.search_prompt }
+            : {}),
         },
       ],
       enrichment: {
@@ -343,18 +346,27 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
     }
   }
 
-  async function regeneratePrompt() {
+  async function regeneratePrompt(slug) {
     setPromptLoading(true);
     setPromptErr("");
     try {
-      const { prompt } = await api.previewPrompt(buildConfig());
-      setF((prev) => ({ ...prev, search_prompt: prompt }));
+      const perVertical = f.mode === "discover" && f.verticals.length > 0;
+      const want = slug !== undefined ? slug : previewVertical;
+      const r = await api.previewPrompt(buildConfig(), perVertical ? want || undefined : undefined);
+      setF((prev) => ({ ...prev, search_prompt: r.prompt }));
+      if (perVertical && r.vertical) setPreviewVertical(r.vertical);
     } catch (e) {
       setPromptErr(String(e.message || e));
     } finally {
       setPromptLoading(false);
     }
   }
+
+  const onPreviewVertical = (e) => {
+    const slug = e.target.value;
+    setPreviewVertical(slug);
+    regeneratePrompt(slug);
+  };
 
   // Auto-fill the research prompt the first time the user reaches the Prompt step.
   // Seeds the value prop / fit criteria from the vendor preset when still empty.
@@ -483,7 +495,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
           )}
           {f.mode === "discover" && (
             <div className="field">
-              <span className="lbl">Markets — one research pass per country per vertical</span>
+              <span className="lbl section-h">Markets — one research pass per country per vertical</span>
               {!ctree ? (
                 <small className="hint">Loading countries…</small>
               ) : (
@@ -576,7 +588,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
           )}
           {f.mode === "discover" && f.vendor && (
             <div className="field">
-              <span className="lbl">Reseller verticals to recruit from</span>
+              <span className="lbl section-h">Reseller verticals to recruit from</span>
               {!vtree ? (
                 <small className="hint">Loading verticals…</small>
               ) : (
@@ -649,6 +661,25 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
               </div>
             </div>
           )}
+          {f.mode === "discover" && f.verticals.length > 0 && vtree && (() => {
+            const all = [
+              ...(vtree.tiers.core || []),
+              ...(vtree.tiers.secondary || []),
+              ...(vtree.tiers.defer || []),
+            ];
+            const opts = all.filter((v) => f.verticals.includes(v.slug));
+            return (
+              <label>Preview vertical prompt
+                <select value={previewVertical || (opts[0] && opts[0].slug) || ""} onChange={onPreviewVertical}>
+                  {opts.map((v) => <option key={v.slug} value={v.slug}>{v.name}</option>)}
+                </select>
+                <small className="hint">
+                  Each selected vertical is researched with its OWN prompt (its own vendor landscape) —
+                  {opts.length} in total. This is a read-only preview.
+                </small>
+              </label>
+            );
+          })()}
           {promptLoading ? (
             <div className="estimate">Building prompt…</div>
           ) : (
@@ -658,14 +689,17 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
               onChange={set("search_prompt")}
               rows={16}
               spellCheck={false}
+              readOnly={f.mode === "discover" && f.verticals.length > 0}
             />
           )}
           {promptErr && <p className="error">{promptErr}</p>}
-          <div>
-            <button type="button" className="link" onClick={regeneratePrompt} disabled={promptLoading}>
-              ↻ Regenerate prompt from fields (discards edits)
-            </button>
-          </div>
+          {!(f.mode === "discover" && f.verticals.length > 0) && (
+            <div>
+              <button type="button" className="link" onClick={() => regeneratePrompt()} disabled={promptLoading}>
+                ↻ Regenerate prompt from fields (discards edits)
+              </button>
+            </div>
+          )}
           <details>
             <summary className="link">Advanced: value proposition & fit criteria</summary>
             <div className="grid" style={{ marginTop: 8 }}>

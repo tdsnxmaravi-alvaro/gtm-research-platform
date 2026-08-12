@@ -21,8 +21,11 @@ export const api = {
   updateCampaign: (id, name, config) =>
     req(`/campaigns/${id}/`, { method: "PUT", body: JSON.stringify({ name, config }) }),
   deleteCampaign: (id) => req(`/campaigns/${id}/`, { method: "DELETE" }),
-  previewPrompt: (config) =>
-    req("/campaigns/preview_prompt/", { method: "POST", body: JSON.stringify({ config }) }),
+  previewPrompt: (config, vertical) =>
+    req("/campaigns/preview_prompt/", {
+      method: "POST",
+      body: JSON.stringify(vertical ? { config, vertical } : { config }),
+    }),
   vendorPreset: (vendor, targetType) =>
     req(`/campaigns/vendor_preset/?vendor=${encodeURIComponent(vendor)}&target_type=${encodeURIComponent(targetType)}`),
   vendorVerticals: (vendor) =>

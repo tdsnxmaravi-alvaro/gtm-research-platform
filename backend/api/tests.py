@@ -71,6 +71,25 @@ class CampaignApiTests(APITestCase):
         self.assertIn("EMEA", regions)
         self.assertIn("United States", regions["North America"])
 
+    def test_preview_prompt_is_per_vertical(self):
+        from gtm.prompts import discover_verticals
+        verts = discover_verticals("Trimble", slugs=["structural-steel-detailing",
+                                                     "geospatial-survey"])
+        cfg = {
+            "name": "disc", "target_type": "resellers", "mode": "discover",
+            "vendor": "Trimble", "countries": ["United States"],
+            "products": [{"name": "Trimble", "value_prop": "vp"}],
+            "verticals": verts,
+        }
+        resp = self.client.post("/api/campaigns/preview_prompt/",
+                                {"config": cfg, "vertical": "geospatial-survey"},
+                                format="json")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        data = resp.json()
+        self.assertEqual(data["vertical"], "geospatial-survey")
+        geo = next(v for v in verts if v["slug"] == "geospatial-survey")
+        self.assertIn(geo["name"], data["prompt"])
+
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
 class ResearchTaskTests(APITestCase):

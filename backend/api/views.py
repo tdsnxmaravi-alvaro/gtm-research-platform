@@ -73,9 +73,14 @@ class CampaignViewSet(viewsets.ModelViewSet):
         except Exception as exc:  # noqa: BLE001
             return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         product = config.products[0].model_copy(update={"search_prompt": None})
-        vert = config.verticals[0] if config.verticals else None
+        # Discover with verticals builds one prompt PER vertical (each has its own
+        # vendor landscape); preview the one requested, else the first.
+        want = (request.data.get("vertical") or "").strip()
+        vert = None
+        if config.verticals:
+            vert = next((v for v in config.verticals if v.slug == want), config.verticals[0])
         prompt = build_prompt(config, product, vertical=vert)
-        return Response({"prompt": prompt})
+        return Response({"prompt": prompt, "vertical": vert.slug if vert else ""})
 
     @action(detail=False, methods=["get"])
     def vendor_preset(self, request):
