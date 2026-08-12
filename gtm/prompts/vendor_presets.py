@@ -66,11 +66,11 @@ VENDOR_PRESETS: dict[str, dict] = {
         ),
         "reseller_fit": [
             "Sells CAD / design / engineering software with services (licensing + renewals + implementation), not hardware only",
-            "Has customers in AEC, manufacturing or industrial design that work in DWG day to day",
             "Existing AutoCAD / Autodesk (or other CAD) footprint — a strong migration & cross-sell opportunity",
+            "Serves BricsCAD's DWG trades: AEC, mechanical, plant, metal fabrication, architecture, civil/survey, underground & electrical engineering",
+            "Develops CAD add-on applications / extensions (LISP / BRX / API) — the app-developer channel",
             "Provides training, deployment, LISP/API customization and technical support for CAD",
             "Can position perpetual-licensing / cost-savings and BIM or mechanical modules, not just 2D drafting",
-            "Established commercial presence and delivery capability in the target country",
         ],
         "account_fit": [
             "Aggressively hiring CAD/BIM/drafting/engineering roles (needs more design seats) — a top trigger",
@@ -165,7 +165,7 @@ VENDOR_PRESETS: dict[str, dict] = {
         "sectors": "manufacturing, automotive, AEC visualization, media & entertainment, training/simulation",
         "value_prop": (
             "Unity is a real-time 3D (RT3D) platform. For non-game use, Unity Industry is the "
-            "primary SKU (Unity 6 engine, Studio no-code authoring, Asset Manager) for digital "
+            "primary SKU (Unity 6 engine, Unity Studio no-code authoring, Asset Manager) for digital "
             "twins, product & AEC visualization, HMI, AR/VR, simulation and immersive training; "
             "the Asset Transformer Toolkit (formerly Pixyz) preps CAD/BIM/3D data for real-time; "
             "and Parsec (by Unity) is a separate add-on for remote GPU sharing across distributed "

@@ -1,0 +1,492 @@
+{
+  "autodesk-aec-vars": [
+    "Bluebeam Revu",
+    "Enscape",
+    "V-Ray",
+    "Rhino",
+    "Pinnacle Series"
+  ],
+  "civil-infrastructure": [
+    "Autodesk Civil 3D",
+    "OpenRoads Designer",
+    "AutoTURN",
+    "Carlson Civil Suite",
+    "12d Model"
+  ],
+  "geospatial-survey": [
+    "Carlson Software",
+    "MicroSurvey FieldGenius",
+    "Leica Cyclone 3DR",
+    "GeoMax X-PAD Ultimate Survey",
+    "Topcon MAGNET Field"
+  ],
+  "structural-steel-detailing": [
+    "Autodesk Advance Steel",
+    "SDS2",
+    "IDEA StatiCa",
+    "ALLPLAN Precast",
+    "SCIA Engineer"
+  ],
+  "construction-erp-pm": [
+    "Acumatica Construction Edition",
+    "Sage 100 Contractor",
+    "Sage 300 Construction and Real Estate",
+    "Sage Intacct Construction",
+    "Deltek ComputerEase"
+  ],
+  "archviz-rendering": [
+    "V-Ray",
+    "Enscape",
+    "Corona",
+    "Lumion",
+    "D5 Render"
+  ],
+  "cde-bim-coordination": [
+    "Bluebeam Revu",
+    "Revizto",
+    "Graphisoft BIMcloud",
+    "Bricsys 24/7",
+    "Bentley ProjectWise"
+  ],
+  "contech-management": [
+    "Procore",
+    "Autodesk Forma (formerly Autodesk Construction Cloud)",
+    "Bluebeam Revu",
+    "Sage 300 Construction and Real Estate",
+    "Oracle Aconex Cloud"
+  ],
+  "mep-building-services": [
+    "Autodesk Revit",
+    "Autodesk Fabrication CADmep",
+    "MagiCAD",
+    "DDScad",
+    "CYPECAD MEP"
+  ],
+  "estimating-takeoff": [
+    "Bluebeam Revu",
+    "PlanSwift",
+    "RIB CostX",
+    "Sage Estimating",
+    "eTakeoff Dimension"
+  ],
+  "interior-woodworking": [
+    "CABINET VISION",
+    "imos iX",
+    "TopSolid'Wood",
+    "Palette CAD",
+    "PolyBoard"
+  ],
+  "field-machine-control": [
+    "Leica iCON build",
+    "Topcon MAGNET Construct",
+    "Carlson Construction",
+    "PIX4Dmapper",
+    "GeoMax X-PAD Ultimate"
+  ],
+  "aec-it-msp": [
+    "Bluebeam Revu",
+    "Egnyte",
+    "Panzura CloudFS",
+    "Deltek Vantagepoint",
+    "Autodesk Architecture, Engineering & Construction Collection"
+  ],
+  "aec-realtime-viz": [
+    "Enscape",
+    "Lumion",
+    "Twinmotion",
+    "D5 Render",
+    "Chaos Vantage"
+  ],
+  "aeco-document-control": [
+    "ProjectWise",
+    "Oracle Aconex Cloud",
+    "Asite CDE",
+    "Autodesk Forma for Construction (formerly Autodesk Construction Cloud)",
+    "Meridian"
+  ],
+  "bim-coordination-clash": [
+    "Autodesk Navisworks Manage",
+    "Revizto",
+    "Solibri",
+    "BIMcollab Zoom",
+    "Trimble Connect"
+  ],
+  "bluebeam-markup": [
+    "Bluebeam Revu",
+    "Foxit PDF Editor",
+    "Nitro PDF Pro",
+    "PDF-XChange Editor",
+    "Tungsten Power PDF"
+  ],
+  "acc-procore-integrators": [
+    "Autodesk Forma (formerly Autodesk Construction Cloud)",
+    "Procore",
+    "Bluebeam Revu",
+    "Revizto",
+    "Solibri"
+  ],
+  "m365-aec-it": [
+    "Autodesk Architecture, Engineering & Construction Collection",
+    "Bluebeam Revu",
+    "Deltek Vantagepoint",
+    "Bentley Systems software",
+    "Egnyte"
+  ],
+  "aeco-msp": [
+    "Egnyte",
+    "Panzura CloudFS",
+    "Nasuni File Data Platform",
+    "LucidLink",
+    "CTERA Enterprise File Services Platform"
+  ],
+  "construction-admin": [
+    "Autodesk Forma Build (formerly Autodesk Build)",
+    "Bluebeam Revu",
+    "ProjectSight",
+    "Oracle Aconex",
+    "Procore"
+  ],
+  "design-authoring-addins": [
+    "Enscape",
+    "V-Ray",
+    "VisualARQ",
+    "Lands Design",
+    "BIMDeX"
+  ],
+  "bentley-infrastructure": [
+    "Autodesk Civil 3D",
+    "Bluebeam Revu",
+    "ArcGIS",
+    "Tekla Structures",
+    "BricsCAD"
+  ],
+  "aec-elearning": [
+    "Pinnacle Series",
+    "Pinnacle Lite",
+    "KnowledgeSmart",
+    "Global eTraining",
+    "SolidProfessor"
+  ],
+  "enterprise-crm": [
+    "ServiceNow",
+    "monday.com Work Management",
+    "Zoho CRM",
+    "SugarAI (formerly SugarCRM)",
+    "Creatio"
+  ],
+  "autocad-alternative": [
+    "GstarCAD",
+    "ZWCAD",
+    "progeCAD Professional",
+    "ARES Commander",
+    "nanoCAD"
+  ],
+  "mechanical-mcad": [
+    "SOLIDWORKS",
+    "Autodesk Inventor",
+    "Mastercam",
+    "Solid Edge",
+    "GibbsCAM"
+  ],
+  "plant-process": [
+    "Forte 3DWorx (formerly CADWorx Plant Professional)",
+    "AutoCAD Plant 3D toolset",
+    "OpenPlant Modeler",
+    "AVEVA E3D Design",
+    "CADMATIC 3D Plant Design"
+  ],
+  "civil-survey": [
+    "Carlson Survey",
+    "MicroSurvey CAD",
+    "Civil Site Design",
+    "Plateia",
+    "AutoTURN"
+  ],
+  "aec-bim-alternative": [
+    "Autodesk Revit",
+    "Archicad",
+    "Vectorworks Architect",
+    "ALLPLAN",
+    "OpenBuildings Designer"
+  ],
+  "cam-machining": [
+    "Mastercam",
+    "SolidCAM",
+    "CAMWorks",
+    "GibbsCAM",
+    "hyperMILL"
+  ],
+  "sheet-metal-nesting": [
+    "SigmaNEST",
+    "ProNest",
+    "Lantek Expert",
+    "cncKad / AutoNest",
+    "JETCAM"
+  ],
+  "reality-capture": [
+    "Leica Cyclone 3DR",
+    "FARO SCENE",
+    "Trimble RealWorks",
+    "PointCab Origins",
+    "Autodesk ReCap Pro"
+  ],
+  "cad-interop": [
+    "CrossManager",
+    "CADfix",
+    "CAD Exchanger Lab",
+    "PolyTrans for CAD",
+    "TransMagic PRO"
+  ],
+  "gis-geospatial": [
+    "ArcGIS",
+    "MapInfo Pro",
+    "GeoMedia",
+    "SuperMap GIS",
+    "OpenCities Map"
+  ],
+  "cafm-iwms": [
+    "Archibus",
+    "Planon",
+    "FMS:Workplace",
+    "Spacewell",
+    "IBM TRIRIGA"
+  ],
+  "ecad-electrical": [
+    "AutoCAD Electrical toolset",
+    "SOLIDWORKS Electrical",
+    "E3.series",
+    "WSCAD ELECTRIX",
+    "EPLAN Electric P8"
+  ],
+  "additive-manufacturing": [
+    "SOLIDWORKS",
+    "Materialise Magics",
+    "nTop",
+    "Autodesk Fusion",
+    "Siemens NX"
+  ],
+  "cae-simulation": [
+    "Ansys",
+    "Simcenter",
+    "SIMULIA Abaqus",
+    "Autodesk Moldflow",
+    "Moldex3D"
+  ],
+  "mes-digital-twin": [
+    "Siemens Opcenter",
+    "DELMIA Apriso",
+    "AVEVA Manufacturing Execution System",
+    "Proficy Smart Factory MES",
+    "ThingWorx"
+  ],
+  "cad-app-developers": [
+    "AutoCAD",
+    "SOLIDWORKS",
+    "Creo",
+    "NX",
+    "Archicad"
+  ],
+  "solidworks-vars": [
+    "SOLIDWORKS",
+    "CAMWorks",
+    "DriveWorks",
+    "SolidCAM",
+    "SWOOD"
+  ],
+  "pdm-plm": [
+    "SOLIDWORKS PDM",
+    "Autodesk Vault",
+    "Teamcenter",
+    "Windchill",
+    "Aras Innovator"
+  ],
+  "aec-2d-cad": [
+    "BricsCAD Lite",
+    "progeCAD Professional",
+    "GstarCAD",
+    "ZWCAD",
+    "ARES Commander"
+  ],
+  "broadline-it": [
+    "AutoCAD",
+    "SketchUp",
+    "BricsCAD",
+    "TurboCAD",
+    "progeCAD"
+  ],
+  "education-academic": [
+    "Adobe Creative Cloud",
+    "Microsoft 365 Education",
+    "Google Workspace for Education",
+    "SOLIDWORKS Education Edition",
+    "IBM SPSS Statistics"
+  ],
+  "technical-comms": [
+    "SOLIDWORKS Composer",
+    "CorelDRAW Technical Suite",
+    "Creo Illustrate",
+    "RapidAuthor",
+    "XVL Studio"
+  ],
+  "ehs-safety": [
+    "EcoOnline",
+    "HSI Donesafe",
+    "SiteDocs",
+    "WorkAware",
+    "Ideagen Lucidity"
+  ],
+  "quality-inspection": [
+    "Bluebeam Revu",
+    "PlanRadar",
+    "Forma Build (formerly Autodesk Build)",
+    "Procore",
+    "Snagstream"
+  ],
+  "cmms-eam": [
+    "IBM Maximo Application Suite",
+    "Fiix CMMS",
+    "IFS Ultimo EAM",
+    "eMaint CMMS",
+    "Octave Attune EAM"
+  ],
+  "field-punchlist": [
+    "Bluebeam Revu",
+    "Autodesk Build",
+    "Revizto",
+    "Trimble Connect",
+    "Trimble ProjectSight"
+  ],
+  "heavy-civil": [
+    "Oracle Primavera P6",
+    "TILOS",
+    "Asta Powerproject",
+    "SYNCHRO",
+    "Deltek Acumen"
+  ],
+  "fsm": [
+    "MobiWork",
+    "Field Force Tracker",
+    "Praxedo",
+    "ServicePower",
+    "Microsoft Dynamics 365 Field Service"
+  ],
+  "commissioning-handover": [
+    "CxPlanner",
+    "Bluebeam",
+    "PlanRadar",
+    "STA Software",
+    "Thinkproject HANDOVER"
+  ],
+  "construction-erp-accounting": [
+    "Acumatica Construction Edition",
+    "Sage 100 Contractor",
+    "Sage 300 Construction and Real Estate",
+    "Deltek ComputerEase",
+    "Vista"
+  ],
+  "analytics-bi": [
+    "Microsoft Power BI",
+    "Tableau",
+    "Qlik",
+    "Domo",
+    "Snowflake"
+  ],
+  "trade-subcontractor": [
+    "Field Force Tracker",
+    "BuildOps",
+    "TopBuilder",
+    "Bluebeam Revu",
+    "Sage Field Operations"
+  ],
+  "rugged-hardware": [
+    "Trimble Access",
+    "MAGNET Field",
+    "Carlson SurvPC",
+    "Leica Captivate",
+    "X-PAD Ultimate Survey"
+  ],
+  "scheduling-estimating": [
+    "Oracle Primavera P6",
+    "Asta Powerproject",
+    "Bluebeam Revu",
+    "PlanSwift",
+    "SYNCHRO 4D"
+  ],
+  "datech-apac": [
+    "Autodesk Revit",
+    "Tekla Structures",
+    "RIB CostX",
+    "Graphisoft Archicad",
+    "Bluebeam Revu"
+  ],
+  "asset-transformer": [
+    "KeyShot Studio",
+    "CrossManager",
+    "SOLIDWORKS Visualize",
+    "Autodesk 3ds Max",
+    "CADfix VIZ"
+  ],
+  "xr-arvr": [
+    "ArborXR",
+    "ManageXR",
+    "TeamViewer Frontline",
+    "SimLab Composer",
+    "VirtualSpeech"
+  ],
+  "digital-twin-iot": [
+    "Ansys Twin Builder",
+    "Bentley iTwin IoT",
+    "Tecnomatix",
+    "DELMIA",
+    "Autodesk Tandem"
+  ],
+  "immersive-training": [
+    "Uptale",
+    "ThingLink",
+    "SimLab Composer",
+    "OmnicastVR",
+    "EON-XR"
+  ],
+  "game-dev-tools": [
+    "Maya",
+    "ZBrush",
+    "Houdini",
+    "Nuke",
+    "Perforce P4"
+  ],
+  "automotive-hmi": [
+    "Qt",
+    "Altia",
+    "Embedded Wizard Studio",
+    "Storyboard",
+    "GL Studio"
+  ],
+  "media-vfx-vp": [
+    "Autodesk Maya",
+    "Nuke",
+    "Cinema 4D",
+    "V-Ray",
+    "Media Composer"
+  ],
+  "product-configurator": [
+    "Zakeke",
+    "Expivi 3D CPQ",
+    "Threekit",
+    "Tacton CPQ",
+    "DriveWorks"
+  ],
+  "gpu-parsec-msp": [
+    "NVIDIA RTX Virtual Workstation (vWS)",
+    "Citrix DaaS",
+    "Omnissa Horizon",
+    "HP Anyware",
+    "Leostream Remote Desktop Access Platform"
+  ],
+  "mobile-growth": [
+    "MoEngage",
+    "Pushwoosh",
+    "OneSignal",
+    "Singular",
+    "Google Ad Manager 360"
+  ]
+}

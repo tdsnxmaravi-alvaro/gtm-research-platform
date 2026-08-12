@@ -2,7 +2,7 @@
 
 from gtm.prompts.vendor_presets import VENDOR_PRESETS
 from gtm.prompts.vertical_presets import (
-    VERTICAL_PRESETS, VENDOR_VERTICALS, VENDOR_EXCLUSIONS,
+    VERTICAL_PRESETS, VENDOR_VERTICALS, VENDOR_EXCLUSIONS, VENDOR_OWN_PRODUCTS,
     verticals_for, vertical_preset, exclusions_for, exclusion_note,
     CORE, SECONDARY, DEFER, TIERS, _validate,
 )
@@ -98,3 +98,14 @@ def test_exclusion_note_is_english_and_nonempty():
 def test_every_vendor_has_exclusions():
     for vendor in VENDOR_PRESETS:
         assert vendor in VENDOR_EXCLUSIONS
+
+
+# Products each vendor OWNS — must never appear in its own verticals' landscape
+# (discover recruits NEW independent resellers, not ones already selling our product).
+def test_no_vendor_self_reference_in_own_verticals():
+    for vendor, tokens in VENDOR_OWN_PRODUCTS.items():
+        for v in verticals_for(vendor, tiers=TIERS):
+            hay = " ".join(v["example_reseller_software"]).lower()
+            for tok in tokens:
+                assert tok.lower() not in hay, (
+                    f"{vendor}/{v['slug']} landscape lists own product '{tok}'")

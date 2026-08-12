@@ -42,20 +42,20 @@ VERTICAL_PRESETS: dict[str, dict] = {
     "geospatial-survey": {
         "name": "Surveying / GIS / reality-capture geospatial dealers",
         "focus": "Dealers of GNSS, survey, scanning and GIS software serving surveyors and mappers.",
-        "example_reseller_software": ["Leica", "Topcon", "Esri ArcGIS", "Pix4D", "Trimble Business Center"],
+        "example_reseller_software": ["Leica", "Topcon", "Esri ArcGIS", "Pix4D", "Carlson"],
     },
     "structural-steel-detailing": {
         "name": "Structural steel/precast detailing & fabrication resellers",
         "focus": "Resellers of structural detailing/analysis/fabrication software for steel & precast.",
-        "example_reseller_software": ["SDS2", "Advance Steel", "IDEA StatiCa", "Tekla PowerFab"],
+        "example_reseller_software": ["SDS2", "Advance Steel", "IDEA StatiCa", "StruMIS"],
     },
     "construction-erp-pm": {
         "name": "Construction ERP / project-management resellers",
         "focus": "Resellers of contractor ERP, accounting, scheduling and project-management software.",
-        "example_reseller_software": ["Sage 300 CRE", "Viewpoint Vista", "Procore", "Oracle Primavera P6"],
+        "example_reseller_software": ["Sage 300 CRE", "CMiC", "Procore", "Oracle Primavera P6"],
     },
     "archviz-rendering": {
-        "name": "Architectural visualization / rendering resellers (SketchUp ecosystem)",
+        "name": "Architectural visualization / rendering resellers",
         "focus": "Resellers of rendering/visualization tools serving architects and designers.",
         "example_reseller_software": ["Enscape", "Chaos V-Ray", "Twinmotion", "Lumion", "D5 Render"],
     },
@@ -72,17 +72,17 @@ VERTICAL_PRESETS: dict[str, dict] = {
     "mep-building-services": {
         "name": "MEP / building-services design resellers",
         "focus": "Resellers of MEP design/detailing software for building-services engineers.",
-        "example_reseller_software": ["MagiCAD", "Trimble Stabicad", "Autodesk Revit MEP", "AX3000"],
+        "example_reseller_software": ["MagiCAD", "LiNear", "Autodesk Revit MEP", "AX3000"],
     },
     "estimating-takeoff": {
         "name": "Estimating & takeoff software resellers",
         "focus": "Resellers of preconstruction estimating and quantity-takeoff tools.",
-        "example_reseller_software": ["Bluebeam Revu", "PlanSwift", "Trimble WinEst", "STACK"],
+        "example_reseller_software": ["Bluebeam Revu", "PlanSwift", "CostX", "STACK"],
     },
     "interior-woodworking": {
-        "name": "Interior design / furniture / woodworking CAD resellers (SketchUp)",
+        "name": "Interior design / furniture / woodworking CAD resellers",
         "focus": "Resellers of interior/kitchen/cabinetry design software.",
-        "example_reseller_software": ["SketchUp", "Chief Architect", "2020 Design", "Cabinet Vision"],
+        "example_reseller_software": ["Microvellum", "Chief Architect", "2020 Design", "Cabinet Vision"],
     },
     "field-machine-control": {
         "name": "Construction field-technology / machine-control / drone integrators",
@@ -236,7 +236,7 @@ VERTICAL_PRESETS: dict[str, dict] = {
     "cad-app-developers": {
         "name": "CAD application developers / customization consultancies",
         "focus": "Developers/consultancies building CAD add-ins, automation and vertical toolsets.",
-        "example_reseller_software": ["AutoLISP / .NET add-ins", "BRX apps", "drawing automation"],
+        "example_reseller_software": ["Autodesk AutoCAD", "Autodesk Revit", "GstarCAD", "ZWCAD"],
     },
     "solidworks-vars": {
         "name": "SOLIDWORKS / Dassault VARs",
@@ -333,7 +333,7 @@ VERTICAL_PRESETS: dict[str, dict] = {
     "datech-apac": {
         "name": "APAC construction-tech resellers (BCA / IMDA ecosystem)",
         "focus": "APAC ConTech resellers aligned to Singapore BCA/IMDA grant-approved solutions.",
-        "example_reseller_software": ["BCA CORENET", "Autodesk Construction Cloud (APAC)", "local ConTech"],
+        "example_reseller_software": ["BCA CORENET X", "Autodesk Construction Cloud", "Procore", "PlanRadar"],
     },
 
     # --- Real-time 3D / XR / digital twin (Unity) -------------------------- #
@@ -511,6 +511,20 @@ VENDOR_EXCLUSIONS: dict[str, dict[str, list[str]]] = {
     "Unity": {"Epic Unreal Engine": ["exclusive"]},
 }
 
+# Products each vendor OWNS — must never appear in its own verticals' landscape
+# (discover recruits NEW independent resellers, not ones already selling our product).
+VENDOR_OWN_PRODUCTS: dict[str, list[str]] = {
+    "Trimble": ["Trimble", "Tekla", "SketchUp", "Viewpoint", "Stabicad", "WinEst",
+                "ProjectSight", "e-Builder", "Accubid"],
+    "Bricsys": ["BricsCAD", "Bricsys"],
+    "DraftSight": ["DraftSight"],
+    "Newforma": ["Newforma"],
+    "Novade": ["Novade"],
+    # From the authoritative Unity product prompt (Prompts GTM/Unity.md).
+    "Unity": ["Unity", "Unity Industry", "Unity Studio", "Asset Manager",
+              "Asset Transformer", "Pixyz", "Parsec"],
+}
+
 
 # --------------------------------------------------------------------------- #
 # Public helpers
@@ -577,6 +591,26 @@ def discover_verticals(vendor: str, slugs: list[str] | None = None,
 # --------------------------------------------------------------------------- #
 # Import-time validation — cheap O(n) integrity check.
 # --------------------------------------------------------------------------- #
+def _load_research_overlay() -> None:
+    """Overlay research-sourced brands (gtm.tools.gen_landscape) onto the catalogue.
+
+    ``landscape_brands.json`` (slug -> [brands]) is the web-researched source of
+    truth for ``example_reseller_software``; the inline lists are the fallback.
+    """
+    import json
+    from pathlib import Path
+    p = Path(__file__).with_name("landscape_brands.json")
+    if not p.exists():
+        return
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    for slug, brands in data.items():
+        if slug in VERTICAL_PRESETS and brands:
+            VERTICAL_PRESETS[slug]["example_reseller_software"] = list(brands)
+
+
 def _validate() -> None:
     for vendor, items in VENDOR_VERTICALS.items():
         seen: set[str] = set()
@@ -590,4 +624,5 @@ def _validate() -> None:
             seen.add(slug)
 
 
+_load_research_overlay()
 _validate()
