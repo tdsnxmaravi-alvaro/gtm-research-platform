@@ -16,7 +16,7 @@ from pathlib import Path
 # Words too generic to identify a brand on their own.
 _STOP_WORDS = {
     "TECHNOLOGIES", "TECHNOLOGY", "TECH", "SYSTEMS", "SOLUTIONS", "SERVICES",
-    "GROUP", "CANADA", "USA", "INTERNATIONAL", "INTL", "CONSULTING",
+    "CANADA", "USA", "INTERNATIONAL", "INTL", "CONSULTING",
     "ENTERPRISES", "PARTNERS", "ASSOCIATES", "RESOURCES", "COMMUNICATIONS",
     "COMPUTER", "DIGITAL", "GLOBAL", "NETWORK", "NETWORKS", "DATA",
     "DESIGN", "ENGINEERING", "SOFTWARE", "HARDWARE", "ELECTRONICS",
@@ -34,7 +34,7 @@ def load_datech_names(csv_path: str | Path, column: str = "Reseller") -> list[st
         col = column if column in (reader.fieldnames or []) else (reader.fieldnames or [""])[0]
         for row in reader:
             name = (row.get(col) or "").strip()
-            if name:
+            if name and name.upper() != "NULL":
                 names.add(name)
     return sorted(names)
 
@@ -69,9 +69,11 @@ class DatechIndex:
             if v_norm == d_norm:                       # 1. exact normalized
                 return original
 
-        if v_tokens:                                   # 2. brand-token match
+        # 2. brand-token match — require >=2 tokens so names that reduce to a single
+        # generic token (e.g. "Applied Software" -> {APPLIED}) don't cross-match.
+        if len(v_tokens) >= 2:
             for original, d_tokens in self.tokens.items():
-                if not d_tokens:
+                if len(d_tokens) < 2:
                     continue
                 if v_tokens == d_tokens:               # 2a. same brand tokens
                     return original
@@ -79,9 +81,6 @@ class DatechIndex:
                                    else (d_tokens, v_tokens))
                 if smaller < larger and len(smaller) >= 2 and all(len(t) >= 2 for t in smaller):
                     return original                    # 2b. proper 2+ token subset
-                if smaller < larger and len(smaller) == 1 and all(len(t) >= 3 for t in smaller):
-                    if SequenceMatcher(None, v_norm, self.normalized[original]).ratio() >= 0.85:
-                        return original                # 2c. single-token subset + fuzzy
 
         if len(v_norm.split()) >= 3:                   # 3. high-threshold fuzzy (long names)
             best_score, best_match = 0.0, None

@@ -29,6 +29,23 @@ def test_no_false_positive_on_generic_words():
     assert idx.find("Global IT Solutions") is None
 
 
+def test_single_generic_token_does_not_cross_match():
+    # both reduce to the single generic brand token {APPLIED} — must not cross-match
+    idx = DatechIndex(["APPLIED COMPUTER", "APPLIED SOFTWARE TECH INC"])
+    assert idx.find("Applied Software") is None
+
+
+def test_multi_token_subset_matches():
+    idx = DatechIndex(["CADAC GROUP AEC B.V.", "CADAC GROUP B.V."])
+    assert idx.find("Cadac Group") is not None
+
+
+def test_load_skips_null_reseller(tmp_path):
+    p = tmp_path / "inv.csv"
+    p.write_text('"Reseller"\n"NULL"\n""\n"Real Co Inc"\n', encoding="utf-8-sig")
+    assert load_datech_names(p) == ["Real Co Inc"]
+
+
 def test_match_companies_map():
     got = match_companies(["ACME CAD Solutions", "Unrelated Widgets Co"], DATECH)
     assert got == {"ACME CAD Solutions": "ACME CAD SOLUTIONS INC"}
