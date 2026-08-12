@@ -250,6 +250,9 @@ class CampaignConfig(BaseModel):
     products: list[Product] = Field(min_length=1)
     verticals: list[Vertical] = Field(default_factory=list)
     provided_list_path: str | None = None
+    # Optional CSV of existing Datech resellers (invoicing export, "Reseller"
+    # column). When set, the master flags companies already in the Datech channel.
+    datech_reseller_list: str | None = None
     # Raw-header (lowercased) -> canonical field ("company"/"website"/"country").
     # Set by the wizard's upload + column-mapping step; applied when loading the list.
     provided_column_overrides: dict[str, str] = Field(default_factory=dict)

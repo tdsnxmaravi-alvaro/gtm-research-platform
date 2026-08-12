@@ -1,0 +1,42 @@
+"""Tests for the Datech reseller matcher (net-new vs existing partner flag)."""
+
+from gtm.consolidate.datech_match import (
+    DatechIndex, load_datech_names, match_companies, normalize_for_match,
+)
+
+DATECH = [
+    "ACME CAD SOLUTIONS INC",
+    "365 IT SOLUTIONS/1583628 ONTARIO INC.",
+    "Redshift Reprographics LLC",
+]
+
+
+def test_normalize_strips_suffixes_and_punct():
+    assert normalize_for_match("Acme CAD Solutions, Inc.") == "ACME CAD SOLUTIONS"
+    assert normalize_for_match("Redshift Reprographics LLC (DBA RedRepro)") == "REDSHIFT REPROGRAPHICS"
+
+
+def test_exact_and_token_match():
+    idx = DatechIndex(DATECH)
+    assert idx.find("ACME CAD Solutions Inc") == "ACME CAD SOLUTIONS INC"
+    # token subset: "Redshift Reprographics" matches ignoring the LLC suffix
+    assert idx.find("Redshift Reprographics") == "Redshift Reprographics LLC"
+
+
+def test_no_false_positive_on_generic_words():
+    idx = DatechIndex(DATECH)
+    # shares only the stop-word "SOLUTIONS" — must NOT match
+    assert idx.find("Global IT Solutions") is None
+
+
+def test_match_companies_map():
+    got = match_companies(["ACME CAD Solutions", "Unrelated Widgets Co"], DATECH)
+    assert got == {"ACME CAD Solutions": "ACME CAD SOLUTIONS INC"}
+
+
+def test_load_datech_names_from_csv(tmp_path):
+    p = tmp_path / "invoicing.csv"
+    p.write_text('"Reseller"\n"Acme CAD Solutions Inc"\n"Redshift Reprographics LLC"\n',
+                 encoding="utf-8-sig")
+    names = load_datech_names(p)
+    assert "Acme CAD Solutions Inc" in names and len(names) == 2

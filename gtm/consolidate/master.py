@@ -15,6 +15,7 @@ from ..config.schema import CampaignConfig
 
 MASTER_COLS = [
     "tier", "score", "company", "website", "country", "employees", "software_resold",
+    "datech_match",
     "contact_name", "title", "email", "email_status",
     "direct_phone", "corporate_phone", "linkedin",
     "vendor", "recommended_products", "fit_summary", "evidence_urls",
@@ -24,6 +25,7 @@ MASTER_COLS = [
 SUMMARY_SHEET = [
     ("Company", "company"), ("Website", "website"), ("Tier", "tier"), ("Score", "score"),
     ("Country", "country"), ("Employees", "employees"), ("Software Resold", "software_resold"),
+    ("Datech Match", "datech_match"),
     ("Independence", "independence"), ("Apollo Verified", "apollo_verified"),
     ("Validation", "validation"), ("Total Contacts", "total_contacts"),
     ("Verified Emails", "verified_emails"), ("Best Contact", "best_contact"),
@@ -97,6 +99,8 @@ def build_master(config: CampaignConfig, out_dir: str | Path | None = None,
         if prev is None or _score(r) > _score(prev):
             best[key] = r
 
+    _annotate_datech(config, best)
+
     # Group contacts by company.
     contacts_by_company: dict[str, list[dict]] = {}
     for c in contacts:
@@ -136,6 +140,17 @@ def _score(r: dict) -> float:
     return _num(r.get("score"))
 
 
+def _annotate_datech(config: CampaignConfig, best: dict[str, dict]) -> None:
+    """Set r['datech_match'] to the existing Datech reseller name, if configured."""
+    path = getattr(config, "datech_reseller_list", None)
+    if not path or not Path(path).exists():
+        return
+    from .datech_match import DatechIndex, load_datech_names
+    index = DatechIndex(load_datech_names(path))
+    for r in best.values():
+        r["datech_match"] = index.find(r.get("company", "")) or ""
+
+
 def _num(v) -> float:
     try:
         return float(v)
@@ -152,6 +167,7 @@ def _master_row(config: CampaignConfig, r: dict, tier: str, c: dict) -> dict:
         "country": r.get("country") or config.country,
         "employees": r.get("employees", ""),
         "software_resold": r.get("software_resold", ""),
+        "datech_match": r.get("datech_match", ""),
         "contact_name": c.get("contact_name", ""),
         "title": c.get("title", ""),
         "email": c.get("email", ""),
@@ -194,6 +210,7 @@ def _summary_row(config: CampaignConfig, r: dict, tier: str, cs: list[dict]) -> 
         "country": r.get("country") or config.country,
         "employees": r.get("employees", ""),
         "software_resold": r.get("software_resold", ""),
+        "datech_match": r.get("datech_match", ""),
         "independence": r.get("independence", ""),
         "apollo_verified": ("Yes" if any((c.get("email_status") or "").lower() == "verified"
                                           for c in cs) else ("No" if cs else "")),
