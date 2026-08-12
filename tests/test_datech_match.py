@@ -46,6 +46,19 @@ def test_load_skips_null_reseller(tmp_path):
     assert load_datech_names(p) == ["Real Co Inc"]
 
 
+def test_country_aware_match_prefers_same_market():
+    recs = [
+        {"name": "ACES DIRECT B.V.", "country": "Netherlands", "geo": "EMEA", "region": "Benelux", "csn": "NL1"},
+        {"name": "ACES DIRECT B.V.", "country": "Belgium", "geo": "EMEA", "region": "Benelux", "csn": "BE1"},
+    ]
+    idx = DatechIndex([], records=recs)
+    m = idx.match("Aces Direct BV", country="Belgium")
+    assert m["name"] == "ACES DIRECT B.V." and m["country"] == "Belgium"
+    assert m["same_country"] is True and m["csn"] == "BE1"
+    assert idx.match("Aces Direct BV", country="France")["same_country"] is False
+    assert idx.match("Totally Unrelated Co", country="Belgium") is None
+
+
 def test_match_companies_map():
     got = match_companies(["ACME CAD Solutions", "Unrelated Widgets Co"], DATECH)
     assert got == {"ACME CAD Solutions": "ACME CAD SOLUTIONS INC"}

@@ -27,16 +27,44 @@ _STOP_WORDS = {
 
 def load_datech_names(csv_path: str | Path, column: str = "Reseller") -> list[str]:
     """Load reseller names from a Datech invoicing CSV export."""
+    return [r["name"] for r in load_datech_records(csv_path, name_col=column)]
+
+
+def load_datech_records(csv_path: str | Path, name_col: str = "Reseller") -> list[dict]:
+    """Load Datech reseller rows (name + geo/region/country/csn when present).
+
+    Dedupes by (name, country, csn). Skips empty / literal 'NULL' reseller names.
+    """
     path = Path(csv_path)
-    names: set[str] = set()
+    out: list[dict] = []
+    seen: set[tuple] = set()
     with open(path, encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
-        col = column if column in (reader.fieldnames or []) else (reader.fieldnames or [""])[0]
+        fields = reader.fieldnames or []
+        ncol = name_col if name_col in fields else (fields[0] if fields else "")
+
+        def g(row: dict, *cands: str) -> str:
+            for c in cands:
+                if (row.get(c) or "").strip():
+                    return row[c].strip()
+            return ""
+
         for row in reader:
-            name = (row.get(col) or "").strip()
-            if name and name.upper() != "NULL":
-                names.add(name)
-    return sorted(names)
+            name = (row.get(ncol) or "").strip()
+            if not name or name.upper() == "NULL":
+                continue
+            rec = {
+                "name": name,
+                "geo": g(row, "Geo Area"),
+                "region": g(row, "Region"),
+                "country": g(row, "Country"),
+                "csn": g(row, "Reseller CSN"),
+            }
+            key = (name, rec["country"], rec["csn"])
+            if key not in seen:
+                seen.add(key)
+                out.append(rec)
+    return out
 
 
 def normalize_for_match(name: str) -> str:
@@ -53,9 +81,18 @@ def brand_tokens(normalized: str) -> set[str]:
 
 
 class DatechIndex:
-    """Pre-normalized Datech names for repeated matching."""
+    """Pre-normalized Datech names for repeated matching.
 
-    def __init__(self, names: list[str]):
+    Pass `records` (from load_datech_records) to enable country-aware matching via
+    ``match``; otherwise pass a plain name list for name-only ``find``.
+    """
+
+    def __init__(self, names: list[str], records: list[dict] | None = None):
+        self.by_name: dict[str, list[dict]] = {}
+        if records is not None:
+            for r in records:
+                self.by_name.setdefault(r["name"], []).append(r)
+            names = sorted(self.by_name)
         self.normalized = {n: normalize_for_match(n) for n in names}
         self.tokens = {n: brand_tokens(v) for n, v in self.normalized.items()}
 
@@ -93,6 +130,28 @@ class DatechIndex:
             if best_score >= 0.90:
                 return best_match
         return None
+
+    def match(self, company: str, country: str | None = None) -> dict | None:
+        """Return the matched Datech record (country-aware) or None.
+
+        Result: {name, geo, region, country, csn, same_country}. When `country` is
+        given and the matched partner has an entry in that country, that entry is
+        chosen and same_country=True; else same_country=False (matched in another
+        market). Falls back to name-only when the index has no records.
+        """
+        name = self.find(company)
+        if not name:
+            return None
+        recs = self.by_name.get(name)
+        if not recs:
+            return {"name": name, "geo": "", "region": "", "country": "",
+                    "csn": "", "same_country": None}
+        chosen, same = recs[0], None
+        if country:
+            c = country.strip().lower()
+            hit = next((r for r in recs if r["country"].strip().lower() == c), None)
+            chosen, same = (hit, True) if hit else (recs[0], False)
+        return {**chosen, "same_country": same}
 
 
 def match_companies(companies: list[str], datech_names: list[str]) -> dict[str, str]:

@@ -15,7 +15,7 @@ from ..config.schema import CampaignConfig
 
 MASTER_COLS = [
     "tier", "score", "company", "website", "country", "employees", "software_resold",
-    "datech_match",
+    "datech_match", "datech_geo",
     "contact_name", "title", "email", "email_status",
     "direct_phone", "corporate_phone", "linkedin",
     "vendor", "recommended_products", "fit_summary", "evidence_urls",
@@ -25,7 +25,7 @@ MASTER_COLS = [
 SUMMARY_SHEET = [
     ("Company", "company"), ("Website", "website"), ("Tier", "tier"), ("Score", "score"),
     ("Country", "country"), ("Employees", "employees"), ("Software Resold", "software_resold"),
-    ("Datech Match", "datech_match"),
+    ("Datech Match", "datech_match"), ("Datech Market", "datech_geo"),
     ("Independence", "independence"), ("Apollo Verified", "apollo_verified"),
     ("Validation", "validation"), ("Total Contacts", "total_contacts"),
     ("Verified Emails", "verified_emails"), ("Best Contact", "best_contact"),
@@ -141,14 +141,21 @@ def _score(r: dict) -> float:
 
 
 def _annotate_datech(config: CampaignConfig, best: dict[str, dict]) -> None:
-    """Set r['datech_match'] to the existing Datech reseller name, if configured."""
+    """Flag existing Datech resellers (country-aware) if a list is configured."""
     path = getattr(config, "datech_reseller_list", None)
     if not path or not Path(path).exists():
         return
-    from .datech_match import DatechIndex, load_datech_names
-    index = DatechIndex(load_datech_names(path))
+    from .datech_match import DatechIndex, load_datech_records
+    index = DatechIndex([], records=load_datech_records(path))
     for r in best.values():
-        r["datech_match"] = index.find(r.get("company", "")) or ""
+        m = index.match(r.get("company", ""), r.get("country") or config.country)
+        r["datech_match"] = m["name"] if m else ""
+        if m:
+            where = m.get("country") or m.get("geo") or ""
+            tag = {True: " (same market)", False: " (other market)"}.get(m.get("same_country"), "")
+            r["datech_geo"] = (where + tag).strip()
+        else:
+            r["datech_geo"] = ""
 
 
 def _num(v) -> float:
@@ -168,6 +175,7 @@ def _master_row(config: CampaignConfig, r: dict, tier: str, c: dict) -> dict:
         "employees": r.get("employees", ""),
         "software_resold": r.get("software_resold", ""),
         "datech_match": r.get("datech_match", ""),
+        "datech_geo": r.get("datech_geo", ""),
         "contact_name": c.get("contact_name", ""),
         "title": c.get("title", ""),
         "email": c.get("email", ""),
@@ -211,6 +219,7 @@ def _summary_row(config: CampaignConfig, r: dict, tier: str, cs: list[dict]) -> 
         "employees": r.get("employees", ""),
         "software_resold": r.get("software_resold", ""),
         "datech_match": r.get("datech_match", ""),
+        "datech_geo": r.get("datech_geo", ""),
         "independence": r.get("independence", ""),
         "apollo_verified": ("Yes" if any((c.get("email_status") or "").lower() == "verified"
                                           for c in cs) else ("No" if cs else "")),
