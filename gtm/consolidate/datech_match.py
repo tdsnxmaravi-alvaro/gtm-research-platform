@@ -13,6 +13,10 @@ import re
 from difflib import SequenceMatcher
 from pathlib import Path
 
+# Bundled real Datech reseller export (FY22, AMER/APAC/EMEA). Used as the default
+# when a campaign doesn't set its own datech_reseller_list.
+DEFAULT_DATECH_CSV = Path(__file__).resolve().parents[2] / "data" / "datech" / "InvoicingFY22.csv"
+
 # Words too generic to identify a brand on their own.
 _STOP_WORDS = {
     "TECHNOLOGIES", "TECHNOLOGY", "TECH", "SYSTEMS", "SOLUTIONS", "SERVICES",

@@ -142,10 +142,12 @@ def _score(r: dict) -> float:
 
 def _annotate_datech(config: CampaignConfig, best: dict[str, dict]) -> None:
     """Flag existing Datech resellers (country-aware) if a list is configured."""
+    from .datech_match import DatechIndex, load_datech_records, DEFAULT_DATECH_CSV
     path = getattr(config, "datech_reseller_list", None)
+    if not path and DEFAULT_DATECH_CSV.exists():
+        path = str(DEFAULT_DATECH_CSV)
     if not path or not Path(path).exists():
         return
-    from .datech_match import DatechIndex, load_datech_records
     index = DatechIndex([], records=load_datech_records(path))
     for r in best.values():
         m = index.match(r.get("company", ""), r.get("country") or config.country)
