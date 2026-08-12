@@ -4,7 +4,6 @@ from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from api.models import Campaign, Run
-
 VALID_CONFIG = {
     "name": "t-api",
     "target_type": "resellers",
@@ -102,4 +101,81 @@ class ResearchTaskTests(APITestCase):
         run = Run.objects.get(campaign=campaign, stage="research")
         self.assertEqual(run.status, "done")
         self.assertEqual(run.result_count, 1)
+
+
+APOLLO_CONFIG = {
+    "name": "t-relaunch",
+    "target_type": "resellers",
+    "mode": "provided",
+    "country": "Spain",
+    "products": [{"name": "Trimble", "value_prop": "design sw",
+                  "fit_criteria": ["sells software"]}],
+    "provided_list_path": "x.csv",
+    "enrichment": {"provider": "apollo", "want": "emails"},
+    "outreach": {"enabled": False, "min_tier": "C"},
+}
+
+
+class RelaunchTests(APITestCase):
+    def _tmp_root(self):
+        import tempfile
+        from pathlib import Path
+        return Path(tempfile.mkdtemp())
+
+    def test_reset_clears_outputs_keeps_shared_cache(self):
+        from api.tasks import reset_campaign_state
+        root = self._tmp_root()
+        with override_settings(GTM_DATA_ROOT=root):
+            out = root / "t-reset"
+            (out / "eml").mkdir(parents=True)
+            for f in ("state.json", "results.csv", "enrich_state.json",
+                      "contacts.csv", "master.csv", "master.xlsx"):
+                (out / f).write_text("x", encoding="utf-8")
+            (out / "eml" / "1.eml").write_text("x", encoding="utf-8")
+            # Global cache lives at the data root, OUTSIDE the campaign folder.
+            cache = root / ".gtm_cache" / "contacts.json"
+            cache.parent.mkdir(parents=True)
+            cache.write_text("{}", encoding="utf-8")
+
+            reset_campaign_state("t-reset")
+
+            for f in ("state.json", "results.csv", "master.csv"):
+                self.assertFalse((out / f).exists(), f)
+            self.assertFalse((out / "eml" / "1.eml").exists())
+            self.assertTrue(cache.exists(), "shared cache must be preserved")
+
+    def test_relaunch_endpoint_runs_fresh(self):
+        campaign = Campaign.objects.create(name="t-relaunch", config=APOLLO_CONFIG)
+        with patch("api.views.run_pipeline") as rp:
+            resp = self.client.post(f"/api/campaigns/{campaign.id}/relaunch/")
+        self.assertEqual(resp.status_code, 202, resp.content)
+        rp.assert_called_once_with(campaign.id, fresh=True)
+
+    def test_relaunch_summary_apollo_new_vs_reused(self):
+        from gtm.enrichment.cache import ContactCache
+        from gtm.enrichment.models import EnrichedContact
+        root = self._tmp_root()
+        campaign = Campaign.objects.create(name="t-relaunch", config=APOLLO_CONFIG)
+        with override_settings(GTM_DATA_ROOT=root):
+            out = root / "t-relaunch"
+            out.mkdir(parents=True)
+            (out / "master.csv").write_text(
+                "company,website,final_tier\n"
+                "Acme,acme.com,A\n"          # cached -> reused
+                "NewCo,newco.com,B\n"        # not cached -> new (would charge)
+                "LowCo,low.com,D\n",         # below min_tier C -> ignored
+                encoding="utf-8")
+            cache = ContactCache(path=root / ".gtm_cache" / "contacts.json")
+            cache.put("acme.com", [EnrichedContact(company="Acme", email="a@acme.com")])
+
+            resp = self.client.get(f"/api/campaigns/{campaign.id}/relaunch_summary/")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        data = resp.json()
+        self.assertTrue(data["uses_apollo"])
+        self.assertTrue(data["research_from_scratch"])
+        self.assertEqual(data["apollo_new_companies"], 1)
+        self.assertEqual(data["apollo_reused_companies"], 1)
+
+
+
 

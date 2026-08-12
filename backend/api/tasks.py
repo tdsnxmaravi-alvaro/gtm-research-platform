@@ -61,11 +61,48 @@ def cancel_mode(name: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Relaunch — clear this campaign's per-run state/outputs so the pipeline runs
+# from scratch. The GLOBAL caches (research + contacts) live at the data root
+# (out.parent/.gtm_cache), OUTSIDE the campaign folder, so they are preserved:
+# Apollo is never re-charged for a domain already enriched anywhere.
+# --------------------------------------------------------------------------- #
+def reset_campaign_state(name: str) -> None:
+    """Delete a campaign's research/enrich/consolidate/outreach artifacts.
+
+    Removes state checkpoints and outputs so a relaunch re-runs everything, while
+    keeping the shared domain caches at the data root untouched.
+    """
+    out = _out_dir(name)
+    for fname in ("state.json", "results.csv",
+                  "enrich_state.json", "contacts.csv",
+                  "master.csv", "master.xlsx",
+                  "phone_reveals.json", "enrich_credits.json"):
+        f = out / fname
+        if f.exists():
+            try:
+                f.unlink()
+            except OSError:
+                pass
+    eml_dir = out / "eml"
+    if eml_dir.exists():
+        for f in eml_dir.glob("*.eml"):
+            try:
+                f.unlink()
+            except OSError:
+                pass
+
+
+# --------------------------------------------------------------------------- #
 # Single stage
 # --------------------------------------------------------------------------- #
 @shared_task
-def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str) -> str:
-    """Execute one pipeline stage and record status + a short summary on the Run."""
+def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str,
+             fresh: bool = False) -> str:
+    """Execute one pipeline stage and record status + a short summary on the Run.
+
+    When ``fresh`` is set (relaunch), research bypasses the research cache so LARA
+    is genuinely re-queried and any prompt/vertical/country changes take effect.
+    """
     close_old_connections()
     run = Run.objects.get(pk=run_id)
     run.status = "running"
@@ -85,7 +122,7 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str) -> str:
             from gtm.research import run_campaign
             results = run_campaign(config, out_dir=out_dir, limit=config.process_limit,
                                    progress_cb=_progress, should_cancel=_should_cancel,
-                                   use_research_cache=config.research_cache)
+                                   use_research_cache=config.research_cache and not fresh)
             count = len(results)
             tiers = Counter((r.get("final_tier") or r.get("tier") or "?") for r in results)
             breakdown = ", ".join(f"{k}:{tiers[k]}" for k in ("A", "B", "C", "D") if tiers.get(k))
@@ -155,15 +192,21 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str) -> str:
 # --------------------------------------------------------------------------- #
 # Full pipeline — run the stages in order, stopping on error or cancel.
 # --------------------------------------------------------------------------- #
-def run_pipeline(campaign_id: int) -> None:
+def run_pipeline(campaign_id: int, fresh: bool = False) -> None:
     """Run research -> (enrich) -> consolidate -> (outreach) sequentially.
 
     Skips enrich when nothing is requested and outreach when disabled. Each stage
     is resumable; stopping leaves saved state so a later Start resumes.
+
+    When ``fresh`` is set (relaunch), the campaign's per-run state/outputs are
+    cleared first so every stage runs from scratch. Shared domain caches are kept
+    so Apollo is never re-charged for an already-enriched company.
     """
     close_old_connections()
     campaign = Campaign.objects.get(pk=campaign_id)
     name, cfg = campaign.name, campaign.config
+    if fresh:
+        reset_campaign_state(name)
     clear_cancel(name)
 
     from gtm.config.schema import CampaignConfig
@@ -180,7 +223,7 @@ def run_pipeline(campaign_id: int) -> None:
         if is_canceled(name):
             break
         run = Run.objects.create(campaign=campaign, stage=stage, status="pending")
-        run_stage(run.id, cfg, stage, name)
+        run_stage(run.id, cfg, stage, name, fresh=fresh)
         run.refresh_from_db()
         if run.status in ("error", "canceled"):
             break

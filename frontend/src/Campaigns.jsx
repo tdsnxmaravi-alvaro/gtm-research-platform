@@ -34,6 +34,8 @@ export default function Campaigns({ onEdit }) {
   const [results, setResults] = useState({}); // campaignId -> rows
   const [resultsOpen, setResultsOpen] = useState({}); // campaignId -> bool
   const [confirmDel, setConfirmDel] = useState(null); // campaign pending delete
+  const [confirmRelaunch, setConfirmRelaunch] = useState(null); // campaign pending relaunch
+  const [relaunchInfo, setRelaunchInfo] = useState(null); // summary for the modal
   const [error, setError] = useState("");
 
   async function refreshStages(id) {
@@ -157,6 +159,32 @@ export default function Campaigns({ onEdit }) {
     }
   }
 
+  async function askRelaunch(c) {
+    setConfirmRelaunch(c);
+    setRelaunchInfo(null);
+    try {
+      setRelaunchInfo(await api.relaunchSummary(c.id));
+    } catch (e) {
+      setError(String(e.message || e));
+    }
+  }
+
+  async function doRelaunch() {
+    const c = confirmRelaunch;
+    setConfirmRelaunch(null);
+    setRelaunchInfo(null);
+    if (!c) return;
+    // Optimistic: reflect "running" immediately so the controls flip.
+    setRuns((r) => ({ ...r, [c.id]: { status: "pending", stage: "research", processed: 0, total: 0 } }));
+    setStageRuns((s) => ({ ...s, [c.id]: { research: { stage: "research", status: "pending" } } }));
+    try {
+      await api.relaunch(c.id);
+      pollPipeline(c.id, c.config);
+    } catch (e) {
+      setError(String(e.message || e));
+    }
+  }
+
   if (error) return <p className="error">{error}</p>;
   if (!campaigns.length) return <p>No campaigns yet. Create one from “New campaign”.</p>;
 
@@ -213,6 +241,10 @@ export default function Campaigns({ onEdit }) {
               )}
               {!started && onEdit && (
                 <button onClick={() => onEdit(c)} title="Edit this campaign (available until it first runs)">✎ Edit</button>
+              )}
+              {started && !running && (
+                <button onClick={() => askRelaunch(c)}
+                        title="Re-run the whole pipeline from scratch (research is re-queried). Shared caches are kept so Apollo isn't re-charged for companies already enriched.">↻ Relaunch</button>
               )}
               {!running && (
                 <button onClick={() => setConfirmDel(c)}
@@ -318,6 +350,40 @@ export default function Campaigns({ onEdit }) {
             <div className="modal-actions">
               <button onClick={() => setConfirmDel(null)}>Cancel</button>
               <button className="danger" onClick={doDelete}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmRelaunch && (
+        <div className="modal-overlay" onClick={() => { setConfirmRelaunch(null); setRelaunchInfo(null); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Relaunch campaign</h3>
+            <p>
+              Re-run <b>{confirmRelaunch.name}</b> from scratch. The <b>research phase
+              runs again</b> (LARA is re-queried), and consolidate{relaunchInfo && relaunchInfo.stages?.includes("enrich") ? ", enrich" : ""}
+              {relaunchInfo && relaunchInfo.stages?.includes("outreach") ? ", outreach" : ""} are rebuilt.
+            </p>
+            {!relaunchInfo ? (
+              <p className="status">Checking what will run…</p>
+            ) : relaunchInfo.uses_apollo ? (
+              <div className="status error">
+                <b>⚠ This campaign uses Apollo (consumes credits).</b>
+                <div style={{ marginTop: 6 }}>
+                  Based on the previous shortlist: <b>{relaunchInfo.apollo_new_companies}</b> new
+                  {" "}compan{relaunchInfo.apollo_new_companies === 1 ? "y" : "ies"} would consume Apollo credits;
+                  {" "}<b>{relaunchInfo.apollo_reused_companies}</b> already in the shared contact base (no charge).
+                </div>
+                <div style={{ marginTop: 6, opacity: 0.8 }}>{relaunchInfo.shortlist_note}</div>
+              </div>
+            ) : (
+              <p className="status">
+                Enrichment uses <b>{relaunchInfo.provider === "lara" ? "LARA (no credit cost)" : relaunchInfo.want === "none" ? "no enrichment" : relaunchInfo.provider}</b>.
+                No Apollo credits will be consumed.
+              </p>
+            )}
+            <div className="modal-actions">
+              <button onClick={() => { setConfirmRelaunch(null); setRelaunchInfo(null); }}>Cancel</button>
+              <button className="danger" onClick={doRelaunch} disabled={!relaunchInfo}>↻ Relaunch</button>
             </div>
           </div>
         </div>

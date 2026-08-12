@@ -338,6 +338,78 @@ class CampaignViewSet(viewsets.ModelViewSet):
             run_pipeline(campaign.id)
         return Response({"started": True}, status=status.HTTP_202_ACCEPTED)
 
+    @action(detail=True, methods=["get"])
+    def relaunch_summary(self, request, pk=None):
+        """Summarize what a Relaunch will do (drives the confirmation modal).
+
+        Research always re-runs from scratch. The key cost signal is Apollo: report
+        the enrichment provider and, when Apollo, how many shortlisted companies are
+        NEW (would consume credits) vs. already in the shared contact base (reused,
+        no charge).
+        """
+        campaign = self.get_object()
+        config = _load_config(campaign.config)
+        enr = config.enrichment
+        provider = enr.provider.value
+        want = enr.want.value
+
+        stages = ["research", "consolidate"]
+        if want != "none":
+            stages.append("enrich")
+        if config.outreach.enabled:
+            stages.append("outreach")
+
+        data = {
+            "provider": provider,
+            "uses_apollo": provider == "apollo" and want != "none",
+            "want": want,
+            "stages": stages,
+            "research_from_scratch": True,
+        }
+
+        # Apollo cost estimate: shortlist domains not yet in the global contact base.
+        if data["uses_apollo"]:
+            from gtm.enrichment.cache import ContactCache
+            from gtm.enrichment.domains import extract_domain
+
+            out = _out_dir(campaign.name)
+            rows = _read_csv(out / "master.csv") or _read_csv(out / "results.csv")
+            tier_order = {"A": 0, "B": 1, "C": 2, "D": 3, "": 9}
+            cap = tier_order.get((config.outreach.min_tier or "D").upper(), 9)
+            cache = ContactCache(
+                path=Path(settings.GTM_DATA_ROOT) / ".gtm_cache" / "contacts.json")
+            new_count = reused_count = 0
+            for r in rows:
+                tier = (r.get("final_tier") or r.get("tier") or "").upper()
+                if tier_order.get(tier, 9) > cap:
+                    continue
+                domain = extract_domain(r.get("website") or "")
+                if domain and cache.get(domain):
+                    reused_count += 1
+                else:
+                    new_count += 1
+            data["apollo_new_companies"] = new_count
+            data["apollo_reused_companies"] = reused_count
+            data["shortlist_note"] = (
+                "Company counts are from the previous run's shortlist; the fresh "
+                "research may change them.")
+
+        return Response(data)
+
+    @action(detail=True, methods=["post"])
+    def relaunch(self, request, pk=None):
+        """Re-run the whole pipeline FROM SCRATCH (research re-queried, outputs
+        rebuilt). Shared caches are kept so Apollo is never re-charged for a company
+        already enriched. Guarded by the client-side confirmation modal."""
+        campaign = self.get_object()
+        if getattr(settings, "RUN_STAGES_IN_THREAD", False):
+            import threading
+            threading.Thread(target=run_pipeline, args=(campaign.id,),
+                             kwargs={"fresh": True}, daemon=True).start()
+        else:
+            run_pipeline(campaign.id, fresh=True)
+        return Response({"relaunched": True}, status=status.HTTP_202_ACCEPTED)
+
     @action(detail=True, methods=["post"])
     def stop(self, request, pk=None):
         """Cancel the run. State is saved on disk, so nothing already spent is lost;
