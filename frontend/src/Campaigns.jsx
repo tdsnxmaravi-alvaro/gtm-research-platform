@@ -265,14 +265,16 @@ export default function Campaigns({ onEdit }) {
                 })}
               </div>
             )}
-            <details>
-              <summary className="link">Run a single stage (manual)</summary>
-              <div className="stages" style={{ marginTop: 8 }}>
-                {STAGES.map((s) => (
-                  <button key={s} onClick={() => startStage(c.id, s)} disabled={running}>{s}</button>
-                ))}
-              </div>
-            </details>
+            {!complete && (
+              <details>
+                <summary className="link">Run a single stage (manual)</summary>
+                <div className="stages" style={{ marginTop: 8 }}>
+                  {STAGES.map((s) => (
+                    <button key={s} onClick={() => startStage(c.id, s)} disabled={running}>{s}</button>
+                  ))}
+                </div>
+              </details>
+            )}
             {resultsOpen[c.id] && rows && (
               <>
                 <div className="status">
