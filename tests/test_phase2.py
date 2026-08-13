@@ -255,6 +255,20 @@ def test_apollo_client_reads_published_webhook_url(tmp_path, monkeypatch):
     assert client.webhook_url == "https://x.trycloudflare.com/apollo-webhook"
 
 
+def test_save_survives_permission_error(tmp_path, monkeypatch):
+    """Windows can raise PermissionError on the atomic replace when another writer
+    holds the file; save() must fall back to an in-place write, not crash the run."""
+    import json
+    import pathlib
+    store = PhoneRevealStore(tmp_path / "ph.json")
+    store.data["p1"] = {"status": "pending"}
+    monkeypatch.setattr("gtm.enrichment.apollo.phones.time.sleep", lambda *_: None)
+    monkeypatch.setattr(pathlib.Path, "replace",
+                        lambda self, target: (_ for _ in ()).throw(PermissionError("locked")))
+    store.save()  # must not raise
+    assert json.load(open(tmp_path / "ph.json", encoding="utf-8"))["p1"]["status"] == "pending"
+
+
 def test_store_save_merges_concurrent_writers(tmp_path):
     """Two processes writing the same store must not clobber each other: a webhook
     marking a reveal 'done' survives a later fire_reveals save from another process."""

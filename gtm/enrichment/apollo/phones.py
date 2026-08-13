@@ -13,12 +13,30 @@ State lives in a single JSON file keyed by apollo_id:
 from __future__ import annotations
 
 import json
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .client import ApolloClient
 from ..models import EnrichedContact
+
+
+# One lock PER store file, shared across all PhoneRevealStore instances in this
+# process, so the runner (fire_reveals) and the webhook receiver never write the
+# same phone_reveals.json concurrently (Windows: os.replace -> PermissionError).
+_LOCKS_META = threading.Lock()
+_PATH_LOCKS: dict[str, threading.Lock] = {}
+
+
+def _lock_for(path) -> threading.Lock:
+    key = str(Path(path).resolve()).lower()
+    with _LOCKS_META:
+        lk = _PATH_LOCKS.get(key)
+        if lk is None:
+            lk = threading.Lock()
+            _PATH_LOCKS[key] = lk
+        return lk
 
 
 # Status precedence so a merge never downgrades a resolved reveal.
@@ -71,31 +89,41 @@ class PhoneRevealStore:
                 pass
 
     def save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        # Cross-process safe: merge with whatever is on disk before writing, so a
-        # concurrent writer (e.g. the webhook receiver persisting a delivered
-        # number while fire_reveals is still firing) is never clobbered.
-        self.data = _merge_stores(self._read_disk(), self.data)
-        tmp = self.path.with_suffix(f".{time.time_ns()}.tmp")
-        tmp.write_text(json.dumps(self.data, indent=2, ensure_ascii=False),
-                       encoding="utf-8")
-        # os.replace can transiently fail on Windows if another process/AV holds
-        # the target; retry a few times before a best-effort direct write.
-        for attempt in range(5):
+        # Serialize all writers to this file (runner + webhook receiver) so the
+        # atomic replace never collides on Windows.
+        with _lock_for(self.path):
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            # Merge with whatever is on disk before writing, so a concurrent writer
+            # (e.g. the webhook receiver persisting a delivered number) is never lost.
+            self.data = _merge_stores(self._read_disk(), self.data)
+            payload = json.dumps(self.data, indent=2, ensure_ascii=False)
+            tmp = self.path.with_name(f"{self.path.name}.{time.time_ns()}.tmp")
             try:
-                tmp.replace(self.path)
-                return
-            except PermissionError:
-                time.sleep(0.1 * (attempt + 1))
-        try:
-            self.path.write_text(json.dumps(self.data, indent=2, ensure_ascii=False),
-                                 encoding="utf-8")
-        finally:
-            if tmp.exists():
+                tmp.write_text(payload, encoding="utf-8")
+            except OSError:
+                return  # can't even stage a temp file; keep in-memory state
+            # os.replace can transiently fail on Windows if another process/AV holds
+            # the target; retry with backoff before a best-effort direct write.
+            last_exc: Exception | None = None
+            for attempt in range(10):
                 try:
-                    tmp.unlink()
-                except OSError:
-                    pass
+                    tmp.replace(self.path)
+                    return
+                except PermissionError as exc:
+                    last_exc = exc
+                    time.sleep(0.1 * (attempt + 1))
+            # Fallback: write in place (also guarded — never crash the caller).
+            try:
+                self.path.write_text(payload, encoding="utf-8")
+            except OSError:
+                print(f"  !! could not persist {self.path.name} "
+                      f"({last_exc}); keeping in-memory state")
+            finally:
+                if tmp.exists():
+                    try:
+                        tmp.unlink()
+                    except OSError:
+                        pass
 
     def _read_disk(self) -> dict:
         if not self.path.exists():
