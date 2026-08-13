@@ -176,7 +176,8 @@ def run_enrichment(
     # key or empty balance stops cleanly instead of a burst of 4xx + a partial run.
     if enr.provider == EnrichProvider.apollo and pending:
         _ensure_provider()
-        ok, msg = apollo_client.preflight()
+        ok, msg = apollo_client.preflight(
+            want_phones=(enr.want == EnrichWant.emails_phones))
         print(f"Apollo preflight: {msg}")
         if not ok:
             (out / "enrich_credits.json").write_text(json.dumps(
@@ -256,8 +257,11 @@ def run_enrichment(
     if (enr.provider == EnrichProvider.apollo and enr.want == EnrichWant.emails_phones
             and all_contacts and apollo_client is None):
         _ensure_provider()
+        _ok, _msg = apollo_client.preflight(want_phones=True)
+        print(f"Apollo preflight: {_msg}")
     if (apollo_client is not None and enr.want == EnrichWant.emails_phones
-            and all_contacts and not apollo_client.exhausted):
+            and all_contacts and not apollo_client.exhausted
+            and not apollo_client.dial_exhausted):
         store = PhoneRevealStore(out / "phone_reveals.json")
         fired = fire_reveals(apollo_client, all_contacts, store, max_reveals=max_reveals)
         print(f"Phone reveals fired: {fired} (numbers arrive async ~40 min).")

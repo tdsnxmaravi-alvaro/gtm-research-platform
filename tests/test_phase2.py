@@ -170,29 +170,49 @@ def test_apollo_client_flags_exhausted_on_credit_status():
 
 
 def test_remaining_credits_parser():
-    from gtm.enrichment.apollo.client import _remaining_credits
+    from gtm.enrichment.apollo.client import _remaining_credits, _credit_balances
     assert _remaining_credits({"email_credits_remaining": 42}) == 42
     assert _remaining_credits({"a": {"credits_left": 0}}) == 0
-    assert _remaining_credits({"credits_used": 100}) is None  # not a "remaining" field
-    assert _remaining_credits({"nothing": 1}) is None
+    assert _remaining_credits({"credits_used": 100}) is None
+    # Real credit_usage_stats shape: wrapped under "credit_usage_stats".
+    usage = {"credit_usage_stats": {
+        "lead_credit": {"limit": 4810, "consumed": 2827, "left_over": 1983},
+        "direct_dial_credit": {"limit": 4000, "consumed": 4000, "left_over": 0},
+    }, "current_credit_cycle": {"start_date": "x", "end_date": "y"}}
+    bal = _credit_balances(usage)
+    assert bal["lead_credit"] == 1983
+    assert bal["direct_dial_credit"] == 0
+    # Flat (unwrapped) shape also supported.
+    assert _credit_balances({"lead_credit": {"left_over": 5}})["lead_credit"] == 5
 
 
-def test_preflight_blocks_on_zero_or_bad_key():
+def test_preflight_uses_credit_usage_stats():
     from gtm.enrichment.apollo.client import ApolloClient
+    # Lead credits at 0 -> block emails (exhausted).
     c = ApolloClient(api_key="k")
-    c.get_api_profile = lambda: (200, {"credits_remaining": 0})
-    ok, msg = c.preflight()
+    c.get_credit_usage = lambda: (200, {"lead_credit": {"left_over": 0}})
+    ok, _ = c.preflight()
     assert ok is False and c.exhausted is True
 
+    # Plenty of lead credits -> ok, balance reported.
     c2 = ApolloClient(api_key="k")
-    c2.get_api_profile = lambda: (200, {"credits_remaining": 500})
+    c2.get_credit_usage = lambda: (200, {"lead_credit": {"left_over": 1983}})
     ok, msg = c2.preflight()
-    assert ok is True
+    assert ok is True and "1983" in msg
 
+    # Rejected key -> block.
     c3 = ApolloClient(api_key="k")
-    c3.get_api_profile = lambda: (401, {})
+    c3.get_credit_usage = lambda: (403, {})
     ok, msg = c3.preflight()
     assert ok is False and "rejected" in msg
+
+    # Phone (direct_dial) at 0 does NOT block emails, but flags dial_exhausted so
+    # phones are skipped (direct_dial_credit funds phone reveals, per Apollo docs).
+    c4 = ApolloClient(api_key="k")
+    c4.get_credit_usage = lambda: (200, {"lead_credit": {"left_over": 100},
+                                         "direct_dial_credit": {"left_over": 0}})
+    ok, msg = c4.preflight(want_phones=True)
+    assert ok is True and c4.dial_exhausted is True and "skipped" in msg
 
 
 def test_tunnel_url_parsing_and_publish(tmp_path):

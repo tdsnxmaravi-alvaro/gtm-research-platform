@@ -18,6 +18,7 @@ _ORG_SEARCH_URL = "https://api.apollo.io/api/v1/mixed_companies/search"
 _MATCH_URL = "https://api.apollo.io/api/v1/people/match"
 _WEBHOOK_RESULT_URL = "https://api.apollo.io/api/v1/webhook_result/{request_id}"
 _PROFILE_URL = "https://api.apollo.io/api/v1/users/api_profile"
+_CREDIT_USAGE_URL = "https://api.apollo.io/api/v1/usage_stats/credit_usage_stats"
 
 _TITLE_PRIORITY = [
     (1, ("owner", "founder", "ceo", "president", "principal")),
@@ -62,6 +63,62 @@ def _remaining_credits(profile: dict):
     return best
 
 
+def _find_num(o, must: str, anys: tuple) -> float | None:
+    """First numeric whose key contains `must` and any of `anys` (case-insensitive)."""
+    out = None
+
+    def walk(x) -> None:
+        nonlocal out
+        if out is not None:
+            return
+        if isinstance(x, dict):
+            for k, v in x.items():
+                lk = str(k).lower()
+                if (isinstance(v, (int, float)) and not isinstance(v, bool)
+                        and must in lk and any(w in lk for w in anys)):
+                    out = v
+                    return
+                walk(v)
+        elif isinstance(x, list):
+            for y in x:
+                walk(y)
+
+    walk(o)
+    return out
+
+
+def _credit_balances(usage: dict) -> dict:
+    """Map each Apollo credit type -> remaining, from credit_usage_stats. The real
+    response wraps the types under a "credit_usage_stats" key:
+    {"credit_usage_stats": {"lead_credit": {"limit","consumed","left_over"}, ...}}.
+    lead_credit = emails/enrich, direct_dial_credit = phone reveals."""
+    types = usage.get("credit_usage_stats")
+    if not isinstance(types, dict):
+        types = usage
+    out: dict = {}
+    for k, v in (types or {}).items():
+        if not isinstance(v, dict):
+            continue
+        if "left_over" in v and isinstance(v["left_over"], (int, float)):
+            out[k] = v["left_over"]
+        elif isinstance(v.get("limit"), (int, float)) and isinstance(v.get("consumed"), (int, float)):
+            out[k] = v["limit"] - v["consumed"]
+    return out
+
+
+def _credits_remaining(data: dict) -> float | None:
+    """Credits left from a usage_stats/profile payload. Handles both a direct
+    'remaining/left/available' field and a 'limit - used' pair. None if unknown."""
+    direct = _remaining_credits(data)
+    if direct is not None:
+        return direct
+    limit = _find_num(data, "credit", ("limit", "cap", "total", "quota", "allotted"))
+    used = _find_num(data, "credit", ("used", "consumed", "spent"))
+    if limit is not None and used is not None:
+        return limit - used
+    return None
+
+
 def _published_webhook_url() -> str | None:
     """Fallback to a tunnel-published webhook URL (no manual .env editing)."""
     try:
@@ -95,6 +152,7 @@ class ApolloClient:
         self.credits_used = 0
         self.usage: dict = {}  # any credit/usage headers Apollo returns
         self.exhausted = False  # set when Apollo signals out-of-credits (402/403)
+        self.dial_exhausted = False  # direct_dial (phone-reveal) credits at 0
         if not self.api_key:
             raise ValueError("APOLLO_API_KEY not set (env or constructor).")
 
@@ -134,25 +192,58 @@ class ApolloClient:
         except ValueError:
             return 200, {}
 
-    def preflight(self) -> tuple[bool, str]:
-        """Verify the key is valid and (best-effort) has credits BEFORE spending.
+    def get_credit_usage(self) -> tuple[int, dict]:
+        """GET /usage_stats/credit_usage_stats — real credit balance (best-effort;
+        tries GET then POST since Apollo's method varies)."""
+        for method in ("GET", "POST"):
+            try:
+                resp = requests.request(method, _CREDIT_USAGE_URL,
+                                        headers=self._headers, timeout=self.timeout)
+            except requests.RequestException:
+                return 0, {}
+            if resp.status_code in (404, 405):
+                continue  # wrong method — try the other
+            self._note_status(resp.status_code)
+            if resp.status_code != 200:
+                return resp.status_code, {}
+            try:
+                return 200, resp.json()
+            except ValueError:
+                return 200, {}
+        return 404, {}
 
-        Returns (ok, message). A rejected key (401/403) or a clearly-zero credit
-        balance returns ok=False so the caller can stop before a burst of 4xx.
-        Unknown/transient states don't block.
+    def preflight(self, want_phones: bool = False) -> tuple[bool, str]:
+        """Verify the key + credits via /usage_stats/credit_usage_stats BEFORE spending.
+
+        Per Apollo docs, credit_usage_stats is keyed by type: lead_credit = email
+        reveals/enrich; direct_dial_credit = phone-number reveals (mobile + direct
+        dial); `dialer` = call minutes. Blocks (ok=False) when the key is rejected or
+        LEAD credits are 0. When phones are requested and direct_dial credits are 0,
+        it doesn't block emails but flags `dial_exhausted` so phones are skipped.
         """
-        status, profile = self.get_api_profile()
+        status, usage = self.get_credit_usage()
         if status in (401, 403):
-            return False, f"Apollo key rejected (HTTP {status}) — check APOLLO_API_KEY / permissions."
+            return False, (f"Apollo key rejected (HTTP {status}) — check APOLLO_API_KEY "
+                           f"and the usage_stats scope.")
         if status != 200:
             return True, f"Could not verify credits (HTTP {status}); proceeding."
-        remaining = _remaining_credits(profile)
-        if remaining is not None and remaining <= 0:
+        bal = _credit_balances(usage)
+        lead = bal.get("lead_credit")
+        dial = bal.get("direct_dial_credit")
+        if lead is not None and lead <= 0:
             self.exhausted = True
-            return False, "Apollo reports 0 credits remaining — top up before enriching."
-        if remaining is not None:
-            return True, f"Apollo credits remaining: {remaining}"
-        return True, "Apollo key valid (credit balance not reported)."
+            return False, "Apollo lead credits exhausted (0 left) — top up before enriching emails."
+        parts = []
+        if lead is not None:
+            parts.append(f"lead(email):{lead}")
+        if dial is not None:
+            parts.append(f"direct_dial(phone):{dial}")
+        warn = ""
+        if want_phones and dial is not None and dial <= 0:
+            self.dial_exhausted = True
+            warn = " · WARNING: 0 phone-reveal credits (direct_dial) — phones will be skipped."
+        head = ("Apollo credits — " + ", ".join(parts)) if parts else "Apollo key valid"
+        return True, head + warn
 
     # ---------------------------------------------------------------- search
     def search_people_by_domain(self, domain: str, per_page: int = 10) -> tuple[list, int]:
