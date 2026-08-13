@@ -221,6 +221,27 @@ class ProviderCatalogTests(APITestCase):
         self.assertFalse(ProviderSetting.objects.filter(name="gpt-next").exists())
 
 
+class PhoneDeliveryTests(APITestCase):
+    def test_falls_back_to_polling_without_cloudflared(self):
+        from unittest.mock import patch
+        import api.phone_delivery as pd
+        pd._SERVICES.clear()
+        with patch.object(pd, "cloudflared_available", return_value=False):
+            status = pd.ensure_phone_delivery("t-nocf", "/tmp/ph.json")
+        self.assertEqual(status["mode"], "polling")
+        self.assertIsNone(status["url"])
+
+    def test_ensure_is_idempotent(self):
+        from unittest.mock import patch
+        import api.phone_delivery as pd
+        pd._SERVICES.clear()
+        with patch.object(pd, "cloudflared_available", return_value=False):
+            a = pd.ensure_phone_delivery("t-idem", "/tmp/ph.json")
+            b = pd.ensure_phone_delivery("t-idem", "/tmp/ph.json")
+        self.assertEqual(a, b)
+        self.assertEqual(len(pd._SERVICES), 1)
+
+
 
 
 

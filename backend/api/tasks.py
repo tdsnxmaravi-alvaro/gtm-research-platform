@@ -108,6 +108,7 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str,
     run.status = "running"
     run.save(update_fields=["status"])
     out_dir = _out_dir(name)
+    exhausted = False  # Apollo out-of-credits -> pause the run (resumable)
 
     def _progress(done: int, total: int) -> None:
         Run.objects.filter(pk=run_id).update(processed=done, total=total)
@@ -130,12 +131,20 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str,
         elif stage == "enrich":
             from gtm.enrichment import run_enrichment
             from gtm.consolidate import build_master
+            enr = config.enrichment
+            # Phones need Apollo's async webhook. Auto-manage the receiver+tunnel so
+            # non-technical users do nothing; fall back to polling if unavailable.
+            delivery = None
+            if (enr.provider.value == "apollo"
+                    and enr.want.value == "emails+phones"):
+                from .phone_delivery import ensure_phone_delivery
+                delivery = ensure_phone_delivery(name, out_dir / "phone_reveals.json")
             contacts = run_enrichment(config, out_dir=out_dir,
-                                      should_cancel=_should_cancel, progress_cb=_progress)
+                                      should_cancel=_should_cancel, progress_cb=_progress,
+                                      use_webhook=bool(delivery and delivery["mode"] == "webhook"))
             count = len(contacts)
             emails = sum(1 for c in contacts if getattr(c, "email", ""))
             phones = sum(1 for c in contacts if getattr(c, "direct_phone", ""))
-            enr = config.enrichment
             if enr.provider.value == "apollo":
                 real = None
                 try:
@@ -152,6 +161,13 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str,
                                f"— ~{est} Apollo credits (est.)")
             else:
                 summary = f"{count} contacts ({emails} emails, {phones} phones) — LARA (no credits)"
+            if delivery:
+                summary += f" · phone delivery: {delivery['mode']}"
+            try:
+                exhausted = bool(json.loads((out_dir / "enrich_credits.json")
+                                 .read_text(encoding="utf-8")).get("exhausted"))
+            except (OSError, ValueError):
+                exhausted = False
             # Refresh the master with the new contacts (join onto the shortlist).
             build_master(config, out_dir=out_dir, min_tier=config.outreach.min_tier)
         elif stage == "consolidate":
@@ -175,6 +191,9 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str,
             run.status = "paused" if cancel_mode(name) == "pause" else "canceled"
             verb = "Paused" if run.status == "paused" else "Stopped"
             run.message = f"{verb} — {summary}"
+        elif exhausted:
+            run.status = "paused"
+            run.message = f"Paused — out of Apollo credits. Top up, then Start to resume. {summary}"
         else:
             run.status = "done"
             run.message = summary
@@ -225,6 +244,6 @@ def run_pipeline(campaign_id: int, fresh: bool = False) -> None:
         run = Run.objects.create(campaign=campaign, stage=stage, status="pending")
         run_stage(run.id, cfg, stage, name, fresh=fresh)
         run.refresh_from_db()
-        if run.status in ("error", "canceled"):
+        if run.status in ("error", "canceled", "paused"):
             break
     close_old_connections()

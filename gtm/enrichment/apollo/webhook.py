@@ -139,6 +139,20 @@ def make_handler(store: PhoneRevealStore, webhook_path: str):
     return WebhookHandler
 
 
+def serve_webhook_bg(store_path: str | Path, *, host: str = "127.0.0.1",
+                     port: int = 8000, path: str = "/apollo-webhook"):
+    """Start the receiver in a daemon thread and return the server (non-blocking).
+
+    Used by the backend to keep a persistent receiver up (it must outlive the enrich
+    stage so Apollo's async callbacks — ~40 min later — still land in the store).
+    """
+    store = PhoneRevealStore(store_path)
+    handler = make_handler(store, path)
+    server = ThreadingHTTPServer((host, port), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
 def run_webhook_server(store_path: str | Path, *, host: str = "0.0.0.0",
                        port: int = 8000, path: str = "/apollo-webhook",
                        tunnel: bool = False) -> None:
