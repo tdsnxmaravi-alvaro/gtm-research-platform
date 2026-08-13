@@ -242,6 +242,18 @@ class PhoneDeliveryTests(APITestCase):
         self.assertEqual(len(pd._SERVICES), 1)
 
 
+class ApolloCreditsEndpointTests(APITestCase):
+    def test_reports_not_configured_without_key(self):
+        import os
+        from unittest.mock import patch
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("APOLLO_API_KEY", None)
+            with patch("dotenv.load_dotenv", lambda *a, **k: None):
+                resp = self.client.get("/api/campaigns/apollo_credits/")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertFalse(resp.json()["configured"])
+
+
 
 
 

@@ -20,6 +20,7 @@ export default function Settings() {
   const [busy, setBusy] = useState(null);
   const [form, setForm] = useState(null); // null | {…provider} (add or edit)
   const [saving, setSaving] = useState(false);
+  const [apollo, setApollo] = useState(null); // Apollo enrichment credit capacity
 
   async function load() {
     try {
@@ -31,6 +32,7 @@ export default function Settings() {
   }
   useEffect(() => {
     load();
+    api.apolloCredits().then(setApollo).catch(() => setApollo({ configured: false }));
   }, []);
 
   async function patch(p, body) {
@@ -87,6 +89,34 @@ export default function Settings() {
   return (
     <div className="list">
       {error && <p className="error">{error}</p>}
+      <div className="card">
+        <h3>Contact enrichment — Apollo</h3>
+        {!apollo ? (
+          <p className="hint">Checking Apollo…</p>
+        ) : !apollo.configured ? (
+          <p className="hint">
+            Apollo not configured. Set <code>APOLLO_API_KEY</code> in <code>.env</code> to
+            enrich contacts (emails + phones).
+          </p>
+        ) : apollo.ok === false ? (
+          <p className="warn">Apollo key set but unavailable: {apollo.error}</p>
+        ) : apollo.remaining == null ? (
+          <p className="ok">Apollo configured (credit balance not reported).</p>
+        ) : (
+          <>
+            <p className="status">
+              <b>{apollo.remaining.toLocaleString()}</b> shared credits left — enough for
+              about <b>{apollo.emails.toLocaleString()}</b> emails <i>or</i>{" "}
+              <b>{apollo.phones.toLocaleString()}</b> phone reveals (mix as you like:
+              email = 1 credit, phone = 8).
+            </p>
+            <p className="hint">
+              One shared pool funds emails, phone reveals, and enrichment.
+              {apollo.cycle_end ? ` Resets ${new Date(apollo.cycle_end).toLocaleDateString()}.` : ""}
+            </p>
+          </>
+        )}
+      </div>
       <div className="card">
         <div className="row" style={{ alignItems: "center" }}>
           <h3>Research providers</h3>

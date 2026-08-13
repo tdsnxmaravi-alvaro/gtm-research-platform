@@ -79,4 +79,5 @@ export const api = {
   createProvider: (body) =>
     req("/providers/", { method: "POST", body: JSON.stringify(body) }),
   deleteProvider: (id) => req(`/providers/${id}/`, { method: "DELETE" }),
+  apolloCredits: () => req("/campaigns/apollo_credits/"),
 };

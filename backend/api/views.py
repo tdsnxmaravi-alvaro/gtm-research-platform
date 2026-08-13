@@ -150,6 +150,25 @@ class CampaignViewSet(viewsets.ModelViewSet):
         from gtm.config.schema import DATECH_COUNTRIES
         return Response({"regions": DATECH_COUNTRIES})
 
+    @action(detail=False, methods=["get"])
+    def apollo_credits(self, request):
+        """Apollo credit capacity (if configured): remaining shared-pool credits and
+        how many emails/phones that buys. Powers the UI capacity indicator."""
+        import os
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            pass
+        if not os.getenv("APOLLO_API_KEY"):
+            return Response({"configured": False})
+        try:
+            from gtm.enrichment.apollo import ApolloClient
+            summary = ApolloClient().credit_summary()
+        except Exception as exc:  # noqa: BLE001
+            return Response({"configured": True, "ok": False, "error": str(exc)[:200]})
+        return Response({"configured": True, **summary})
+
     @action(detail=False, methods=["post"])
     def outreach_preview(self, request):
         """Render the outreach email HTML (vendor branded template + sample body in

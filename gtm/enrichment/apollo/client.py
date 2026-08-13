@@ -20,6 +20,10 @@ _WEBHOOK_RESULT_URL = "https://api.apollo.io/api/v1/webhook_result/{request_id}"
 _PROFILE_URL = "https://api.apollo.io/api/v1/users/api_profile"
 _CREDIT_USAGE_URL = "https://api.apollo.io/api/v1/usage_stats/credit_usage_stats"
 
+# Apollo credit costs (per docs): email reveal = 1, mobile phone reveal = 8.
+EMAIL_CREDIT_COST = 1
+PHONE_CREDIT_COST = 8
+
 _TITLE_PRIORITY = [
     (1, ("owner", "founder", "ceo", "president", "principal")),
     (2, ("vp", "vice president", "general manager", "managing director")),
@@ -152,7 +156,6 @@ class ApolloClient:
         self.credits_used = 0
         self.usage: dict = {}  # any credit/usage headers Apollo returns
         self.exhausted = False  # set when Apollo signals out-of-credits (402/403)
-        self.dial_exhausted = False  # direct_dial (phone-reveal) credits at 0
         if not self.api_key:
             raise ValueError("APOLLO_API_KEY not set (env or constructor).")
 
@@ -212,14 +215,14 @@ class ApolloClient:
                 return 200, {}
         return 404, {}
 
-    def preflight(self, want_phones: bool = False) -> tuple[bool, str]:
+    def preflight(self) -> tuple[bool, str]:
         """Verify the key + credits via /usage_stats/credit_usage_stats BEFORE spending.
 
-        Per Apollo docs, credit_usage_stats is keyed by type: lead_credit = email
-        reveals/enrich; direct_dial_credit = phone-number reveals (mobile + direct
-        dial); `dialer` = call minutes. Blocks (ok=False) when the key is rejected or
-        LEAD credits are 0. When phones are requested and direct_dial credits are 0,
-        it doesn't block emails but flags `dial_exhausted` so phones are skipped.
+        Most Apollo plans are UNIFIED: one shared credit pool (reported as
+        `lead_credit`) funds emails (1 credit), phone reveals (~8), and enrich — the
+        per-type buckets like `direct_dial_credit` are misleading on such plans, so we
+        do NOT gate phones on them. Blocks only when the key is rejected or the shared
+        pool is 0. Phone spend beyond the pool is still caught in-flight (402/403).
         """
         status, usage = self.get_credit_usage()
         if status in (401, 403):
@@ -227,23 +230,34 @@ class ApolloClient:
                            f"and the usage_stats scope.")
         if status != 200:
             return True, f"Could not verify credits (HTTP {status}); proceeding."
-        bal = _credit_balances(usage)
-        lead = bal.get("lead_credit")
-        dial = bal.get("direct_dial_credit")
-        if lead is not None and lead <= 0:
+        pool = _credit_balances(usage).get("lead_credit")
+        if pool is not None and pool <= 0:
             self.exhausted = True
-            return False, "Apollo lead credits exhausted (0 left) — top up before enriching emails."
-        parts = []
-        if lead is not None:
-            parts.append(f"lead(email):{lead}")
-        if dial is not None:
-            parts.append(f"direct_dial(phone):{dial}")
-        warn = ""
-        if want_phones and dial is not None and dial <= 0:
-            self.dial_exhausted = True
-            warn = " · WARNING: 0 phone-reveal credits (direct_dial) — phones will be skipped."
-        head = ("Apollo credits — " + ", ".join(parts)) if parts else "Apollo key valid"
-        return True, head + warn
+            return False, "Apollo credits exhausted (0 left) — top up before enriching."
+        if pool is not None:
+            return True, (f"Apollo credits: {pool} remaining "
+                          f"(~{int(pool)} emails or ~{int(pool // PHONE_CREDIT_COST)} phones)")
+        return True, "Apollo key valid (credit balance not reported)."
+
+    def credit_summary(self) -> dict:
+        """Remaining shared-pool credits + how many emails/phones that buys. Used by
+        the UI to show capacity when Apollo is configured. 0 credits/reveal costs."""
+        status, usage = self.get_credit_usage()
+        if status in (401, 403):
+            return {"ok": False, "error": f"key rejected (HTTP {status})"}
+        if status != 200:
+            return {"ok": False, "error": f"unavailable (HTTP {status})"}
+        pool = _credit_balances(usage).get("lead_credit")
+        cycle = usage.get("current_credit_cycle") or {} if isinstance(usage, dict) else {}
+        if pool is None:
+            return {"ok": True, "remaining": None}
+        return {
+            "ok": True,
+            "remaining": int(pool),
+            "emails": int(pool // EMAIL_CREDIT_COST),
+            "phones": int(pool // PHONE_CREDIT_COST),
+            "cycle_end": cycle.get("end_date"),
+        }
 
     # ---------------------------------------------------------------- search
     def search_people_by_domain(self, domain: str, per_page: int = 10) -> tuple[list, int]:

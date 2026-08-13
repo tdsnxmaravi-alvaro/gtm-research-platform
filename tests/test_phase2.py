@@ -188,15 +188,16 @@ def test_remaining_credits_parser():
 
 def test_preflight_uses_credit_usage_stats():
     from gtm.enrichment.apollo.client import ApolloClient
-    # Lead credits at 0 -> block emails (exhausted).
+    wrap = lambda d: {"credit_usage_stats": d}
+    # Shared pool (lead_credit) at 0 -> block (exhausted).
     c = ApolloClient(api_key="k")
-    c.get_credit_usage = lambda: (200, {"lead_credit": {"left_over": 0}})
+    c.get_credit_usage = lambda: (200, wrap({"lead_credit": {"left_over": 0}}))
     ok, _ = c.preflight()
     assert ok is False and c.exhausted is True
 
-    # Plenty of lead credits -> ok, balance reported.
+    # Pool with credits -> ok, reports remaining + email/phone capacity.
     c2 = ApolloClient(api_key="k")
-    c2.get_credit_usage = lambda: (200, {"lead_credit": {"left_over": 1983}})
+    c2.get_credit_usage = lambda: (200, wrap({"lead_credit": {"left_over": 1983}}))
     ok, msg = c2.preflight()
     assert ok is True and "1983" in msg
 
@@ -206,13 +207,24 @@ def test_preflight_uses_credit_usage_stats():
     ok, msg = c3.preflight()
     assert ok is False and "rejected" in msg
 
-    # Phone (direct_dial) at 0 does NOT block emails, but flags dial_exhausted so
-    # phones are skipped (direct_dial_credit funds phone reveals, per Apollo docs).
+    # direct_dial=0 must NOT skip phones on a unified plan (shared pool funds them).
     c4 = ApolloClient(api_key="k")
-    c4.get_credit_usage = lambda: (200, {"lead_credit": {"left_over": 100},
-                                         "direct_dial_credit": {"left_over": 0}})
-    ok, msg = c4.preflight(want_phones=True)
-    assert ok is True and c4.dial_exhausted is True and "skipped" in msg
+    c4.get_credit_usage = lambda: (200, wrap({"lead_credit": {"left_over": 100},
+                                              "direct_dial_credit": {"left_over": 0}}))
+    ok, _ = c4.preflight()
+    assert ok is True
+
+
+def test_credit_summary_estimates_emails_and_phones():
+    from gtm.enrichment.apollo.client import ApolloClient
+    c = ApolloClient(api_key="k")
+    c.get_credit_usage = lambda: (200, {"credit_usage_stats": {
+        "lead_credit": {"left_over": 1983}},
+        "current_credit_cycle": {"end_date": "2026-09-01"}})
+    s = c.credit_summary()
+    assert s["ok"] and s["remaining"] == 1983
+    assert s["emails"] == 1983 and s["phones"] == 247  # 1983 // 8
+    assert s["cycle_end"] == "2026-09-01"
 
 
 def test_tunnel_url_parsing_and_publish(tmp_path):
