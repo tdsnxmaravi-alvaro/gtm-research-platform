@@ -16,6 +16,17 @@ ALLOWED_LIST_EXT = (".csv", ".xlsx", ".xlsm")
 ALLOWED_IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp")
 
 
+def _run_bg(fn, *args, **kwargs) -> None:
+    """Run a pipeline/stage in a background thread so the HTTP request returns
+    immediately (the frontend polls for progress). Runs synchronously under the
+    test runner so assertions stay deterministic."""
+    if getattr(settings, "TESTING", False):
+        fn(*args, **kwargs)
+    else:
+        import threading
+        threading.Thread(target=fn, args=args, kwargs=kwargs, daemon=True).start()
+
+
 def _out_dir(name: str) -> Path:
     return Path(settings.GTM_DATA_ROOT) / name
 
@@ -331,18 +342,8 @@ class CampaignViewSet(viewsets.ModelViewSet):
     def _start(self, campaign, stage) -> Run:
         run = Run.objects.create(campaign=campaign, stage=stage, status="pending")
         clear_cancel(campaign.name)
-        # In local dev (no broker) run in a background thread so the request returns
-        # immediately and progress is pollable; otherwise dispatch to the broker
-        # (and, under the test runner, run eagerly/synchronously).
-        if getattr(settings, "RUN_STAGES_IN_THREAD", False):
-            import threading
-            threading.Thread(
-                target=run_stage,
-                args=(run.id, campaign.config, stage, campaign.name),
-                daemon=True,
-            ).start()
-        else:
-            run_stage.delay(run.id, campaign.config, stage, campaign.name)
+        # Background thread (or synchronous under tests) — no broker required.
+        _run_bg(run_stage, run.id, campaign.config, stage, campaign.name)
         return run
 
     @action(detail=True, methods=["post"])
@@ -350,11 +351,7 @@ class CampaignViewSet(viewsets.ModelViewSet):
         """Run the whole pipeline (research -> consolidate -> enrich -> outreach)
         phase by phase, stopping on error or when stopped. Resumable."""
         campaign = self.get_object()
-        if getattr(settings, "RUN_STAGES_IN_THREAD", False):
-            import threading
-            threading.Thread(target=run_pipeline, args=(campaign.id,), daemon=True).start()
-        else:
-            run_pipeline(campaign.id)
+        _run_bg(run_pipeline, campaign.id)
         return Response({"started": True}, status=status.HTTP_202_ACCEPTED)
 
     @action(detail=True, methods=["get"])
@@ -421,12 +418,7 @@ class CampaignViewSet(viewsets.ModelViewSet):
         rebuilt). Shared caches are kept so Apollo is never re-charged for a company
         already enriched. Guarded by the client-side confirmation modal."""
         campaign = self.get_object()
-        if getattr(settings, "RUN_STAGES_IN_THREAD", False):
-            import threading
-            threading.Thread(target=run_pipeline, args=(campaign.id,),
-                             kwargs={"fresh": True}, daemon=True).start()
-        else:
-            run_pipeline(campaign.id, fresh=True)
+        _run_bg(run_pipeline, campaign.id, fresh=True)
         return Response({"relaunched": True}, status=status.HTTP_202_ACCEPTED)
 
     @action(detail=True, methods=["post"])
