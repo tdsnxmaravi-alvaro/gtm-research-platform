@@ -21,6 +21,35 @@ from .client import ApolloClient
 from ..models import EnrichedContact
 
 
+# Status precedence so a merge never downgrades a resolved reveal.
+_STATUS_RANK = {"done": 3, "no_number": 2, "pending": 1, "error": 0, "": 0}
+
+
+def _merge_entry(a: dict, b: dict) -> dict:
+    """Merge two records for the same apollo_id: keep the more-advanced status and
+    union the phone numbers (so concurrent writers never lose a delivered number)."""
+    hi, lo = (a, b) if _STATUS_RANK.get(a.get("status", ""), 0) >= \
+        _STATUS_RANK.get(b.get("status", ""), 0) else (b, a)
+    merged = dict(lo)
+    merged.update(hi)  # advanced-status fields win
+    phones: list[str] = []
+    for src in (a, b):
+        for p in (src.get("phones") or []):
+            if p and p not in phones:
+                phones.append(p)
+    if phones:
+        merged["phones"] = phones
+    return merged
+
+
+def _merge_stores(disk: dict, mem: dict) -> dict:
+    """Union two store dicts by apollo_id, merging conflicting entries."""
+    out = dict(disk)
+    for k, v in mem.items():
+        out[k] = _merge_entry(disk[k], v) if k in disk else v
+    return out
+
+
 class PhoneRevealStore:
     """Resumable per-apollo_id phone-reveal state, persisted atomically."""
 
@@ -43,6 +72,10 @@ class PhoneRevealStore:
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        # Cross-process safe: merge with whatever is on disk before writing, so a
+        # concurrent writer (e.g. the webhook receiver persisting a delivered
+        # number while fire_reveals is still firing) is never clobbered.
+        self.data = _merge_stores(self._read_disk(), self.data)
         tmp = self.path.with_suffix(f".{time.time_ns()}.tmp")
         tmp.write_text(json.dumps(self.data, indent=2, ensure_ascii=False),
                        encoding="utf-8")
@@ -63,6 +96,14 @@ class PhoneRevealStore:
                     tmp.unlink()
                 except OSError:
                     pass
+
+    def _read_disk(self) -> dict:
+        if not self.path.exists():
+            return {}
+        try:
+            return json.loads(self.path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {}
 
     def is_attempted(self, apollo_id: str) -> bool:
         return apollo_id in self.data

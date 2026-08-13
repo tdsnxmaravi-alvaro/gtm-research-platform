@@ -144,6 +144,28 @@ def test_fire_reveals_respects_max_reveals(tmp_path, monkeypatch):
     assert len(store.data) == 3
 
 
+def test_store_save_merges_concurrent_writers(tmp_path):
+    """Two processes writing the same store must not clobber each other: a webhook
+    marking a reveal 'done' survives a later fire_reveals save from another process."""
+    path = tmp_path / "ph.json"
+    # Writer A (e.g. runner) fires p1 -> pending.
+    a = PhoneRevealStore(path)
+    a.data["p1"] = {"status": "pending", "request_id": "r1", "phones": []}
+    a.save()
+    # Writer B (e.g. webhook receiver) reloads, marks p1 done with a number.
+    b = PhoneRevealStore(path)
+    b.data["p1"] = {"status": "done", "phones": ["+34123"]}
+    b.save()
+    # Writer A, still holding a STALE in-memory p1 (pending), now fires p2 and saves.
+    a.data["p2"] = {"status": "pending", "request_id": "r2", "phones": []}
+    a.save()
+    # The delivered number must survive; p2 must be added.
+    final = PhoneRevealStore(path)
+    assert final.status_for("p1") == "done"
+    assert final.phones_for("p1") == ["+34123"]
+    assert final.is_attempted("p2")
+
+
 # --- LARA enrichment agent ------------------------------------------------ #
 def test_lara_parse_contacts():
     text = '```json\n{"contacts":[{"contact_name":"Ana","title":"CEO",' \
