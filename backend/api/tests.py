@@ -37,6 +37,22 @@ class CampaignApiTests(APITestCase):
         resp = self.client.get(f"/api/campaigns/{cid}/results/")
         self.assertEqual(resp.json()["count"], 0)
 
+    def test_stop_marks_running_run_canceled(self):
+        campaign = Campaign.objects.create(name="t-stop", config=VALID_CONFIG)
+        run = Run.objects.create(campaign=campaign, stage="research", status="running")
+        resp = self.client.post(f"/api/campaigns/{campaign.id}/stop/")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        run.refresh_from_db()
+        self.assertEqual(run.status, "canceled")
+
+    def test_pause_marks_running_run_paused(self):
+        campaign = Campaign.objects.create(name="t-pause", config=VALID_CONFIG)
+        run = Run.objects.create(campaign=campaign, stage="enrich", status="running")
+        resp = self.client.post(f"/api/campaigns/{campaign.id}/pause/")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        run.refresh_from_db()
+        self.assertEqual(run.status, "paused")
+
     def test_invalid_config_rejected(self):
         bad = dict(VALID_CONFIG)
         bad["mode"] = "provided"

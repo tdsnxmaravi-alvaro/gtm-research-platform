@@ -104,8 +104,21 @@ export default function Campaigns({ onEdit }) {
       setError(String(e.message || e));
     }
   }
-  const pause = (id) => api.pause(id).catch((e) => setError(String(e.message || e)));
-  const stop = (id) => api.stop(id).catch((e) => setError(String(e.message || e)));
+  const pause = (id) => stopOrPause(id, api.pause);
+  const stop = (id) => stopOrPause(id, api.stop);
+
+  async function stopOrPause(id, fn) {
+    try {
+      await fn(id);
+      // Refresh so the button flips to Resume even without an active poll (e.g. the
+      // worker already died and the run was left 'running').
+      const run = await api.campaignStatus(id);
+      setRuns((r) => ({ ...r, [id]: run }));
+      refreshStages(id);
+    } catch (e) {
+      setError(String(e.message || e));
+    }
+  }
 
   async function startStage(id, stage) {
     try {

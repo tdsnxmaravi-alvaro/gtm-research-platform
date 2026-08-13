@@ -427,6 +427,7 @@ class CampaignViewSet(viewsets.ModelViewSet):
         a later Start resumes (never re-charges cached companies)."""
         campaign = self.get_object()
         request_cancel(campaign.name, mode="stop")
+        self._mark_latest_run(campaign, "canceled")
         return Response({"stopping": True})
 
     @action(detail=True, methods=["post"])
@@ -435,7 +436,21 @@ class CampaignViewSet(viewsets.ModelViewSet):
         running low on Apollo credits). Start resumes from where it left off."""
         campaign = self.get_object()
         request_cancel(campaign.name, mode="pause")
+        self._mark_latest_run(campaign, "paused")
         return Response({"pausing": True})
+
+    @staticmethod
+    def _mark_latest_run(campaign, new_status: str) -> None:
+        """Flip the latest in-flight run to canceled/paused so the UI updates even if
+        the worker thread already died (e.g. after a server restart left it 'running').
+        A live worker converges to the same status on its next cancel check."""
+        run = campaign.runs.exclude(
+            status__in=["done", "error", "canceled", "paused"]).first()
+        if run:
+            verb = "Paused" if new_status == "paused" else "Stopped"
+            run.status = new_status
+            run.message = f"{verb} by user — {run.message or run.stage}"
+            run.save(update_fields=["status", "message"])
 
     @action(detail=True, methods=["get"])
     def status(self, request, pk=None):
