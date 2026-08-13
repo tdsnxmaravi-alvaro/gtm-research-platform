@@ -109,6 +109,7 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str,
     run.save(update_fields=["status"])
     out_dir = _out_dir(name)
     exhausted = False  # Apollo out-of-credits -> pause the run (resumable)
+    exhausted_reason = ""
 
     def _progress(done: int, total: int) -> None:
         Run.objects.filter(pk=run_id).update(processed=done, total=total)
@@ -164,8 +165,10 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str,
             if delivery:
                 summary += f" · phone delivery: {delivery['mode']}"
             try:
-                exhausted = bool(json.loads((out_dir / "enrich_credits.json")
-                                 .read_text(encoding="utf-8")).get("exhausted"))
+                _cred = json.loads((out_dir / "enrich_credits.json")
+                                   .read_text(encoding="utf-8"))
+                exhausted = bool(_cred.get("exhausted"))
+                exhausted_reason = _cred.get("preflight") or ""
             except (OSError, ValueError):
                 exhausted = False
             # Refresh the master with the new contacts (join onto the shortlist).
@@ -193,7 +196,8 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str,
             run.message = f"{verb} — {summary}"
         elif exhausted:
             run.status = "paused"
-            run.message = f"Paused — out of Apollo credits. Top up, then Start to resume. {summary}"
+            detail = exhausted_reason or "out of Apollo credits"
+            run.message = f"Paused — {detail} Start again to resume. {summary}"
         else:
             run.status = "done"
             run.message = summary

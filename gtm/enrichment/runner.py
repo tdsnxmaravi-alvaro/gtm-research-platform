@@ -172,6 +172,19 @@ def run_enrichment(
         if lara_provider is None:
             lara_provider = build_lara_enrichment_provider()
 
+    # Pre-flight: verify the Apollo key + credits BEFORE spending, so an invalid
+    # key or empty balance stops cleanly instead of a burst of 4xx + a partial run.
+    if enr.provider == EnrichProvider.apollo and pending:
+        _ensure_provider()
+        ok, msg = apollo_client.preflight()
+        print(f"Apollo preflight: {msg}")
+        if not ok:
+            (out / "enrich_credits.json").write_text(json.dumps(
+                {"apollo_credits": 0, "exhausted": True, "preflight": msg,
+                 "updated": datetime.now().isoformat()},
+                ensure_ascii=False, indent=2), encoding="utf-8")
+            return all_contacts
+
     for _i, r in enumerate(pending, 1):
         if should_cancel and should_cancel():
             print("  canceled — stopping enrichment (state saved)")

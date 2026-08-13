@@ -83,6 +83,14 @@ def cmd_webhook(args):
     run_webhook_server(store_path, port=args.port, path=args.path, tunnel=args.tunnel)
 
 
+def cmd_apollo_profile(args):
+    """Check the Apollo key + credit balance without spending (uses api_profile)."""
+    from .enrichment.apollo import ApolloClient
+    ok, msg = ApolloClient().preflight()
+    print(("OK — " if ok else "BLOCKED — ") + msg)
+    raise SystemExit(0 if ok else 1)
+
+
 def cmd_consolidate(args):
     c = load_campaign(args.config)
     build_master(c, min_tier=args.min_tier)
@@ -200,6 +208,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="Auto-open a cloudflared tunnel + set APOLLO_WEBHOOK_URL "
                          "(one command, no manual .env editing)")
     wh.set_defaults(func=cmd_webhook)
+
+    ap = sub.add_parser("apollo-profile",
+                        help="Check the Apollo key + credit balance (no spend)")
+    ap.set_defaults(func=cmd_apollo_profile)
 
     ins = sub.add_parser("inspect", help="Pre-flight a provided list (columns + data quality)")
     ins.add_argument("target", help="A list file (.csv/.xlsx) or a campaign .yaml")

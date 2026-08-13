@@ -17,6 +17,7 @@ _SEARCH_URL = "https://api.apollo.io/api/v1/mixed_people/api_search"
 _ORG_SEARCH_URL = "https://api.apollo.io/api/v1/mixed_companies/search"
 _MATCH_URL = "https://api.apollo.io/api/v1/people/match"
 _WEBHOOK_RESULT_URL = "https://api.apollo.io/api/v1/webhook_result/{request_id}"
+_PROFILE_URL = "https://api.apollo.io/api/v1/users/api_profile"
 
 _TITLE_PRIORITY = [
     (1, ("owner", "founder", "ceo", "president", "principal")),
@@ -36,6 +37,29 @@ def title_priority(title: str) -> int:
         if any(kw in low for kw in keywords):
             return priority
     return 50
+
+
+def _remaining_credits(profile: dict):
+    """Best-effort: pull a 'credits remaining/available' number from a variably
+    shaped api_profile payload. Returns None when no such field is found."""
+    best = None
+
+    def walk(o) -> None:
+        nonlocal best
+        if isinstance(o, dict):
+            for k, v in o.items():
+                lk = str(k).lower()
+                if (isinstance(v, (int, float)) and not isinstance(v, bool)
+                        and "credit" in lk
+                        and any(w in lk for w in ("remain", "left", "available", "balance"))):
+                    best = v if best is None else min(best, v)
+                walk(v)
+        elif isinstance(o, list):
+            for x in o:
+                walk(x)
+
+    walk(profile)
+    return best
 
 
 def _published_webhook_url() -> str | None:
@@ -93,6 +117,42 @@ class ApolloClient:
     @property
     def _headers(self) -> dict:
         return {"Content-Type": "application/json", "X-Api-Key": self.api_key}
+
+    # -------------------------------------------------------------- preflight
+    def get_api_profile(self) -> tuple[int, dict]:
+        """GET /users/api_profile — used to verify the key + read the credit balance."""
+        try:
+            resp = requests.get(_PROFILE_URL, headers={"X-Api-Key": self.api_key},
+                                timeout=self.timeout)
+        except requests.RequestException:
+            return 0, {}
+        self._note_status(resp.status_code)
+        if resp.status_code != 200:
+            return resp.status_code, {}
+        try:
+            return 200, resp.json()
+        except ValueError:
+            return 200, {}
+
+    def preflight(self) -> tuple[bool, str]:
+        """Verify the key is valid and (best-effort) has credits BEFORE spending.
+
+        Returns (ok, message). A rejected key (401/403) or a clearly-zero credit
+        balance returns ok=False so the caller can stop before a burst of 4xx.
+        Unknown/transient states don't block.
+        """
+        status, profile = self.get_api_profile()
+        if status in (401, 403):
+            return False, f"Apollo key rejected (HTTP {status}) — check APOLLO_API_KEY / permissions."
+        if status != 200:
+            return True, f"Could not verify credits (HTTP {status}); proceeding."
+        remaining = _remaining_credits(profile)
+        if remaining is not None and remaining <= 0:
+            self.exhausted = True
+            return False, "Apollo reports 0 credits remaining — top up before enriching."
+        if remaining is not None:
+            return True, f"Apollo credits remaining: {remaining}"
+        return True, "Apollo key valid (credit balance not reported)."
 
     # ---------------------------------------------------------------- search
     def search_people_by_domain(self, domain: str, per_page: int = 10) -> tuple[list, int]:

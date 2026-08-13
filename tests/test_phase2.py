@@ -169,6 +169,32 @@ def test_apollo_client_flags_exhausted_on_credit_status():
     assert c.exhausted is True
 
 
+def test_remaining_credits_parser():
+    from gtm.enrichment.apollo.client import _remaining_credits
+    assert _remaining_credits({"email_credits_remaining": 42}) == 42
+    assert _remaining_credits({"a": {"credits_left": 0}}) == 0
+    assert _remaining_credits({"credits_used": 100}) is None  # not a "remaining" field
+    assert _remaining_credits({"nothing": 1}) is None
+
+
+def test_preflight_blocks_on_zero_or_bad_key():
+    from gtm.enrichment.apollo.client import ApolloClient
+    c = ApolloClient(api_key="k")
+    c.get_api_profile = lambda: (200, {"credits_remaining": 0})
+    ok, msg = c.preflight()
+    assert ok is False and c.exhausted is True
+
+    c2 = ApolloClient(api_key="k")
+    c2.get_api_profile = lambda: (200, {"credits_remaining": 500})
+    ok, msg = c2.preflight()
+    assert ok is True
+
+    c3 = ApolloClient(api_key="k")
+    c3.get_api_profile = lambda: (401, {})
+    ok, msg = c3.preflight()
+    assert ok is False and "rejected" in msg
+
+
 def test_tunnel_url_parsing_and_publish(tmp_path):
     from gtm.enrichment.apollo.tunnel import (
         parse_tunnel_url, publish_webhook_url, read_webhook_url,
