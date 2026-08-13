@@ -228,7 +228,12 @@ def run_enrichment(
         write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
                        columns=CONTACT_COLS)
 
-    # Phone reveals (Apollo only, when requested).
+    # Phone reveals (Apollo only, when requested). Ensure the Apollo client exists
+    # even when nothing was pending (e.g. resuming phone reveals for contacts whose
+    # emails were already enriched) so reveals can still fire/poll.
+    if (enr.provider == EnrichProvider.apollo and enr.want == EnrichWant.emails_phones
+            and all_contacts and apollo_client is None):
+        _ensure_provider()
     if (apollo_client is not None and enr.want == EnrichWant.emails_phones
             and all_contacts):
         store = PhoneRevealStore(out / "phone_reveals.json")
