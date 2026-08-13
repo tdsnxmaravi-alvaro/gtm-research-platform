@@ -70,8 +70,15 @@ class ApolloClient:
         # Real credit accounting, tallied per billable Apollo action performed.
         self.credits_used = 0
         self.usage: dict = {}  # any credit/usage headers Apollo returns
+        self.exhausted = False  # set when Apollo signals out-of-credits (402/403)
         if not self.api_key:
             raise ValueError("APOLLO_API_KEY not set (env or constructor).")
+
+    def _note_status(self, status: int) -> None:
+        """Flag credit/auth exhaustion so callers can stop resumably (not burn the
+        remaining companies by marking them done with no contacts)."""
+        if status in (401, 402, 403):
+            self.exhausted = True
 
     def _capture_usage(self, resp) -> None:
         """Record any credit/usage info Apollo returns in response headers."""
@@ -102,6 +109,7 @@ class ApolloClient:
         resp = requests.post(_SEARCH_URL, headers=self._headers,
                              json=payload, timeout=self.timeout)
         if resp.status_code != 200:
+            self._note_status(resp.status_code)
             return [], 0
         data = resp.json()
         total = (data.get("pagination") or {}).get("total_entries", 0)
@@ -116,6 +124,7 @@ class ApolloClient:
             resp = requests.post(_ORG_SEARCH_URL, headers=self._headers,
                                  json=payload, timeout=self.timeout)
             if resp.status_code != 200:
+                self._note_status(resp.status_code)
                 return None
             self.credits_used += 1  # org search = 1 credit
             self._capture_usage(resp)
@@ -141,6 +150,7 @@ class ApolloClient:
         except requests.RequestException:
             return None
         if resp.status_code != 200:
+            self._note_status(resp.status_code)
             return None
         self._capture_usage(resp)
         person = resp.json().get("person")
@@ -167,6 +177,8 @@ class ApolloClient:
         if resp.status_code == 200:
             self.credits_used += 8  # phone reveal = ~8 credits
             self._capture_usage(resp)
+        else:
+            self._note_status(resp.status_code)
         request_id = ""
         try:
             request_id = ((resp.json().get("phone_enrichment") or {})

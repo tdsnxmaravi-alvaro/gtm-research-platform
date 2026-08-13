@@ -144,6 +144,31 @@ def test_fire_reveals_respects_max_reveals(tmp_path, monkeypatch):
     assert len(store.data) == 3
 
 
+def test_fire_reveals_out_of_credits_is_resumable(tmp_path, monkeypatch):
+    """A 402 (out of credits) must NOT mark the contact attempted, so the reveal
+    retries after a top-up instead of being silently skipped forever."""
+    monkeypatch.setattr("gtm.enrichment.apollo.phones.time.sleep", lambda *_: None)
+
+    class _NoCredits:
+        def fire_phone_reveal(self, pid):
+            return 402, ""
+
+    contacts = [EnrichedContact(company="A", apollo_id="p1")]
+    store = PhoneRevealStore(tmp_path / "ph.json")
+    assert fire_reveals(_NoCredits(), contacts, store) == 0
+    assert not store.is_attempted("p1")  # retryable after credits are topped up
+
+
+def test_apollo_client_flags_exhausted_on_credit_status():
+    from gtm.enrichment.apollo.client import ApolloClient
+    c = ApolloClient(api_key="k")
+    assert c.exhausted is False
+    c._note_status(404)
+    assert c.exhausted is False
+    c._note_status(402)
+    assert c.exhausted is True
+
+
 def test_tunnel_url_parsing_and_publish(tmp_path):
     from gtm.enrichment.apollo.tunnel import (
         parse_tunnel_url, publish_webhook_url, read_webhook_url,

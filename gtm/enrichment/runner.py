@@ -210,6 +210,15 @@ def run_enrichment(
             print(f"  !! enrich error for {company}: {exc}")
             continue
 
+        # Out of Apollo credits: STOP without marking this company done, so a later
+        # Start resumes and re-enriches it once credits are topped up (otherwise the
+        # remaining companies would be silently marked done with no contacts).
+        if (enr.provider == EnrichProvider.apollo and apollo_client is not None
+                and apollo_client.exhausted):
+            print(f"  !! Apollo out of credits — stopping before '{company}'. "
+                  f"Top up, then Start again to resume (nothing lost).")
+            break
+
         all_contacts = _drop_company(all_contacts, company)
         if got:
             all_contacts.extend(got)
@@ -235,7 +244,7 @@ def run_enrichment(
             and all_contacts and apollo_client is None):
         _ensure_provider()
     if (apollo_client is not None and enr.want == EnrichWant.emails_phones
-            and all_contacts):
+            and all_contacts and not apollo_client.exhausted):
         store = PhoneRevealStore(out / "phone_reveals.json")
         fired = fire_reveals(apollo_client, all_contacts, store, max_reveals=max_reveals)
         print(f"Phone reveals fired: {fired} (numbers arrive async ~40 min).")
@@ -272,6 +281,8 @@ def run_enrichment(
         (out / "enrich_credits.json").write_text(
             json.dumps({"apollo_credits": credits, "usage": usage,
                         "cache_hits": cache_hits,
+                        "exhausted": bool(apollo_client is not None
+                                          and apollo_client.exhausted),
                         "updated": datetime.now().isoformat()},
                        ensure_ascii=False, indent=2),
             encoding="utf-8")

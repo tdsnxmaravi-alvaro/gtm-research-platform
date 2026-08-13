@@ -153,6 +153,11 @@ def fire_reveals(
                                         "fired_at": _now()}
             store.save()
             continue
+        if status in (401, 402, 403):
+            # Credit/auth failure: do NOT mark attempted, so the reveal retries
+            # after credits are topped up. Stop this pass (resumable).
+            print("  !! Apollo credit/auth error on phone reveal — stopping (resumable).")
+            break
         store.data[c.apollo_id] = {
             "status": "pending" if status == 200 else "error",
             "request_id": request_id,
@@ -166,7 +171,7 @@ def fire_reveals(
         store.save()
         if status == 200:
             fired += 1
-        if status in (401, 403):
+        if status == 429:  # rate limited — resumable, stop this pass
             break
         time.sleep(delay)
     store.save()
