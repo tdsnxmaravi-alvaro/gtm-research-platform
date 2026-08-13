@@ -38,6 +38,15 @@ def title_priority(title: str) -> int:
     return 50
 
 
+def _published_webhook_url() -> str | None:
+    """Fallback to a tunnel-published webhook URL (no manual .env editing)."""
+    try:
+        from .tunnel import read_webhook_url
+        return read_webhook_url()
+    except Exception:  # noqa: BLE001 - best effort
+        return None
+
+
 class ApolloClient:
     """Thin wrapper over the Apollo endpoints used by the enrichment pipeline."""
 
@@ -51,7 +60,8 @@ class ApolloClient:
         timeout: int = 60,
     ):
         self.api_key = api_key or os.getenv("APOLLO_API_KEY")
-        self.webhook_url = webhook_url or os.getenv("APOLLO_WEBHOOK_URL")
+        self.webhook_url = (webhook_url or os.getenv("APOLLO_WEBHOOK_URL")
+                            or _published_webhook_url())
         self.seniorities = seniorities or [
             "owner", "founder", "c_suite", "vp", "head", "director", "manager",
         ]

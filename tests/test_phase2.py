@@ -144,6 +144,34 @@ def test_fire_reveals_respects_max_reveals(tmp_path, monkeypatch):
     assert len(store.data) == 3
 
 
+def test_tunnel_url_parsing_and_publish(tmp_path):
+    from gtm.enrichment.apollo.tunnel import (
+        parse_tunnel_url, publish_webhook_url, read_webhook_url,
+    )
+    banner = ("2026-08-13T15:34:43Z INF |  Your quick Tunnel has been created! ...  |\n"
+              "2026-08-13T15:34:43Z INF |  https://represents-strictly-frank-mart."
+              "trycloudflare.com                       |\n")
+    url = parse_tunnel_url(banner)
+    assert url == "https://represents-strictly-frank-mart.trycloudflare.com"
+    assert parse_tunnel_url("no url here") is None
+    f = tmp_path / "webhook_url.txt"
+    full = publish_webhook_url(url, "/apollo-webhook", file=f)
+    assert full.endswith("/apollo-webhook")
+    assert read_webhook_url(file=f) == full
+
+
+def test_apollo_client_reads_published_webhook_url(tmp_path, monkeypatch):
+    monkeypatch.setenv("APOLLO_API_KEY", "k")
+    monkeypatch.delenv("APOLLO_WEBHOOK_URL", raising=False)
+    import gtm.enrichment.apollo.tunnel as tun
+    f = tmp_path / "webhook_url.txt"
+    f.write_text("https://x.trycloudflare.com/apollo-webhook", encoding="utf-8")
+    monkeypatch.setattr(tun, "WEBHOOK_URL_FILE", f)
+    from gtm.enrichment.apollo.client import ApolloClient
+    client = ApolloClient()
+    assert client.webhook_url == "https://x.trycloudflare.com/apollo-webhook"
+
+
 def test_store_save_merges_concurrent_writers(tmp_path):
     """Two processes writing the same store must not clobber each other: a webhook
     marking a reveal 'done' survives a later fire_reveals save from another process."""

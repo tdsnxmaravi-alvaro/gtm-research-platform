@@ -140,18 +140,49 @@ def make_handler(store: PhoneRevealStore, webhook_path: str):
 
 
 def run_webhook_server(store_path: str | Path, *, host: str = "0.0.0.0",
-                       port: int = 8000, path: str = "/apollo-webhook") -> None:
-    """Start the blocking webhook receiver, writing into `store_path`."""
+                       port: int = 8000, path: str = "/apollo-webhook",
+                       tunnel: bool = False) -> None:
+    """Start the blocking webhook receiver, writing into `store_path`.
+
+    When `tunnel=True`, also open a cloudflared quick tunnel, auto-set
+    APOLLO_WEBHOOK_URL, and publish the public URL to a file the enrich runner
+    reads — so a non-technical operator runs ONE command with no .env editing.
+    """
+    import os
+
     store = PhoneRevealStore(store_path)
     handler = make_handler(store, path)
     server = ThreadingHTTPServer((host, port), handler)
     print(f"Apollo webhook listening on http://{host}:{port}{path}")
     print(f"Store: {Path(store_path)}")
-    print("Expose with:  cloudflared tunnel --url http://localhost:%d" % port)
-    print("Then set APOLLO_WEBHOOK_URL=https://<tunnel-host>%s" % path)
+
+    tunnel_proc = None
+    if tunnel:
+        from .tunnel import open_quick_tunnel, publish_webhook_url, cloudflared_available
+        if not cloudflared_available():
+            print("cloudflared not found — install it or set APOLLO_WEBHOOK_URL "
+                  "manually; the runner will fall back to polling.")
+        else:
+            print("Opening cloudflared tunnel…")
+            tunnel_proc, url = open_quick_tunnel(port)
+            if url:
+                full = publish_webhook_url(url, path)
+                os.environ["APOLLO_WEBHOOK_URL"] = full
+                print(f"Public webhook URL: {full}  (auto-set APOLLO_WEBHOOK_URL)")
+            else:
+                print("Tunnel URL not detected — runner will fall back to polling.")
+    else:
+        print("Expose with:  cloudflared tunnel --url http://localhost:%d" % port)
+        print("Then set APOLLO_WEBHOOK_URL=https://<tunnel-host>%s" % path)
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nStopping webhook receiver.")
     finally:
         server.server_close()
+        if tunnel_proc is not None:
+            try:
+                tunnel_proc.terminate()
+            except OSError:
+                pass

@@ -80,7 +80,7 @@ def cmd_enrich(args):
 def cmd_webhook(args):
     c = load_campaign(args.config)
     store_path = Path("campaigns") / c.name / "phone_reveals.json"
-    run_webhook_server(store_path, port=args.port, path=args.path)
+    run_webhook_server(store_path, port=args.port, path=args.path, tunnel=args.tunnel)
 
 
 def cmd_consolidate(args):
@@ -196,6 +196,9 @@ def build_parser() -> argparse.ArgumentParser:
     wh.add_argument("config")
     wh.add_argument("--port", type=int, default=8000)
     wh.add_argument("--path", default="/apollo-webhook")
+    wh.add_argument("--tunnel", action="store_true",
+                    help="Auto-open a cloudflared tunnel + set APOLLO_WEBHOOK_URL "
+                         "(one command, no manual .env editing)")
     wh.set_defaults(func=cmd_webhook)
 
     ins = sub.add_parser("inspect", help="Pre-flight a provided list (columns + data quality)")
