@@ -108,6 +108,42 @@ def test_phone_reveal_flow(tmp_path, monkeypatch):
     assert fire_reveals(client, contacts, store) == 0
 
 
+def test_fire_reveals_persists_after_each_fire(tmp_path, monkeypatch):
+    """Crash safety: each fired reveal hits disk before the next, so a mid-run
+    crash can never re-charge an already-fired apollo_id on resume."""
+    monkeypatch.setattr("gtm.enrichment.apollo.phones.time.sleep", lambda *_: None)
+
+    class _CrashAfterFirst:
+        def __init__(self):
+            self.calls = 0
+
+        def fire_phone_reveal(self, pid):
+            self.calls += 1
+            if self.calls >= 2:
+                raise RuntimeError("network down")
+            return 200, f"req-{pid}"
+
+    contacts = [EnrichedContact(company="A", apollo_id="p1"),
+                EnrichedContact(company="B", apollo_id="p2")]
+    path = tmp_path / "ph.json"
+    store = PhoneRevealStore(path)
+    fire_reveals(_CrashAfterFirst(), contacts, store)
+    # A fresh store reading the SAME file sees p1 persisted (survives a crash).
+    reloaded = PhoneRevealStore(path)
+    assert reloaded.status_for("p1") == "pending"
+    assert reloaded.is_attempted("p1")
+    # p2 (the failed one) is recorded too, so it isn't blindly re-fired.
+    assert reloaded.is_attempted("p2")
+
+
+def test_fire_reveals_respects_max_reveals(tmp_path, monkeypatch):
+    monkeypatch.setattr("gtm.enrichment.apollo.phones.time.sleep", lambda *_: None)
+    contacts = [EnrichedContact(company=f"C{i}", apollo_id=f"p{i}") for i in range(5)]
+    store = PhoneRevealStore(tmp_path / "ph.json")
+    assert fire_reveals(_FakePhoneApollo(), contacts, store, max_reveals=3) == 3
+    assert len(store.data) == 3
+
+
 # --- LARA enrichment agent ------------------------------------------------ #
 def test_lara_parse_contacts():
     text = '```json\n{"contacts":[{"contact_name":"Ana","title":"CEO",' \

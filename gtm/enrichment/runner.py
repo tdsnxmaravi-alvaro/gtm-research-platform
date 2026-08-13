@@ -65,6 +65,7 @@ def run_enrichment(
     poll_interval: int = 600,
     use_webhook: bool = False,
     use_cache: bool = True,
+    max_reveals: int | None = None,
     out_dir: str | Path | None = None,
     min_tier: str | None = None,
     should_cancel=None,
@@ -231,7 +232,7 @@ def run_enrichment(
     if (apollo_client is not None and enr.want == EnrichWant.emails_phones
             and all_contacts):
         store = PhoneRevealStore(out / "phone_reveals.json")
-        fired = fire_reveals(apollo_client, all_contacts, store)
+        fired = fire_reveals(apollo_client, all_contacts, store, max_reveals=max_reveals)
         print(f"Phone reveals fired: {fired} (numbers arrive async ~40 min).")
         start = time.time()
         if use_webhook:

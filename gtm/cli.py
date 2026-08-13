@@ -73,7 +73,8 @@ def cmd_enrich(args):
     run_enrichment(c, limit=args.limit, delay=args.delay,
                    resume=not args.no_resume,
                    poll_wait=args.poll_wait, poll_interval=args.poll_interval,
-                   use_webhook=args.webhook, use_cache=not args.no_cache)
+                   use_webhook=args.webhook, use_cache=not args.no_cache,
+                   max_reveals=args.max_reveals)
 
 
 def cmd_webhook(args):
@@ -187,6 +188,8 @@ def build_parser() -> argparse.ArgumentParser:
     en.add_argument("--webhook", action="store_true",
                     help="Use a live webhook (run `gtm webhook` + cloudflared) "
                          "instead of polling for phone reveals")
+    en.add_argument("--max-reveals", type=int, default=None,
+                    help="Cap how many phone reveals to fire (bounds Apollo spend)")
     en.set_defaults(func=cmd_enrich)
 
     wh = sub.add_parser("webhook", help="Run the Apollo phone-reveal webhook receiver")

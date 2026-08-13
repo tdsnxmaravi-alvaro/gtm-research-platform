@@ -102,12 +102,15 @@ def fire_reveals(
         targets = targets[:max_reveals]
 
     fired = 0
-    for i, c in enumerate(targets, 1):
+    for c in targets:
         try:
             status, request_id = client.fire_phone_reveal(c.apollo_id)
         except Exception as exc:  # noqa: BLE001 - record & continue
+            # Persist the failed attempt immediately: an ambiguous network error
+            # may have reached (and charged) Apollo, so we never blindly re-fire.
             store.data[c.apollo_id] = {"status": "error", "error": str(exc),
                                         "fired_at": _now()}
+            store.save()
             continue
         store.data[c.apollo_id] = {
             "status": "pending" if status == 200 else "error",
@@ -118,10 +121,10 @@ def fire_reveals(
             "phones": [],
             "fired_at": _now(),
         }
+        # Save BEFORE the next fire so a crash can never re-charge this apollo_id.
+        store.save()
         if status == 200:
             fired += 1
-        if i % 25 == 0:
-            store.save()
         if status in (401, 403):
             break
         time.sleep(delay)
