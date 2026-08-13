@@ -177,5 +177,28 @@ class RelaunchTests(APITestCase):
         self.assertEqual(data["apollo_reused_companies"], 1)
 
 
+class ProviderCatalogTests(APITestCase):
+    def test_seeded_providers_listed(self):
+        resp = self.client.get("/api/providers/")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        names = {p["name"] for p in (resp.json().get("results") or resp.json())}
+        self.assertIn("lara", names)
+        self.assertIn("azure-sol", names)
+
+    def test_toggle_enabled_and_exclusive_default(self):
+        from api.models import ProviderSetting
+        azure = ProviderSetting.objects.get(name="azure-sol")
+        # Enable + make default -> lara must lose the default flag.
+        resp = self.client.patch(f"/api/providers/{azure.id}/",
+                                 {"enabled": True, "is_default_research": True},
+                                 format="json")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        azure.refresh_from_db()
+        self.assertTrue(azure.enabled)
+        self.assertTrue(azure.is_default_research)
+        self.assertFalse(ProviderSetting.objects.get(name="lara").is_default_research)
+
+
+
 
 

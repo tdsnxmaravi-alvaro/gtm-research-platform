@@ -73,4 +73,7 @@ export const api = {
   campaignRuns: (id) => req(`/campaigns/${id}/runs/`),
   results: (id) => req(`/campaigns/${id}/results/`),
   getRun: (id) => req(`/runs/${id}/`),
+  listProviders: () => req("/providers/"),
+  updateProvider: (id, patch) =>
+    req(`/providers/${id}/`, { method: "PATCH", body: JSON.stringify(patch) }),
 };

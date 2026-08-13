@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import Wizard from "./Wizard.jsx";
 import Campaigns from "./Campaigns.jsx";
+import Settings from "./Settings.jsx";
 import logoWhite from "./assets/datech-logo-white.png";
 
 export default function App() {
@@ -27,6 +28,9 @@ export default function App() {
           <button className={tab === "list" ? "on" : ""} onClick={() => setTab("list")}>
             Campaigns
           </button>
+          <button className={tab === "settings" ? "on" : ""} onClick={() => setTab("settings")}>
+            Settings
+          </button>
         </nav>
       </header>
       <main>
@@ -40,6 +44,8 @@ export default function App() {
               setTab("list");
             }}
           />
+        ) : tab === "settings" ? (
+          <Settings />
         ) : (
           <Campaigns
             onEdit={(c) => {

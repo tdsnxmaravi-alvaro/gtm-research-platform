@@ -272,6 +272,56 @@ def test_ensemble_run_batch_averages_across_providers(tmp_path):
     providers = [_Prov("lara", 80), _Prov("azure-sol", 60)]
     out = _run_batch(c, providers, "prompt", tmp_path, "batch1", passes=1, delay=0)
     assert len(out) == 1
-    assert out[0]["score"] == 70  # mean(80, 60)
+    # mean(80, 60) = 70, +5 agreement bonus (2 providers found it) -> 75
+    assert out[0]["score"] == 75
     assert out[0]["passes"] == 2
+    assert out[0]["ensemble_agreement"] == 2
+    assert out[0]["ensemble_singleton"] is False
+
+
+def test_ensemble_singleton_is_flagged_and_penalized(tmp_path):
+    from gtm.research.runner import _run_batch
+
+    class _Prov:
+        def __init__(self, name, company, score):
+            self.name = name
+            self._c = company
+            self._s = score
+
+        def send(self, prompt, web_search=None):
+            class R:
+                text = ('{"results":[{"company":"%s","website":"x.es","score":%d,'
+                        '"tier":"B","evidence":[{"claim":"x","url":"https://x.es"}]}]}'
+                        % (self._c, self._s))
+            return R()
+
+    c = _cfg()
+    # Each provider surfaces a DIFFERENT company -> both are singletons.
+    providers = [_Prov("lara", "Acme", 80), _Prov("azure-sol", "Globex", 80)]
+    out = _run_batch(c, providers, "prompt", tmp_path, "batch1", passes=1, delay=0)
+    by = {r["company"].lower(): r for r in out}
+    assert by["acme"]["ensemble_agreement"] == 1
+    assert by["acme"]["ensemble_singleton"] is True
+    assert by["acme"]["score"] == 75  # 80 - 5 singleton penalty
+    assert by["globex"]["ensemble_singleton"] is True
+
+
+def test_azure_foundry_parses_responses_payload():
+    from gtm.providers.azure_foundry import _extract_text, _annotation_urls
+
+    payload = {
+        "output": [
+            {"type": "web_search_call"},
+            {"type": "message", "content": [
+                {"type": "output_text", "text": "Acme sells CAD.",
+                 "annotations": [{"url": "https://acme.example/about"}]},
+            ]},
+        ]
+    }
+    assert _extract_text(payload) == "Acme sells CAD."
+    assert _annotation_urls(payload) == ["https://acme.example/about"]
+    # SDK convenience field wins when present.
+    assert _extract_text({"output_text": "hi", "output": []}) == "hi"
+
+
 

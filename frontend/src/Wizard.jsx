@@ -32,6 +32,12 @@ function hydrate(cfg) {
     verticals: (cfg.verticals || []).map((v) => v.slug).filter(Boolean),
     provided_list_path: cfg.provided_list_path || "",
     colMap,
+    providers:
+      cfg.research_providers && cfg.research_providers.length
+        ? cfg.research_providers
+        : cfg.research_provider
+        ? [cfg.research_provider]
+        : [],
     value_prop: p0.value_prop || "",
     fit_criteria: (p0.fit_criteria || []).join("\n"),
     search_prompt: p0.search_prompt || "",
@@ -64,6 +70,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
   const [dims, setDims] = useState({ universal: [], specific: [] });
   const [vtree, setVtree] = useState(null);
   const [ctree, setCtree] = useState(null);
+  const [provCatalog, setProvCatalog] = useState([]);
   const [previewVertical, setPreviewVertical] = useState("");
   const [emailPreview, setEmailPreview] = useState({ html: "", source: "", loading: false });
   const [f, setF] = useState(() =>
@@ -79,6 +86,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
           verticals: [],
           provided_list_path: "",
           colMap: { company: "", website: "", country: "" },
+          providers: [],
           value_prop: "",
           fit_criteria: "",
           search_prompt: "",
@@ -112,6 +120,13 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
       verticals: prev.verticals.includes(slug)
         ? prev.verticals.filter((x) => x !== slug)
         : [...prev.verticals, slug],
+    }));
+  const toggleProvider = (name) =>
+    setF((prev) => ({
+      ...prev,
+      providers: prev.providers.includes(name)
+        ? prev.providers.filter((x) => x !== name)
+        : [...prev.providers, name],
     }));
   const toggleCountry = (c) =>
     setF((prev) => ({
@@ -325,6 +340,25 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
     if (f.mode === "provided" && Object.keys(overrides).length)
       cfg.provided_column_overrides = overrides;
     if (f.mode === "provided" && f.limit > 0) cfg.process_limit = f.limit;
+    // Research providers: declare the selected catalog entries, pick the primary,
+    // and enable the ensemble when >1 is chosen.
+    const chosen = f.providers
+      .map((n) => provCatalog.find((p) => p.name === n))
+      .filter(Boolean);
+    if (chosen.length) {
+      cfg.llm_providers = chosen.map((p) => ({
+        name: p.name,
+        type: p.type,
+        web_search: p.web_search,
+        ...(p.model ? { model: p.model } : {}),
+        ...(p.api_key_env ? { api_key_env: p.api_key_env } : {}),
+        ...(p.endpoint_env ? { endpoint_env: p.endpoint_env } : {}),
+        ...(p.assistant_id_env ? { assistant_id_env: p.assistant_id_env } : {}),
+      }));
+      const primary = chosen.find((p) => p.is_default_research) || chosen[0];
+      cfg.research_provider = primary.name;
+      if (chosen.length > 1) cfg.research_providers = chosen.map((p) => p.name);
+    }
     return cfg;
   }
 
@@ -367,6 +401,25 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
     setPreviewVertical(slug);
     regeneratePrompt(slug);
   };
+
+  // Load the enabled research-provider catalog once; default-select the primary
+  // provider when the campaign hasn't chosen any yet.
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await api.listProviders();
+        const enabled = (data.results || data).filter((p) => p.enabled);
+        setProvCatalog(enabled);
+        setF((prev) => {
+          if (prev.providers.length) return prev;
+          const def = enabled.find((p) => p.is_default_research) || enabled[0];
+          return def ? { ...prev, providers: [def.name] } : prev;
+        });
+      } catch {
+        /* ignore — providers section just won't render */
+      }
+    })();
+  }, []);
 
   // Auto-fill the research prompt the first time the user reaches the Prompt step.
   // Seeds the value prop / fit criteria from the vendor preset when still empty.
@@ -635,6 +688,28 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
             <li>Requires a source URL for every claim — without evidence a company can’t exceed the capped tier.</li>
             <li>Edit the prompt directly, or tweak the value prop / fit criteria below and regenerate.</li>
           </ul>
+          {provCatalog.length > 0 && (
+            <div className="field">
+              <span className="lbl">Research models</span>
+              <div className="checks">
+                {provCatalog.map((p) => (
+                  <label className="chk" key={p.name}>
+                    <input
+                      type="checkbox"
+                      checked={f.providers.includes(p.name)}
+                      onChange={() => toggleProvider(p.name)}
+                    />
+                    <span>{p.label || p.name}{p.web_search ? "" : " (no web search)"}</span>
+                  </label>
+                ))}
+              </div>
+              <small className="hint">
+                {f.providers.length > 1
+                  ? `Ensemble: ${f.providers.length} models run research; scores are averaged and companies found by several models get a confidence boost.`
+                  : "Pick one model, or select several to run an ensemble. Manage the catalog in Settings."}
+              </small>
+            </div>
+          )}
           {(dims.universal.length > 0 || dims.specific.length > 0) && (
             <div className="criteria">
               <div className="crit-group">

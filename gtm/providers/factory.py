@@ -8,6 +8,7 @@ from ..config.schema import LLMProvider, ProviderType
 from .base import BaseProvider
 from .lara import LaraProvider
 from .azure_openai import AzureOpenAIProvider
+from .azure_foundry import AzureFoundryProvider
 from .manual import ManualProvider
 
 
@@ -53,5 +54,16 @@ def build_provider(cfg: LLMProvider, load_env: bool = True) -> BaseProvider:
             raise ValueError(f"Azure provider '{cfg.name}' missing env values: {missing}")
         return AzureOpenAIProvider(cfg.name, endpoint, api_key, deployment,
                                    api_version=api_version, web_search=cfg.web_search)
+
+    if cfg.type == ProviderType.azure_foundry:
+        endpoint = _env(cfg.endpoint_env, "AZURE_FOUNDRY_ENDPOINT")
+        api_key = _env(cfg.api_key_env, "AZURE_FOUNDRY_API_KEY")
+        deployment = cfg.model or os.getenv("AZURE_FOUNDRY_DEPLOYMENT")
+        missing = [k for k, v in (("endpoint", endpoint), ("api_key", api_key),
+                                  ("deployment", deployment)) if not v]
+        if missing:
+            raise ValueError(f"Azure Foundry provider '{cfg.name}' missing env values: {missing}")
+        return AzureFoundryProvider(cfg.name, endpoint, api_key, deployment,
+                                    web_search=cfg.web_search)
 
     raise ValueError(f"Unknown provider type: {cfg.type}")

@@ -84,6 +84,8 @@ td.tier.tB { color: var(--teal); }
 td.tier.tC { color: #9a6a00; }
 td.tier.tD { color: #8a8f98; }
 .hint { font-weight: 400; color: #6b7280; font-size: 12px; }
+.ok { color: #1e7e34; font-weight: 600; font-size: 12px; }
+.warn { color: #9a6a00; font-weight: 600; font-size: 12px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field .lbl { font-size: 13px; font-weight: 600; }
 .segmented { display: flex; gap: 8px; flex-wrap: wrap; }

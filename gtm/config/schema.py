@@ -47,6 +47,7 @@ class EnrichWant(str, Enum):
 class ProviderType(str, Enum):
     lara = "lara"
     azure_openai = "azure_openai"
+    azure_foundry = "azure_foundry"
     manual = "manual"
 
 

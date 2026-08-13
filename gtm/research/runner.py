@@ -29,8 +29,15 @@ OUT_COLS = [
     "independence",
     "final_tier", "tier", "score",
     "tier_capped", "tier_cap_reason", "fit_summary", "recommended_products",
-    "evidence_count", "has_verified_url", "evidence_urls", "notes", "passes", "evidence",
+    "evidence_count", "has_verified_url", "evidence_urls", "notes", "passes",
+    "ensemble_agreement", "ensemble_singleton", "evidence",
 ]
+
+# Ensemble agreement-confidence (only applied when >1 provider runs research):
+# a company independently surfaced by multiple providers is more trustworthy.
+_AGREEMENT_BONUS = 5        # points per extra agreeing provider
+_AGREEMENT_BONUS_CAP = 15   # max total boost
+_SINGLETON_PENALTY = 5      # points off when only one provider found the company
 
 # Context columns carried from the provided list into the results (for the master).
 _EMP_KEYS = ("number of employees", "employees", "company size", "size")
@@ -99,12 +106,17 @@ def _log(logs: Path, tag: str, prompt: str, response: str) -> None:
     )
 
 
-def _aggregate_passes(parsed_lists: list[list[dict]]) -> list[dict]:
+def _aggregate_passes(parsed_lists: list[list[dict]], n_providers: int = 1) -> list[dict]:
     """Average scores across N passes per company to reduce run-to-run variance.
 
     Groups parsed rows by company, averages the (deterministic) score, unions the
     evidence URLs, and keeps the pass whose score is closest to the mean as the
     representative row (fit_summary/notes/recommended_products).
+
+    In an ENSEMBLE (n_providers > 1), also applies agreement-confidence: a company
+    independently surfaced by >=2 distinct providers gets a score bonus; one found
+    by a single provider is flagged and lightly penalized. Adjusted rows clear the
+    letter `tier` so it is re-derived from the adjusted score by score_results.
     """
     from statistics import mean
 
@@ -139,6 +151,17 @@ def _aggregate_passes(parsed_lists: list[list[dict]]) -> list[dict]:
         merged["evidence_count"] = len(urls)
         merged["has_verified_url"] = bool(urls)
         merged["passes"] = len(rs)
+        if n_providers > 1:
+            found_by = {r.get("_provider") for r in rs if r.get("_provider")}
+            agreement = len(found_by)
+            merged["ensemble_agreement"] = agreement
+            merged["ensemble_singleton"] = agreement < 2
+            if agreement >= 2:
+                bonus = min(_AGREEMENT_BONUS * (agreement - 1), _AGREEMENT_BONUS_CAP)
+                merged["score"] = min(100, avg + bonus)
+            else:
+                merged["score"] = max(0, avg - _SINGLETON_PENALTY)
+            merged["tier"] = ""  # re-derive from the confidence-adjusted score
         out.append(merged)
     return out
 
@@ -148,7 +171,8 @@ def _run_batch(config, providers, prompt: str, logs: Path, tag: str,
     """Call each provider `passes` times, aggregate across the ensemble, and score.
 
     `providers` may be a single provider or a list (ensemble): scores are averaged
-    across all provider x pass responses per company.
+    across all provider x pass responses per company, and companies independently
+    surfaced by >=2 providers get an agreement-confidence boost.
     """
     if not isinstance(providers, (list, tuple)):
         providers = [providers]
@@ -163,11 +187,17 @@ def _run_batch(config, providers, prompt: str, logs: Path, tag: str,
                 continue
             multi = len(providers) > 1 or passes > 1
             _log(logs, f"{tag}_{pname}_pass{p+1}" if multi else tag, prompt, resp.text)
-            parsed_lists.append(parse_results(resp.text))
+            rows = parse_results(resp.text)
+            for r in rows:
+                r["_provider"] = pname          # who surfaced this company (agreement)
+            parsed_lists.append(rows)
             time.sleep(delay)
     if not parsed_lists:
         return []
-    parsed = _aggregate_passes(parsed_lists) if len(parsed_lists) > 1 else parsed_lists[0]
+    parsed = (_aggregate_passes(parsed_lists, n_providers=len(providers))
+              if len(parsed_lists) > 1 else parsed_lists[0])
+    for r in parsed:
+        r.pop("_provider", None)
     return score_results(config, parsed)
 
 

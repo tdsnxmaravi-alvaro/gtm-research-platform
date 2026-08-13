@@ -7,8 +7,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import Campaign, Run
-from .serializers import CampaignSerializer, RunSerializer
+from .models import Campaign, Run, ProviderSetting
+from .serializers import CampaignSerializer, RunSerializer, ProviderSettingSerializer
 from .tasks import run_stage, run_pipeline, request_cancel, clear_cancel
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB cap for provided lists
@@ -514,3 +514,19 @@ class CampaignViewSet(viewsets.ModelViewSet):
 class RunViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Run.objects.all()
     serializer_class = RunSerializer
+
+
+class ProviderSettingViewSet(viewsets.ModelViewSet):
+    """Global catalog of research LLM providers (Settings page + wizard source).
+
+    Toggling `enabled`/`is_default_research` is a PATCH. Secrets stay in env vars;
+    the serializer only reports whether they're configured.
+    """
+    queryset = ProviderSetting.objects.all()
+    serializer_class = ProviderSettingSerializer
+
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        # Exactly one default research provider.
+        if obj.is_default_research:
+            ProviderSetting.objects.exclude(pk=obj.pk).update(is_default_research=False)

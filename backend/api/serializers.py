@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Campaign, Run
+from .models import Campaign, Run, ProviderSetting
 
 
 class RunSerializer(serializers.ModelSerializer):
@@ -33,3 +33,46 @@ class CampaignSerializer(serializers.ModelSerializer):
         except ValidationError as exc:
             raise serializers.ValidationError(exc.errors())
         return value
+
+
+_DEFAULT_KEY_ENV = {
+    "lara": "LARA_RESEARCH_API_KEY",
+    "azure_openai": "AZURE_OPENAI_API_KEY",
+    "azure_foundry": "AZURE_FOUNDRY_API_KEY",
+}
+_DEFAULT_ENDPOINT_ENV = {
+    "azure_openai": "AZURE_OPENAI_ENDPOINT",
+    "azure_foundry": "AZURE_FOUNDRY_ENDPOINT",
+}
+
+
+class ProviderSettingSerializer(serializers.ModelSerializer):
+    """Catalog entry. `configured` reports (without exposing secrets) whether the
+    referenced env vars are set, so the UI can warn when a key is missing."""
+
+    configured = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProviderSetting
+        fields = ["id", "name", "label", "type", "model", "web_search", "enabled",
+                  "is_default_research", "api_key_env", "endpoint_env",
+                  "assistant_id_env", "configured"]
+        read_only_fields = ["id", "configured"]
+
+    def get_configured(self, obj) -> bool:
+        import os
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            pass
+        if obj.type == "manual":
+            return True
+        key_env = obj.api_key_env or _DEFAULT_KEY_ENV.get(obj.type, "")
+        if key_env and not os.getenv(key_env):
+            return False
+        if obj.type in ("azure_openai", "azure_foundry"):
+            ep = obj.endpoint_env or _DEFAULT_ENDPOINT_ENV.get(obj.type, "")
+            if ep and not os.getenv(ep):
+                return False
+        return True

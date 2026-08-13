@@ -38,3 +38,32 @@ class Run(models.Model):
 
     def __str__(self):
         return f"{self.campaign.name}:{self.stage}:{self.status}"
+
+
+class ProviderSetting(models.Model):
+    """A selectable research LLM provider (global catalog).
+
+    Secrets are NEVER stored here — only the ENV VAR NAMES that hold them. The
+    catalog is what the wizard offers per campaign and what Settings toggles on/off.
+    """
+
+    TYPE = [(t, t) for t in ("lara", "azure_openai", "azure_foundry", "manual")]
+
+    name = models.SlugField(max_length=60, unique=True)  # config provider `name`
+    label = models.CharField(max_length=120, blank=True, default="")
+    type = models.CharField(max_length=20, choices=TYPE)
+    model = models.CharField(max_length=120, blank=True, default="")  # deployment
+    web_search = models.BooleanField(default=False)
+    enabled = models.BooleanField(default=True)          # available for use
+    is_default_research = models.BooleanField(default=False)
+    api_key_env = models.CharField(max_length=80, blank=True, default="")
+    endpoint_env = models.CharField(max_length=80, blank=True, default="")
+    assistant_id_env = models.CharField(max_length=80, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-is_default_research", "name"]
+
+    def __str__(self):
+        return self.name
