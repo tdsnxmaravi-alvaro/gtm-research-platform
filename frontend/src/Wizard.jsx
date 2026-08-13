@@ -353,6 +353,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
         ...(p.model ? { model: p.model } : {}),
         ...(p.api_key_env ? { api_key_env: p.api_key_env } : {}),
         ...(p.endpoint_env ? { endpoint_env: p.endpoint_env } : {}),
+        ...(p.endpoint_url ? { endpoint_url: p.endpoint_url } : {}),
         ...(p.assistant_id_env ? { assistant_id_env: p.assistant_id_env } : {}),
       }));
       const primary = chosen.find((p) => p.is_default_research) || chosen[0];

@@ -56,7 +56,7 @@ class ProviderSettingSerializer(serializers.ModelSerializer):
         model = ProviderSetting
         fields = ["id", "name", "label", "type", "model", "web_search", "enabled",
                   "is_default_research", "api_key_env", "endpoint_env",
-                  "assistant_id_env", "configured"]
+                  "endpoint_url", "assistant_id_env", "configured"]
         read_only_fields = ["id", "configured"]
 
     def get_configured(self, obj) -> bool:
@@ -71,7 +71,7 @@ class ProviderSettingSerializer(serializers.ModelSerializer):
         key_env = obj.api_key_env or _DEFAULT_KEY_ENV.get(obj.type, "")
         if key_env and not os.getenv(key_env):
             return False
-        if obj.type in ("azure_openai", "azure_foundry"):
+        if obj.type in ("azure_openai", "azure_foundry") and not obj.endpoint_url:
             ep = obj.endpoint_env or _DEFAULT_ENDPOINT_ENV.get(obj.type, "")
             if ep and not os.getenv(ep):
                 return False

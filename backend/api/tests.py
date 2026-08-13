@@ -198,6 +198,28 @@ class ProviderCatalogTests(APITestCase):
         self.assertTrue(azure.is_default_research)
         self.assertFalse(ProviderSetting.objects.get(name="lara").is_default_research)
 
+    def test_crud_add_edit_remove_provider(self):
+        # Create a new provider entirely via the API (no code change).
+        resp = self.client.post("/api/providers/", {
+            "name": "gpt-next", "label": "GPT next", "type": "azure_foundry",
+            "model": "gpt-next", "endpoint_url": "https://x.services.ai.azure.com/openai/v1",
+            "api_key_env": "GPT_NEXT_KEY", "web_search": True,
+        }, format="json")
+        self.assertEqual(resp.status_code, 201, resp.content)
+        pid = resp.json()["id"]
+        # Secret is never stored/echoed — only the env var NAME.
+        self.assertNotIn("api_key", resp.json())
+        self.assertEqual(resp.json()["api_key_env"], "GPT_NEXT_KEY")
+        # Edit
+        resp = self.client.patch(f"/api/providers/{pid}/", {"model": "gpt-next-2"},
+                                 format="json")
+        self.assertEqual(resp.json()["model"], "gpt-next-2")
+        # Remove
+        resp = self.client.delete(f"/api/providers/{pid}/")
+        self.assertEqual(resp.status_code, 204)
+        from api.models import ProviderSetting
+        self.assertFalse(ProviderSetting.objects.filter(name="gpt-next").exists())
+
 
 
 

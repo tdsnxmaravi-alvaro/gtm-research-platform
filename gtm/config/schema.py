@@ -219,6 +219,7 @@ class LLMProvider(BaseModel):
     # Secrets are referenced by ENV VAR NAME, never inlined.
     api_key_env: str | None = None
     endpoint_env: str | None = None
+    endpoint_url: str | None = None       # inline endpoint (not a secret)
     assistant_id_env: str | None = None
 
 

@@ -324,4 +324,18 @@ def test_azure_foundry_parses_responses_payload():
     assert _extract_text({"output_text": "hi", "output": []}) == "hi"
 
 
+def test_factory_resolves_inline_endpoint_url(monkeypatch):
+    from gtm.config.schema import LLMProvider, ProviderType
+    from gtm.providers import build_provider
+
+    monkeypatch.setenv("FOUNDRY_TEST_KEY", "secret")
+    cfg = LLMProvider(name="gpt-next", type=ProviderType.azure_foundry,
+                      model="gpt-next", endpoint_url="https://x.ai/openai/v1",
+                      api_key_env="FOUNDRY_TEST_KEY", web_search=True)
+    prov = build_provider(cfg, load_env=False)
+    assert prov.endpoint == "https://x.ai/openai/v1"
+    assert prov.deployment == "gpt-next"
+    assert prov.web_search is True
+
+
 

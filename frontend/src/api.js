@@ -76,4 +76,7 @@ export const api = {
   listProviders: () => req("/providers/"),
   updateProvider: (id, patch) =>
     req(`/providers/${id}/`, { method: "PATCH", body: JSON.stringify(patch) }),
+  createProvider: (body) =>
+    req("/providers/", { method: "POST", body: JSON.stringify(body) }),
+  deleteProvider: (id) => req(`/providers/${id}/`, { method: "DELETE" }),
 };

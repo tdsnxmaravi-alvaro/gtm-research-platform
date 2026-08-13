@@ -58,6 +58,7 @@ class ProviderSetting(models.Model):
     is_default_research = models.BooleanField(default=False)
     api_key_env = models.CharField(max_length=80, blank=True, default="")
     endpoint_env = models.CharField(max_length=80, blank=True, default="")
+    endpoint_url = models.CharField(max_length=300, blank=True, default="")  # inline, not a secret
     assistant_id_env = models.CharField(max_length=80, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

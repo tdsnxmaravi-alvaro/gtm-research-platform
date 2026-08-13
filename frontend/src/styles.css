@@ -42,6 +42,7 @@ nav button.on { background: var(--aqua); color: var(--deep-teal); }
 .choice.on { border-color: var(--teal); box-shadow: 0 0 0 2px rgba(0,87,88,.18); }
 .choice span { color: var(--muted); font-size: 13px; }
 .grid { display: grid; gap: 12px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
 input, select, textarea { font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
 input:focus, select:focus, textarea:focus, .segmented button:focus-visible { outline: 2px solid var(--aqua); outline-offset: 1px; border-color: var(--teal); }

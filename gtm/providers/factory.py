@@ -44,7 +44,7 @@ def build_provider(cfg: LLMProvider, load_env: bool = True) -> BaseProvider:
         return LaraProvider(cfg.name, api_url, api_key, assistant, web_search=cfg.web_search)
 
     if cfg.type == ProviderType.azure_openai:
-        endpoint = _env(cfg.endpoint_env, "AZURE_OPENAI_ENDPOINT")
+        endpoint = cfg.endpoint_url or _env(cfg.endpoint_env, "AZURE_OPENAI_ENDPOINT")
         api_key = _env(cfg.api_key_env, "AZURE_OPENAI_API_KEY")
         deployment = cfg.model or os.getenv("AZURE_OPENAI_DEPLOYMENT")
         api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview")
@@ -56,7 +56,7 @@ def build_provider(cfg: LLMProvider, load_env: bool = True) -> BaseProvider:
                                    api_version=api_version, web_search=cfg.web_search)
 
     if cfg.type == ProviderType.azure_foundry:
-        endpoint = _env(cfg.endpoint_env, "AZURE_FOUNDRY_ENDPOINT")
+        endpoint = cfg.endpoint_url or _env(cfg.endpoint_env, "AZURE_FOUNDRY_ENDPOINT")
         api_key = _env(cfg.api_key_env, "AZURE_FOUNDRY_API_KEY")
         deployment = cfg.model or os.getenv("AZURE_FOUNDRY_DEPLOYMENT")
         missing = [k for k, v in (("endpoint", endpoint), ("api_key", api_key),
