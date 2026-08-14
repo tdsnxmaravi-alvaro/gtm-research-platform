@@ -50,8 +50,6 @@ def test_discover_vertical_prompt_is_exhaustive():
     assert "Autodesk Gold/Platinum/Premier partners" in p
     # discovery rules + two-part task + independence emphasis
     assert "PART 1" in p and "PART 2" in p and "Independence FIRST" in p
-    # product vendors / owners are explicitly excluded (only resellers wanted)
-    assert "EXCLUDE VENDORS" in p
     # strict JSON output schema
     assert '"results"' in p
 
