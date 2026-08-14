@@ -47,6 +47,13 @@ the lowest band."""
 # of the shared anti-hallucination rules.
 DISCOVER_RULES = """\
 DISCOVERY RULES (in addition to the evidence rules above):
+- EXCLUDE VENDORS / PRODUCT OWNERS: only include companies whose PRIMARY business is
+  RESELLING third-party products (value-added resellers, dealers, distributors, solution
+  partners, system integrators). If a company primarily develops, publishes, or
+  manufactures its OWN commercial product — i.e. it is a software vendor/ISV, a hardware
+  manufacturer, a game/content studio, or a brand owner — it is NOT a reseller: EXCLUDE it,
+  even if it also resells some third-party tools. When in doubt about whether a company is
+  a vendor or a reseller, exclude it.
 - Independence FIRST: include only INDEPENDENT resellers. Exclude direct subsidiaries,
   wholly-owned offices, or captive channels of a software vendor. Flag any company
   acquired by a major vendor in the last 24 months (note acquirer + date) and treat it
@@ -139,7 +146,8 @@ RESELLER_DISCOVER_VERTICAL = """\
 You are a senior channel-strategy analyst for TD SYNNEX running a {vendor} channel-expansion
 project. Your task is to identify EVERY independent reseller in the {vertical_name} vertical
 operating in {country} that could ADD {product_name} to their portfolio (fit to SELL this
-product to their customers) and is NOT a subsidiary of a software vendor.
+product to their customers), whose PRIMARY business is RESELLING third-party products, and
+that is NOT itself a software/product vendor nor a subsidiary of one.
 
 PRODUCT: {product_name} — {value_prop}
 
