@@ -10,12 +10,12 @@ export default function App() {
   const [editing, setEditing] = useState(null); // campaign being edited, or null
   const [credits, setCredits] = useState(null); // Apollo credit capacity (header badge)
 
-  // Refresh the Apollo credit badge on load, on tab change, and periodically.
+  // Refresh the Apollo credit badge on load and tab change, then hourly.
   useEffect(() => {
     let alive = true;
     const load = () => api.apolloCredits().then((c) => alive && setCredits(c)).catch(() => {});
     load();
-    const t = setInterval(load, 60000);
+    const t = setInterval(load, 3600000);
     return () => { alive = false; clearInterval(t); };
   }, [tab]);
 

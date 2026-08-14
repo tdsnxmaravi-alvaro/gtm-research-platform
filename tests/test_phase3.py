@@ -50,6 +50,30 @@ def test_build_master_joins_results_and_contacts(tmp_path):
     assert (out / "master.xlsx").exists()
 
 
+def test_build_master_merges_domain_variants_and_dedupes_contacts(tmp_path):
+    out = tmp_path / "camp"
+    out.mkdir()
+    # Two name variants of the same site (trimech.com) + a duplicate contact row.
+    (out / "results.csv").write_text(
+        "company,website,final_tier,score,fit_summary,recommended_products,evidence_urls,product\n"
+        "TriMech,https://trimech.com/,A,99,fit,X,https://trimech.com/x,Unity\n"
+        "TriMech Group / Javelin,https://trimech.com/,A,94,fit,X,https://trimech.com/y,Unity\n",
+        encoding="utf-8-sig")
+    (out / "contacts.csv").write_text(
+        "company,website,contact_name,title,email,email_status,direct_phone,linkedin\n"
+        "TriMech,trimech.com,Craig Oznick,VP,craig@trimech.com,verified,,\n"
+        "TriMech,trimech.com,Craig Oznick,VP,craig@trimech.com,verified,,\n",
+        encoding="utf-8-sig")
+
+    rows = build_master(_cfg(), out_dir=out, min_tier="D")
+    # Both variants merge into ONE company (highest score kept), and the duplicate
+    # contact collapses to a single row.
+    assert len(rows) == 1
+    assert rows[0]["company"] == "TriMech"
+    assert rows[0]["score"] == "99"
+    assert rows[0]["email"] == "craig@trimech.com"
+
+
 def test_outreach_auto_localizes_per_row_country():
     # No explicit outreach language + empty campaign country => auto per-row country.
     c = CampaignConfig(name="loc", target_type="resellers", mode="provided",

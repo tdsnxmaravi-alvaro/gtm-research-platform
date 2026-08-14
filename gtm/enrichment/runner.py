@@ -143,6 +143,9 @@ def run_enrichment(
     def _eligible(r: dict) -> bool:
         if _TIER_ORDER.get(_row_tier(r), 9) > cap:
             return False
+        # Skip existing Datech partners to save Apollo credits (opt-out via config).
+        if getattr(enr, "skip_datech_matches", True) and (r.get("datech_match") or "").strip():
+            return False
         company = r.get("company")
         if company not in done:
             return True

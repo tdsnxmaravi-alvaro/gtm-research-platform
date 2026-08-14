@@ -188,6 +188,9 @@ class Enrichment(BaseModel):
     want: EnrichWant = EnrichWant.emails
     max_contacts: int = 3
     provider: EnrichProvider = EnrichProvider.lara
+    # Skip contact enrichment for companies already in the Datech channel (they're
+    # existing partners) to save Apollo credits; validate later if worth enriching.
+    skip_datech_matches: bool = True
     # Credit-estimate inputs (Apollo). Observed ~8 credits per phone reveal.
     credits_per_email: int = 1
     credits_per_phone: int = 8

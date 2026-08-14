@@ -129,6 +129,14 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str,
             tiers = Counter((r.get("final_tier") or r.get("tier") or "?") for r in results)
             breakdown = ", ".join(f"{k}:{tiers[k]}" for k in ("A", "B", "C", "D") if tiers.get(k))
             summary = f"{count} companies" + (f" — {breakdown}" if breakdown else "")
+            try:
+                stats = json.loads((out_dir / "provider_stats.json")
+                                   .read_text(encoding="utf-8"))
+                if len(stats) > 1:
+                    summary += " · by model: " + ", ".join(
+                        f"{p}:{c}" for p, c in stats.items())
+            except (OSError, ValueError):
+                pass
         elif stage == "enrich":
             from gtm.enrichment import run_enrichment
             from gtm.consolidate import build_master

@@ -351,6 +351,29 @@ def test_run_batch_retries_transient_provider_error(tmp_path, monkeypatch):
     assert len(out) == 1 and out[0]["company"] == "Acme"
 
 
+def test_run_batch_records_per_provider_counts(tmp_path, monkeypatch):
+    from gtm.research.runner import _run_batch
+
+    def _prov(name, companies):
+        class P:
+            def send(self, prompt, web_search=None):
+                res = ",".join(f'{{"company":"{c}","website":"{c}.es","score":80,'
+                               f'"tier":"B","evidence":[{{"claim":"x","url":"https://{c}.es"}}]}}'
+                               for c in companies)
+                class R:
+                    text = '{"results":[' + res + ']}'
+                return R()
+        p = P(); p.name = name
+        return p
+
+    monkeypatch.setattr("gtm.research.runner.time.sleep", lambda *_: None)
+    stats = {}
+    _run_batch(_cfg(), [_prov("lara", ["Acme", "Globex"]), _prov("azure-sol", ["Acme"])],
+               "prompt", tmp_path, "t", passes=1, delay=0, provider_stats=stats)
+    assert len(stats["lara"]) == 2
+    assert len(stats["azure-sol"]) == 1
+
+
 def test_factory_resolves_inline_endpoint_url(monkeypatch):
     from gtm.config.schema import LLMProvider, ProviderType
     from gtm.providers import build_provider

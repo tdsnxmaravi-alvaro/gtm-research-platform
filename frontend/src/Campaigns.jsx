@@ -310,9 +310,9 @@ export default function Campaigns({ onEdit }) {
                 })}
               </div>
             )}
-            {!complete && (
+            {started && (
               <details>
-                <summary className="link">Run a single stage (manual)</summary>
+                <summary className="link">Run / re-run a single stage (research · consolidate · enrich · outreach)</summary>
                 <div className="stages" style={{ marginTop: 8 }}>
                   {STAGES.map((s) => (
                     <button key={s} onClick={() => startStage(c.id, s)} disabled={running}>{s}</button>

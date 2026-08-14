@@ -190,12 +190,13 @@ def _send_with_retry(prov, prompt: str, tag: str, pname: str, retries: int):
 
 
 def _run_batch(config, providers, prompt: str, logs: Path, tag: str,
-               passes: int, delay: int) -> list[dict]:
+               passes: int, delay: int, provider_stats: dict | None = None) -> list[dict]:
     """Call each provider `passes` times, aggregate across the ensemble, and score.
 
     `providers` may be a single provider or a list (ensemble): scores are averaged
     across all provider x pass responses per company, and companies independently
-    surfaced by >=2 providers get an agreement-confidence boost.
+    surfaced by >=2 providers get an agreement-confidence boost. When
+    `provider_stats` is given, records the set of companies each provider surfaced.
     """
     if not isinstance(providers, (list, tuple)):
         providers = [providers]
@@ -212,6 +213,10 @@ def _run_batch(config, providers, prompt: str, logs: Path, tag: str,
             rows = parse_results(resp.text)
             for r in rows:
                 r["_provider"] = pname          # who surfaced this company (agreement)
+            if provider_stats is not None:
+                provider_stats.setdefault(pname, set()).update(
+                    (r.get("company") or "").strip().lower()
+                    for r in rows if (r.get("company") or "").strip())
             parsed_lists.append(rows)
             time.sleep(delay)
     if not parsed_lists:
@@ -253,6 +258,7 @@ def run_campaign(
     # Resume must ACCUMULATE: load prior results so a limited/partial run appends
     # instead of overwriting results.csv with only the current batch.
     all_results: list[dict] = _read_existing_rows(results_path) if resume else []
+    provider_stats: dict[str, set] = {}  # provider name -> set of companies surfaced
 
     if config.mode == Mode.provided:
         rows = load_provided_list(config.provided_list_path,
@@ -301,7 +307,8 @@ def run_campaign(
                 prompt = build_prompt(config, product,
                                       company_input=format_companies(batch))
                 tag = f"{product.name}_batch{idx + 1}"
-                scored = _run_batch(config, providers, prompt, logs, tag, passes, delay)
+                scored = _run_batch(config, providers, prompt, logs, tag, passes, delay,
+                                    provider_stats=provider_stats)
                 country_by = {(b.get("company") or "").strip().lower(): b.get("country", "")
                               for b in batch}
                 domain_by = {(b.get("company") or "").strip().lower(): _domain_or_name(b)
@@ -392,7 +399,8 @@ def run_campaign(
                         continue
                     prompt = build_prompt(config, product, vertical=vert, country=country)
                     scored = _run_batch(config, providers, prompt, logs,
-                                        key.replace("|", "_").replace(" ", ""), passes, delay)
+                                        key.replace("|", "_").replace(" ", ""), passes, delay,
+                                        provider_stats=provider_stats)
                     for r in scored:
                         r["product"] = product.name
                         r["vertical"] = vert.name if vert else ""
@@ -406,6 +414,15 @@ def run_campaign(
                         progress_cb(step_n, total)
                     print(f"  {key}: +{len(scored)} results")
                     time.sleep(delay)
+
+    if provider_stats:
+        counts = {p: len(s) for p, s in provider_stats.items()}
+        try:
+            (out / "provider_stats.json").write_text(
+                json.dumps(counts, ensure_ascii=False, indent=2), encoding="utf-8")
+        except OSError:
+            pass
+        print("  by model: " + ", ".join(f"{p}: {c}" for p, c in counts.items()))
 
     print(f"Done. {len(all_results)} results -> {results_path}")
     return all_results

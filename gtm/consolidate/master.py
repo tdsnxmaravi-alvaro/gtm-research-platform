@@ -80,6 +80,37 @@ def _read_csv(path: Path) -> list[dict]:
         return list(csv.DictReader(f))
 
 
+_BAD_DOMAIN_HINTS = ("not found", "n/a", "unknown", "unverified", "no website")
+
+
+def _domain(url: str) -> str:
+    """Bare domain from a website field ('' if missing/placeholder)."""
+    d = (url or "").strip().lower()
+    if not d or any(h in d for h in _BAD_DOMAIN_HINTS):
+        return ""
+    d = re.sub(r"^https?://", "", d)
+    if d.startswith("www."):
+        d = d[4:]
+    d = d.split("/")[0].split("?")[0].strip()
+    return d if "." in d and " " not in d else ""
+
+
+def _dedup_contacts(cs: list[dict]) -> list[dict]:
+    """Drop repeated contact rows (same email / apollo_id / name)."""
+    seen: set = set()
+    out: list[dict] = []
+    for c in cs:
+        ident = ((c.get("email") or "").strip().lower()
+                 or (c.get("apollo_id") or "").strip()
+                 or (c.get("contact_name") or "").strip().lower())
+        if ident and ident in seen:
+            continue
+        if ident:
+            seen.add(ident)
+        out.append(c)
+    return out
+
+
 def build_master(config: CampaignConfig, out_dir: str | Path | None = None,
                  min_tier: str | None = None, progress_cb=None) -> list[dict]:
     """Join results.csv + contacts.csv into a master list. Returns master rows."""
@@ -89,7 +120,7 @@ def build_master(config: CampaignConfig, out_dir: str | Path | None = None,
 
     tier_cap = _TIER_ORDER.get((min_tier or "").upper(), 9)
 
-    # Best result row per normalized company (keep highest score).
+    # Best result row per normalized company name (join key with contacts).
     best: dict[str, dict] = {}
     for r in results:
         key = normalize_name(r.get("company", ""))
@@ -99,13 +130,33 @@ def build_master(config: CampaignConfig, out_dir: str | Path | None = None,
         if prev is None or _score(r) > _score(prev):
             best[key] = r
 
+    # Merge name variants that share the same website domain into one company
+    # (e.g. "TriMech" + "TriMech Group / Javelin" on trimech.com). The highest-score
+    # entry is canonical; the others become aliases whose contacts fold in.
+    by_domain: dict[str, list[str]] = {}
+    for key, r in best.items():
+        dom = _domain(r.get("website", ""))
+        if dom:
+            by_domain.setdefault(dom, []).append(key)
+    alias_to_canonical: dict[str, str] = {}
+    for dom, keys in by_domain.items():
+        if len(keys) < 2:
+            continue
+        canonical = max(keys, key=lambda k: _score(best[k]))
+        for k in keys:
+            if k != canonical:
+                alias_to_canonical[k] = canonical
+    for k in alias_to_canonical:
+        best.pop(k, None)  # drop merged entries; contacts fold into the canonical
+
     _annotate_datech(config, best)
 
-    # Group contacts by company.
+    # Group contacts by normalized company name, then fold aliases into canonicals.
     contacts_by_company: dict[str, list[dict]] = {}
     for c in contacts:
         key = normalize_name(c.get("company", ""))
-        contacts_by_company.setdefault(key, []).append(c)
+        canonical = alias_to_canonical.get(key, key)
+        contacts_by_company.setdefault(canonical, []).append(c)
 
     rows: list[dict] = []
     summary: list[dict] = []
@@ -114,7 +165,7 @@ def build_master(config: CampaignConfig, out_dir: str | Path | None = None,
         tier = (r.get("final_tier") or r.get("tier") or "").upper()
         if min_tier and _TIER_ORDER.get(tier, 9) > tier_cap:
             continue
-        cs = contacts_by_company.get(key, [])
+        cs = _dedup_contacts(contacts_by_company.get(key, []))
         if cs:
             for c in cs:
                 rows.append(_master_row(config, r, tier, c))
