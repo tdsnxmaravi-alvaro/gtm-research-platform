@@ -30,7 +30,7 @@ OUT_COLS = [
     "final_tier", "tier", "score",
     "tier_capped", "tier_cap_reason", "fit_summary", "recommended_products",
     "evidence_count", "has_verified_url", "evidence_urls", "notes", "passes",
-    "ensemble_agreement", "ensemble_singleton", "evidence",
+    "ensemble_agreement", "ensemble_singleton", "ensemble_providers", "evidence",
 ]
 
 # Ensemble agreement-confidence (only applied when >1 provider runs research):
@@ -161,6 +161,7 @@ def _aggregate_passes(parsed_lists: list[list[dict]], n_providers: int = 1) -> l
             agreement = len(found_by)
             merged["ensemble_agreement"] = agreement
             merged["ensemble_singleton"] = agreement < 2
+            merged["ensemble_providers"] = ",".join(sorted(p for p in found_by if p))
             if agreement >= 2:
                 bonus = min(_AGREEMENT_BONUS * (agreement - 1), _AGREEMENT_BONUS_CAP)
                 merged["score"] = min(100, avg + bonus)

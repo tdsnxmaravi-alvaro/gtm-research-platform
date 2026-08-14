@@ -277,6 +277,7 @@ def test_ensemble_run_batch_averages_across_providers(tmp_path):
     assert out[0]["passes"] == 2
     assert out[0]["ensemble_agreement"] == 2
     assert out[0]["ensemble_singleton"] is False
+    assert out[0]["ensemble_providers"] == "azure-sol,lara"  # sorted, both models
 
 
 def test_ensemble_singleton_is_flagged_and_penalized(tmp_path):

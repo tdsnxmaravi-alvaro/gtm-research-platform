@@ -260,6 +260,14 @@ def _summary_row(config: CampaignConfig, r: dict, tier: str, cs: list[dict]) -> 
     """One company-level row for the 'Master Outreach' sheet."""
     verified = [c for c in cs
                 if (c.get("email_status") or "").lower() == "verified" and c.get("email")]
+    # De-duplicate verified emails (case-insensitive), preserving order.
+    seen: set = set()
+    uniq_emails: list[str] = []
+    for c in verified:
+        e = (c.get("email") or "").strip()
+        if e and e.lower() not in seen:
+            seen.add(e.lower())
+            uniq_emails.append(e)
     bc = _best_contact(cs)
     has_url = (str(r.get("has_verified_url", "")).lower() in ("true", "1", "yes")
                or _num(r.get("evidence_count")) > 0)
@@ -278,12 +286,12 @@ def _summary_row(config: CampaignConfig, r: dict, tier: str, cs: list[dict]) -> 
                                           for c in cs) else ("No" if cs else "")),
         "validation": "PASS" if has_url else "REVIEW",
         "total_contacts": len(cs),
-        "verified_emails": len(verified),
+        "verified_emails": len(uniq_emails),
         "best_contact": bc.get("contact_name", ""),
         "best_title": bc.get("title", ""),
         "best_email": bc.get("email", ""),
         "best_phone": bc.get("direct_phone", "") or bc.get("corporate_phone", ""),
-        "all_verified_emails": "; ".join(c.get("email", "") for c in verified),
+        "all_verified_emails": "; ".join(uniq_emails),
         "vendor": config.vendor or r.get("product", ""),
         "recommended_products": r.get("recommended_products", ""),
         "fit_summary": r.get("fit_summary", ""),
