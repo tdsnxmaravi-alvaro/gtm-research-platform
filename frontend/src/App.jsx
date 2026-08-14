@@ -1,12 +1,23 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Wizard from "./Wizard.jsx";
 import Campaigns from "./Campaigns.jsx";
 import Settings from "./Settings.jsx";
+import { api } from "./api.js";
 import logoWhite from "./assets/datech-logo-white.png";
 
 export default function App() {
   const [tab, setTab] = useState("new");
   const [editing, setEditing] = useState(null); // campaign being edited, or null
+  const [credits, setCredits] = useState(null); // Apollo credit capacity (header badge)
+
+  // Refresh the Apollo credit badge on load, on tab change, and periodically.
+  useEffect(() => {
+    let alive = true;
+    const load = () => api.apolloCredits().then((c) => alive && setCredits(c)).catch(() => {});
+    load();
+    const t = setInterval(load, 60000);
+    return () => { alive = false; clearInterval(t); };
+  }, [tab]);
 
   const newCampaign = () => {
     setEditing(null);
@@ -21,6 +32,12 @@ export default function App() {
           <span className="brand-divider" aria-hidden="true" />
           <h1>GTM <span className="accent">Research Platform</span></h1>
         </div>
+        {credits && credits.configured && credits.remaining != null && (
+          <span className="credits-badge"
+                title={`Apollo shared credits — ~${credits.emails?.toLocaleString()} emails or ~${credits.phones?.toLocaleString()} phone reveals`}>
+            <b>{credits.remaining.toLocaleString()}</b> Apollo credits
+          </span>
+        )}
         <nav>
           <button className={tab === "new" ? "on" : ""} onClick={newCampaign}>
             {editing ? "Edit campaign" : "New campaign"}
