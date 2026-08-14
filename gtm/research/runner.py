@@ -151,6 +151,16 @@ def _aggregate_passes(parsed_lists: list[list[dict]], n_providers: int = 1) -> l
                     urls.append(u)
         rep = min(rs, key=lambda r: abs(float(r.get("score") or 0) - avg))
         merged = dict(rep)
+        # Coalesce useful fields from any pass that has them, so a value only one
+        # model returned (e.g. employees) isn't lost when the other became the rep.
+        for field in ("employees", "software_resold", "website", "independence",
+                      "recommended_products", "fit_summary"):
+            if not (merged.get(field) or "").strip():
+                for r2 in rs:
+                    v = (r2.get(field) or "").strip()
+                    if v:
+                        merged[field] = v
+                        break
         merged["score"] = avg
         merged["evidence_urls"] = "; ".join(urls)
         merged["evidence_count"] = len(urls)
