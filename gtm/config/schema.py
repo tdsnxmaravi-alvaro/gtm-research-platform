@@ -266,6 +266,9 @@ class CampaignConfig(BaseModel):
     # Research batches to run concurrently (provided mode). >1 sends parallel LLM
     # requests so a large list finishes far faster; keep modest to respect rate limits.
     research_concurrency: int = 3
+    # Extra attempts (after the first) for a provider call that errors transiently,
+    # so one flaky batch doesn't silently drop an ensemble member.
+    research_retries: int = 2
 
     scoring: Scoring = Field(default_factory=Scoring)
     enrichment: Enrichment = Field(default_factory=Enrichment)

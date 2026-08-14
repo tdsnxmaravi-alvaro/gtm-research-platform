@@ -324,6 +324,33 @@ def test_azure_foundry_parses_responses_payload():
     assert _extract_text({"output_text": "hi", "output": []}) == "hi"
 
 
+def test_run_batch_retries_transient_provider_error(tmp_path, monkeypatch):
+    from gtm.research.runner import _run_batch
+
+    class _Flaky:
+        name = "azure-sol"
+
+        def __init__(self):
+            self.calls = 0
+
+        def send(self, prompt, web_search=None):
+            self.calls += 1
+            if self.calls < 3:
+                raise RuntimeError("HTTP 429")  # transient — should be retried
+
+            class R:
+                text = ('{"results":[{"company":"Acme","website":"a.es","score":80,'
+                        '"tier":"B","evidence":[{"claim":"x","url":"https://a.es"}]}]}')
+            return R()
+
+    monkeypatch.setattr("gtm.research.runner.time.sleep", lambda *_: None)
+    prov = _Flaky()
+    out = _run_batch(_cfg(research_retries=2), [prov], "prompt", tmp_path, "t",
+                     passes=1, delay=0)
+    assert prov.calls == 3          # failed twice, succeeded on the 3rd
+    assert len(out) == 1 and out[0]["company"] == "Acme"
+
+
 def test_factory_resolves_inline_endpoint_url(monkeypatch):
     from gtm.config.schema import LLMProvider, ProviderType
     from gtm.providers import build_provider

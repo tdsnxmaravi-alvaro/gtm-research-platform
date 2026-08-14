@@ -39,6 +39,11 @@ _AGREEMENT_BONUS = 5        # points per extra agreeing provider
 _AGREEMENT_BONUS_CAP = 15   # max total boost
 _SINGLETON_PENALTY = 5      # points off when only one provider found the company
 
+# Retry a provider call on a transient error (timeout, 429, 5xx) before giving up,
+# so one flaky batch doesn't silently drop an ensemble member.
+_PROVIDER_RETRIES = 2       # extra attempts after the first (so up to 3 tries)
+_RETRY_BACKOFF = 3          # seconds, multiplied by the attempt number
+
 # Context columns carried from the provided list into the results (for the master).
 _EMP_KEYS = ("number of employees", "employees", "company size", "size")
 _SW_KEYS = ("other software in use", "software resold", "software", "other software")
@@ -166,6 +171,24 @@ def _aggregate_passes(parsed_lists: list[list[dict]], n_providers: int = 1) -> l
     return out
 
 
+def _send_with_retry(prov, prompt: str, tag: str, pname: str, retries: int):
+    """Call prov.send with retries + linear backoff on transient errors. Returns the
+    ProviderResponse, or None after exhausting retries (so an ensemble member that
+    flakes on one batch isn't silently dropped without trying again)."""
+    for attempt in range(retries + 1):
+        try:
+            return prov.send(prompt)
+        except Exception as exc:  # noqa: BLE001 - transient provider error
+            if attempt >= retries:
+                print(f"  !! provider error ({tag}/{pname}) after {attempt + 1} tries: {exc}")
+                return None
+            wait = _RETRY_BACKOFF * (attempt + 1)
+            print(f"  .. provider {pname} error ({tag}); retry "
+                  f"{attempt + 1}/{retries} in {wait}s: {exc}")
+            time.sleep(wait)
+    return None
+
+
 def _run_batch(config, providers, prompt: str, logs: Path, tag: str,
                passes: int, delay: int) -> list[dict]:
     """Call each provider `passes` times, aggregate across the ensemble, and score.
@@ -176,14 +199,13 @@ def _run_batch(config, providers, prompt: str, logs: Path, tag: str,
     """
     if not isinstance(providers, (list, tuple)):
         providers = [providers]
+    retries = getattr(config, "research_retries", _PROVIDER_RETRIES)
     parsed_lists: list[list[dict]] = []
     for prov in providers:
         pname = getattr(prov, "name", "provider")
         for p in range(max(1, passes)):
-            try:
-                resp = prov.send(prompt)
-            except Exception as exc:  # noqa: BLE001 - log and continue
-                print(f"  !! provider error ({tag}/{pname}) pass {p+1}: {exc}")
+            resp = _send_with_retry(prov, prompt, tag, pname, retries)
+            if resp is None:
                 continue
             multi = len(providers) > 1 or passes > 1
             _log(logs, f"{tag}_{pname}_pass{p+1}" if multi else tag, prompt, resp.text)
