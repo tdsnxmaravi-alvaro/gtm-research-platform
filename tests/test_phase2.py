@@ -435,3 +435,36 @@ def test_run_enrichment_persists_contacts_when_exhausted(tmp_path, monkeypatch):
     from gtm.enrichment.cache import ContactCache
     cached = ContactCache(path=out.parent / ".gtm_cache" / "contacts.json").get("acme.com")
     assert cached and cached[0].email == "a@acme.com"
+
+
+def test_run_enrichment_checkpoint_flushes_complete_csv(tmp_path, monkeypatch):
+    """Cache-hit path may skip intermediate CSV rewrites; the file is complete at end."""
+    monkeypatch.setenv("GTM_CSV_CHECKPOINT_EVERY", "50")
+
+    class _Client:
+        exhausted = False
+        credits_used = 0
+        usage = {}
+
+        def preflight(self):
+            return True, "ok"
+
+    monkeypatch.setattr("gtm.enrichment.runner.ApolloClient", lambda **_kw: _Client())
+    from gtm.enrichment.cache import ContactCache
+
+    out = tmp_path / "camp"
+    out.mkdir()
+    cache = ContactCache(path=out.parent / ".gtm_cache" / "contacts.json")
+    for name, domain in (("Acme", "acme.com"), ("Beta", "beta.com"), ("Gamma", "gamma.com")):
+        cache.put(domain, [EnrichedContact(
+            company=name, domain=domain, email=f"a@{domain}", source="apollo")])
+    rows = [
+        {"company": "Acme", "website": "https://acme.com", "final_tier": "A", "score": "90"},
+        {"company": "Beta", "website": "https://beta.com", "final_tier": "A", "score": "88"},
+        {"company": "Gamma", "website": "https://gamma.com", "final_tier": "A", "score": "87"},
+    ]
+    c = _cfg(enrichment={"provider": "apollo", "want": "emails", "max_contacts": 3})
+    got = run_enrichment(c, rows=rows, out_dir=out, use_cache=True, resume=False, delay=0)
+    assert {c.email for c in got} == {"a@acme.com", "a@beta.com", "a@gamma.com"}
+    csv_text = (out / "contacts.csv").read_text(encoding="utf-8")
+    assert "a@acme.com" in csv_text and "a@beta.com" in csv_text and "a@gamma.com" in csv_text

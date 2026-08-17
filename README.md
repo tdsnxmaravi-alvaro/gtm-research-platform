@@ -192,5 +192,6 @@ your own `.eml`); custom always wins over a vendor default.
 | 4 | Django + DRF API | Done (local; no auth) |
 | 5 | React wizard UI | Done (local wizard + campaign list) |
 
-Roadmap is tracked in [GitHub Issues](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues).
+Roadmap and GitHub issue inventory (open vs closed) are in
+[docs/next-steps.md](docs/next-steps.md) (for engineers and LLMs).
 CI runs the test suite on every push/PR (badge above).

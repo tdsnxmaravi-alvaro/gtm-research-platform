@@ -26,6 +26,38 @@ def test_normalize_name():
     assert normalize_name("Foo (Bar) LLC") == "FOO"
 
 
+def test_build_master_neutralizes_formula_injection(tmp_path):
+    import csv
+    out = tmp_path / "camp"
+    out.mkdir()
+    formula = '=HYPERLINK("http://evil.example","x")'
+    with open(out / "results.csv", "w", encoding="utf-8-sig", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=[
+            "company", "website", "final_tier", "score", "fit_summary",
+            "recommended_products", "evidence_urls", "product"])
+        w.writeheader()
+        w.writerow({
+            "company": "Acme SA", "website": "https://a.es", "final_tier": "A",
+            "score": "88", "fit_summary": formula, "recommended_products": "SketchUp",
+            "evidence_urls": "https://a.es/x", "product": "Trimble",
+        })
+    (out / "contacts.csv").write_text(
+        "company,contact_name,title,email,email_status,direct_phone,linkedin\n"
+        "Acme SA,Ana Ruiz,CEO,ana@a.es,verified,,\n",
+        encoding="utf-8-sig")
+    build_master(_cfg(), out_dir=out, min_tier="D")
+    csv_text = (out / "master.csv").read_text(encoding="utf-8-sig")
+    assert "'=HYPERLINK" in csv_text
+    from openpyxl import load_workbook
+    wb = load_workbook(out / "master.xlsx")
+    ws = wb["Master Outreach"]
+    headers = [c.value for c in ws[1]]
+    fit_col = headers.index("Fit Summary") + 1
+    cell = ws.cell(row=2, column=fit_col)
+    assert str(cell.value).startswith("'=")
+    assert cell.data_type != "f"
+
+
 def test_build_master_joins_results_and_contacts(tmp_path):
     out = tmp_path / "camp"
     out.mkdir()
@@ -96,6 +128,23 @@ def test_render_template_es():
     assert body.startswith("Hola Ana")
     assert "Trimble" in body
     assert "Ana BDR" in body  # sender in signature
+
+
+def test_write_eml_strips_crlf_from_subject(tmp_path):
+    path = write_eml(
+        tmp_path / "inj.eml",
+        to_email="ana@a.es",
+        to_name="Ana",
+        subject="Hola\r\nBcc: evil@x.com",
+        body="Hola Ana\n\nSaludos",
+        from_email="bdr@tdsynnex.com",
+        from_name="BDR",
+    )
+    with open(path, "rb") as f:
+        msg = email.message_from_binary_file(f, policy=email.policy.default)
+    assert msg.get("Bcc") is None
+    assert "\r" not in (msg["Subject"] or "") and "\n" not in (msg["Subject"] or "")
+    assert msg["Subject"] == "Hola Bcc: evil@x.com"
 
 
 def test_write_eml_is_smtp_and_unsent(tmp_path):

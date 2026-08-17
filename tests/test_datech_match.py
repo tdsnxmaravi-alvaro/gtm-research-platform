@@ -11,6 +11,12 @@ DATECH = [
 ]
 
 
+def test_sl_suffix_matches_dotted_sl():
+    assert normalize_for_match("Acme SL") == normalize_for_match("ACME, S.L.")
+    idx = DatechIndex(["ACME, S.L."])
+    assert idx.find("Acme SL") == "ACME, S.L."
+
+
 def test_normalize_strips_suffixes_and_punct():
     assert normalize_for_match("Acme CAD Solutions, Inc.") == "ACME CAD SOLUTIONS"
     assert normalize_for_match("Redshift Reprographics LLC (DBA RedRepro)") == "REDSHIFT REPROGRAPHICS"

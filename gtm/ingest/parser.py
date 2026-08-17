@@ -14,6 +14,8 @@ import json
 import re
 from pathlib import Path
 
+from ..io import csv_safe
+
 RESULT_COLUMNS = [
     "company", "website", "fit_summary", "score", "tier",
     "recommended_products", "notes",
@@ -351,7 +353,8 @@ def write_rows_csv(rows: list[dict], path: str | Path, columns: list[str] | None
     else:
         columns = columns or list({k for r in rows for k in r}) or RESULT_COLUMNS
     Path(path).parent.mkdir(parents=True, exist_ok=True)
+    safe_rows = [{k: csv_safe(r.get(k, "")) for k in columns} for r in rows]
     with open(path, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=columns, extrasaction="ignore")
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(safe_rows)

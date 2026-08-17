@@ -22,7 +22,7 @@ from ..prompts import build_prompt, format_companies
 from ..ingest import parse_results, load_provided_list, write_rows_csv
 from ..scoring import score_results
 from ..providers import build_provider
-from ..io import atomic_write_json
+from ..io import atomic_write_json, CsvCheckpoint, read_csv_dicts
 from .cache import ResearchCache, _domain_or_name
 
 OUT_COLS = [
@@ -79,11 +79,7 @@ def _providers_for(config: CampaignConfig) -> list:
 
 def _read_existing_rows(path: Path) -> list[dict]:
     """Load previously written result rows so resumed runs accumulate."""
-    if not path.exists():
-        return []
-    import csv
-    with open(path, encoding="utf-8-sig", newline="") as f:
-        return list(csv.DictReader(f))
+    return read_csv_dicts(path)
 
 
 def _load_state(path: Path) -> set:
@@ -269,6 +265,15 @@ def run_campaign(
     # instead of overwriting results.csv with only the current batch.
     all_results: list[dict] = _read_existing_rows(results_path) if resume else []
     provider_stats: dict[str, set] = {}  # provider name -> set of companies surfaced
+    checkpoint = CsvCheckpoint(results_path, OUT_COLS)
+
+    def persist_results(*, force: bool = False) -> None:
+        if checkpoint.note(all_results, force=force):
+            _save_state(state_path, done)
+
+    def persist_results_now() -> None:
+        checkpoint.flush(all_results)
+        _save_state(state_path, done)
 
     if config.mode == Mode.provided:
         rows = load_provided_list(config.provided_list_path,
@@ -309,8 +314,7 @@ def run_campaign(
                 else:
                     to_research.append(r)
             if hits:
-                _save_state(state_path, done)
-                write_rows_csv(all_results, results_path, columns=OUT_COLS)
+                persist_results()
                 print(f"  {product.name}: {hits} reused from research cache")
 
             def _process_batch(batch: list[dict], idx: int):
@@ -349,8 +353,7 @@ def run_campaign(
                 if scored:
                     for r in batch:
                         done.add(r.get("company"))
-                    _save_state(state_path, done)
-                    write_rows_csv(all_results, results_path, columns=OUT_COLS)
+                    persist_results()
 
             batches = [to_research[i:i + batch_size]
                        for i in range(0, len(to_research), batch_size)]
@@ -359,6 +362,7 @@ def run_campaign(
             if concurrency <= 1 or len(batches) <= 1:
                 for idx, batch in enumerate(batches):
                     if should_cancel and should_cancel():
+                        persist_results_now()
                         print("  canceled — stopping after saved progress")
                         return all_results
                     _accept(*_process_batch(batch, idx))
@@ -374,6 +378,7 @@ def run_campaign(
                 w = 0
                 while w < len(batches):
                     if should_cancel and should_cancel():
+                        persist_results_now()
                         print("  canceled — stopping after saved progress")
                         return all_results
                     wave = list(enumerate(batches))[w:w + concurrency]
@@ -399,6 +404,7 @@ def run_campaign(
             for product in config.products:
                 for vert in targets:
                     if should_cancel and should_cancel():
+                        persist_results_now()
                         print("  canceled — stopping after saved progress")
                         return all_results
                     key = f"{country}|{product.name}|{vert.slug if vert else 'broad'}"
@@ -417,8 +423,7 @@ def run_campaign(
                         r["country"] = country
                     all_results.extend(scored)
                     done.add(key)
-                    _save_state(state_path, done)
-                    write_rows_csv(all_results, results_path, columns=OUT_COLS)
+                    persist_results(force=True)
                     step_n += 1
                     if progress_cb:
                         progress_cb(step_n, total)
@@ -434,6 +439,7 @@ def run_campaign(
             pass
         print("  by model: " + ", ".join(f"{p}: {c}" for p, c in counts.items()))
 
+    persist_results_now()
     print(f"Done. {len(all_results)} results -> {results_path}")
     return all_results
 

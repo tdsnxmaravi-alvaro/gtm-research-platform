@@ -13,7 +13,6 @@ LARA path:
 
 from __future__ import annotations
 
-import csv
 import json
 import logging
 import time
@@ -23,8 +22,7 @@ from pathlib import Path
 from ..config.schema import (
     CampaignConfig, EnrichProvider, EnrichWant, apollo_locations_for,
 )
-from ..ingest import write_rows_csv
-from ..io import atomic_write_json
+from ..io import atomic_write_json, CsvCheckpoint, read_csv_dicts
 from .models import EnrichedContact, CONTACT_COLS
 from .apollo import (
     ApolloClient, enrich_company,
@@ -36,10 +34,7 @@ log = logging.getLogger(__name__)
 
 
 def _load_rows(results_path: Path) -> list[dict]:
-    if not results_path.exists():
-        return []
-    with open(results_path, encoding="utf-8-sig") as f:
-        return list(csv.DictReader(f))
+    return read_csv_dicts(results_path)
 
 
 def _load_done(path: Path) -> set:
@@ -191,8 +186,22 @@ def run_enrichment(
             })
             return all_contacts
 
+    checkpoint = CsvCheckpoint(contacts_path, CONTACT_COLS)
+
+    def _contact_rows() -> list[dict]:
+        return [c.to_row() for c in all_contacts]
+
+    def persist(*, force: bool = False) -> None:
+        if checkpoint.note(_contact_rows(), force=force):
+            _save_done(state_path, done)
+
+    def persist_now() -> None:
+        checkpoint.flush(_contact_rows())
+        _save_done(state_path, done)
+
     for _i, r in enumerate(pending, 1):
         if should_cancel and should_cancel():
+            persist_now()
             log.info("canceled — stopping enrichment (state saved)")
             break
         if progress_cb:
@@ -207,9 +216,7 @@ def run_enrichment(
             all_contacts = _drop_company(all_contacts, company)
             all_contacts.extend(cached)
             done.add(company)
-            _save_done(state_path, done)
-            write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
-                           columns=CONTACT_COLS)
+            persist()
             cache_hits += 1
             log.info("%s: %s contacts (cache)", company, len(cached))
             continue
@@ -242,25 +249,20 @@ def run_enrichment(
             log.info("%s: +%s contacts%s", company, len(got),
                      f" (upgraded from {cached_src})" if cached is not None else "")
             done.add(company)
-            _save_done(state_path, done)
-            write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
-                           columns=CONTACT_COLS)
+            persist(force=True)
         elif cached is not None:
             all_contacts.extend(cached)
             log.info("%s: kept %s %s contacts (no %s contacts found)",
                      company, len(cached), cached_src, cur_provider)
             done.add(company)
-            _save_done(state_path, done)
-            write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
-                           columns=CONTACT_COLS)
+            persist()
         elif not exhausted:
             # Genuine empty result (no people found) — do not retry forever.
             done.add(company)
-            _save_done(state_path, done)
-            write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
-                           columns=CONTACT_COLS)
+            persist(force=True)
 
         if exhausted:
+            persist_now()
             log.warning("Apollo out of credits after %r — %s contacts saved. "
                         "Top up and Start again to resume.",
                         company, len(got) if got else 0)
@@ -300,8 +302,8 @@ def run_enrichment(
                 time.sleep(poll_interval)
         merged = merge_phones(all_contacts, store)
         log.info("Merged %s phone numbers.", merged)
-        write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
-                       columns=CONTACT_COLS)
+
+    persist_now()
 
     # Persist the REAL Apollo credit tally — 0 when everything came from cache or
     # the LARA path (so the summary never shows a misleading estimate).

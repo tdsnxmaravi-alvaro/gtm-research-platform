@@ -12,6 +12,8 @@ import re
 from pathlib import Path
 
 from ..config.schema import CampaignConfig
+from ..io import csv_safe, read_csv_dicts
+from .datech_match import normalize_name
 
 MASTER_COLS = [
     "tier", "score", "company", "website", "country", "employees", "software_resold",
@@ -60,24 +62,8 @@ _CONTACT_PRIORITY = ["president", "ceo", "owner", "founder", "managing director"
 _TIER_ORDER = {"A": 0, "B": 1, "C": 2, "D": 3, "": 9}
 
 
-def normalize_name(name: str) -> str:
-    """Normalize a company name for deduplication."""
-    n = (name or "").upper().strip()
-    n = re.sub(r"\(.*?\)", "", n)
-    for suf in (" INC.", " INC", " LLC", " LTD.", " LTD", " CORP.", " CORP",
-                " CO.", " CO", " L.P.", " LP", " LIMITED", " PTE",
-                " S.L.U.", " S.L.", " SL", " S.A.", " SA", " SLU", " LDA"):
-        if n.endswith(suf):
-            n = n[:-len(suf)]
-    n = re.sub(r"[^A-Z0-9 ]", "", n)
-    return re.sub(r"\s+", " ", n).strip()
-
-
 def _read_csv(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
-    with open(path, encoding="utf-8-sig", newline="") as f:
-        return list(csv.DictReader(f))
+    return read_csv_dicts(path)
 
 
 _BAD_DOMAIN_HINTS = ("not found", "n/a", "unknown", "unverified", "no website")
@@ -301,10 +287,11 @@ def _summary_row(config: CampaignConfig, r: dict, tier: str, cs: list[dict]) -> 
 
 def _write_csv(rows: list[dict], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    safe_rows = [{k: csv_safe(r.get(k, "")) for k in MASTER_COLS} for r in rows]
     with open(path, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.DictWriter(f, fieldnames=MASTER_COLS, extrasaction="ignore")
         w.writeheader()
-        w.writerows(rows)
+        w.writerows(safe_rows)
 
 
 def _write_xlsx(summary_rows: list[dict], contact_rows: list[dict], path: Path) -> None:
@@ -393,7 +380,11 @@ def _fill_sheet(ws, title: str, spec: list, rows: list[dict]) -> None:
         cell.border = border
     for ri, r in enumerate(rows, 2):
         for ci, (_header, key) in enumerate(spec, 1):
-            cell = ws.cell(row=ri, column=ci, value=r.get(key, ""))
+            raw = r.get(key, "")
+            val = csv_safe(raw)
+            cell = ws.cell(row=ri, column=ci, value=val)
+            if isinstance(val, str) and val.startswith("'"):
+                cell.number_format = "@"
             cell.border = border
             cell.alignment = Alignment(vertical="top", wrap_text=key in _XLSX_WRAP,
                                        horizontal="center" if key in _XLSX_CENTER else "left")

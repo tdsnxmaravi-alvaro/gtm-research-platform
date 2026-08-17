@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import csv
 import re
 from pathlib import Path
 
 from ..config.schema import CampaignConfig
+from ..io import read_csv_dicts
 from .email_gen import generate_outreach
 from .eml import write_eml
 
@@ -45,8 +45,7 @@ def run_outreach(
         print("No master.csv — run `gtm consolidate` first.")
         return []
 
-    with open(master_path, encoding="utf-8-sig", newline="") as f:
-        rows = list(csv.DictReader(f))
+    rows = read_csv_dicts(master_path)
 
     cap = _TIER_ORDER.get((min_tier or config.outreach.min_tier or "B").upper(), 1)
 

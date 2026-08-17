@@ -9,6 +9,7 @@ Correctness lessons carried over from the BricsCAD pipeline:
 from __future__ import annotations
 
 import email.policy
+import re
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid, formataddr
 from pathlib import Path
@@ -40,6 +41,17 @@ def _plain_to_html(body: str) -> str:
         'background:#fafbfc; font-size:9pt; color:#8a8f98;">TD SYNNEX</div>'
         '</div></body></html>'
     )
+
+
+# RFC 5322 allows 998; keep subjects/names short so Outlook does not wrap oddly.
+_HEADER_MAX = 200
+
+
+def _header_text(value: str, max_len: int = _HEADER_MAX) -> str:
+    """Strip CR/LF (header injection) and cap length before assigning headers."""
+    s = (value or "").replace("\r", " ").replace("\n", " ")
+    s = re.sub(r"[ \t]+", " ", s).strip()
+    return s[:max_len]
 
 
 # Marker in a branded sample .eml where the per-company body is injected.
@@ -137,6 +149,11 @@ def write_eml(
     branded box when neither is provided.
     """
     msg = EmailMessage()
+    subject = _header_text(subject)
+    to_email = _header_text(to_email)
+    to_name = _header_text(to_name)
+    from_email = _header_text(from_email)
+    from_name = _header_text(from_name)
     msg["Subject"] = subject
     if from_email:
         msg["From"] = formataddr((from_name or None, from_email))
