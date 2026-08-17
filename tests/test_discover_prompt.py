@@ -158,3 +158,69 @@ def test_discover_runs_one_pass_per_country(tmp_path):
     assert {r["country"] for r in rows} == {"United States", "Canada"}
     assert any("United States" in p for p in fake.prompts)
     assert any("Canada" in p for p in fake.prompts)
+
+
+def _slow_provider(sleep_s=0.12):
+    import threading
+    import time
+    import types
+
+    lock = threading.Lock()
+    state = {"in_flight": 0, "max_in_flight": 0, "prompts": []}
+
+    class Slow:
+        def send(self, prompt):
+            with lock:
+                state["in_flight"] += 1
+                state["max_in_flight"] = max(state["max_in_flight"], state["in_flight"])
+                state["prompts"].append(prompt)
+            time.sleep(sleep_s)
+            with lock:
+                state["in_flight"] -= 1
+            return types.SimpleNamespace(
+                text='{"results":[{"company":"Acme","website":"https://a.com","dimension_scores":[]}]}')
+
+    return Slow(), state
+
+
+def test_discover_keys_overlap_when_concurrency_gt_1(tmp_path):
+    from gtm.research.runner import run_campaign
+    v = discover_verticals("Trimble", slugs=["structural-steel-detailing"])[0]
+    c = _discover_cfg(
+        country="", countries=["United States", "Canada"], verticals=[v],
+        research_concurrency=2,
+    )
+    prov, state = _slow_provider()
+    run_campaign(c, provider=prov, out_dir=tmp_path, delay=0, resume=False)
+    assert state["max_in_flight"] >= 2
+    assert len(state["prompts"]) == 2
+
+
+def test_discover_concurrent_waves_stop_on_cancel(tmp_path):
+    from gtm.research.runner import run_campaign
+    v = discover_verticals("Trimble", slugs=["structural-steel-detailing"])[0]
+    countries = ["United States", "Canada", "Spain", "France"]
+    c = _discover_cfg(
+        country="", countries=countries, verticals=[v], research_concurrency=2,
+    )
+    fake = _FakeProvider()
+    run_campaign(
+        c, provider=fake, out_dir=tmp_path, delay=0, resume=False,
+        should_cancel=lambda: len(fake.prompts) >= 2,
+    )
+    assert 1 <= len(fake.prompts) <= 2
+
+
+def test_discover_skips_checkpointed_keys_under_concurrency(tmp_path):
+    from gtm.research.runner import run_campaign, _save_state
+    v = discover_verticals("Trimble", slugs=["structural-steel-detailing"])[0]
+    c = _discover_cfg(
+        country="", countries=["United States", "Canada"], verticals=[v],
+        research_concurrency=2,
+    )
+    _save_state(tmp_path / "state.json", {"United States|Trimble|structural-steel-detailing"})
+    fake = _FakeProvider()
+    run_campaign(c, provider=fake, out_dir=tmp_path, delay=0, resume=True)
+    assert len(fake.prompts) == 1
+    assert any("Canada" in p for p in fake.prompts)
+    assert not any("United States" in p for p in fake.prompts)

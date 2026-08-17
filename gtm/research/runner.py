@@ -5,7 +5,10 @@ call the provider, parse + score results. Resumable (per-company state) with
 per-batch audit logs.
 
 Discover mode: build a broad or per-vertical prompt, call the provider, parse +
-score the returned companies. Resumable per (product, vertical).
+score the returned companies. Resumable per (country, product, vertical). Country
+× product × vertical keys run in bounded concurrent waves (`research_concurrency`),
+same cancel/checkpoint semantics as provided-mode batches. High concurrency can
+trip LLM/web-search rate limits — keep the default modest.
 
 Manual provider: `send()` is unsupported; use ingest_manual() with pasted output.
 """
@@ -396,39 +399,63 @@ def run_campaign(
     else:  # discover
         targets = config.verticals or [None]
         run_countries = config.countries or [config.country]
-        total = len(config.products) * len(targets) * len(run_countries)
-        step_n = 0
-        if progress_cb:
-            progress_cb(0, total)
+        jobs = []
         for country in run_countries:
             for product in config.products:
                 for vert in targets:
-                    if should_cancel and should_cancel():
-                        persist_results_now()
-                        print("  canceled — stopping after saved progress")
-                        return all_results
                     key = f"{country}|{product.name}|{vert.slug if vert else 'broad'}"
-                    if key in done:
-                        step_n += 1
-                        if progress_cb:
-                            progress_cb(step_n, total)
-                        continue
-                    prompt = build_prompt(config, product, vertical=vert, country=country)
-                    scored = _run_batch(config, providers, prompt, logs,
-                                        key.replace("|", "_").replace(" ", ""), passes, delay,
-                                        provider_stats=provider_stats)
-                    for r in scored:
-                        r["product"] = product.name
-                        r["vertical"] = vert.name if vert else ""
-                        r["country"] = country
-                    all_results.extend(scored)
-                    done.add(key)
-                    persist_results(force=True)
-                    step_n += 1
-                    if progress_cb:
-                        progress_cb(step_n, total)
-                    print(f"  {key}: +{len(scored)} results")
-                    time.sleep(delay)
+                    jobs.append((key, country, product, vert))
+        pending = [j for j in jobs if j[0] not in done]
+        total = len(jobs)
+        step_n = total - len(pending)
+        if progress_cb:
+            progress_cb(step_n, total)
+        concurrency = max(1, getattr(config, "research_concurrency", 1) or 1)
+
+        def _process_key(item):
+            key, country, product, vert = item
+            prompt = build_prompt(config, product, vertical=vert, country=country)
+            scored = _run_batch(config, providers, prompt, logs,
+                                key.replace("|", "_").replace(" ", ""), passes, delay,
+                                provider_stats=provider_stats)
+            for r in scored:
+                r["product"] = product.name
+                r["vertical"] = vert.name if vert else ""
+                r["country"] = country
+            return key, scored
+
+        def _accept_key(key, scored) -> None:
+            nonlocal step_n
+            all_results.extend(scored)
+            done.add(key)
+            persist_results(force=True)
+            step_n += 1
+            if progress_cb:
+                progress_cb(step_n, total)
+            print(f"  {key}: +{len(scored)} results")
+
+        if concurrency <= 1 or len(pending) <= 1:
+            for item in pending:
+                if should_cancel and should_cancel():
+                    persist_results_now()
+                    print("  canceled — stopping after saved progress")
+                    return all_results
+                _accept_key(*_process_key(item))
+                time.sleep(delay)
+        else:
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            w = 0
+            while w < len(pending):
+                if should_cancel and should_cancel():
+                    persist_results_now()
+                    print("  canceled — stopping after saved progress")
+                    return all_results
+                wave = pending[w:w + concurrency]
+                with ThreadPoolExecutor(max_workers=concurrency) as ex:
+                    futs = [ex.submit(_process_key, item) for item in wave]
+                    for fut in as_completed(futs):
+                        _accept_key(*fut.result())
+                w += concurrency
 
     if provider_stats:
         counts = {p: len(s) for p, s in provider_stats.items()}

@@ -266,8 +266,9 @@ class CampaignConfig(BaseModel):
     # Reuse a company's scored analysis for the same vendor/product across runs and
     # campaigns (saves LLM tokens). Disable to force fresh research.
     research_cache: bool = True
-    # Research batches to run concurrently (provided mode). >1 sends parallel LLM
-    # requests so a large list finishes far faster; keep modest to respect rate limits.
+    # Research jobs to run concurrently (provided-mode batches and discover-mode
+    # country×product×vertical keys). >1 sends parallel LLM requests so a large
+    # list finishes far faster; keep modest to respect provider rate limits.
     research_concurrency: int = 3
     # Extra attempts (after the first) for a provider call that errors transiently,
     # so one flaky batch doesn't silently drop an ensemble member.

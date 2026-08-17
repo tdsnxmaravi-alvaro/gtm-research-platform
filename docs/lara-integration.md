@@ -157,8 +157,10 @@ requested per call via a flag.
    and per-agent API keys (or a single key). Confirm which assistants can enable **web search**.
 2. **Strict JSON output** — all four rely on JSON-only replies. Best results come from a system
    prompt that returns *only* a JSON object (no prose/markdown). Can we lock this behavior?
-3. **Concurrency / rate limits** — research runs **~3 parallel** calls (configurable higher).
-   What concurrency and per-minute limits can we rely on? Any burst throttling to design around?
+3. **Concurrency / rate limits** — research runs **~3 parallel** calls (configurable via
+   `research_concurrency`) in both provided-mode batches and discover-mode country ×
+   vertical keys. What concurrency and per-minute limits can we rely on? Any burst
+   throttling to design around?
 4. **Latency** — typical response time for a web-search research call? This drives batch size
    and concurrency (goal: avoid multi-hour runs).
 5. **Payload limits** — max prompt size / token budget per call (affects how many companies we

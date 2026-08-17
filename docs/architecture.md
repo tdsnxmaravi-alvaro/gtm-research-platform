@@ -99,8 +99,10 @@ flowchart LR
 ```
 
 > **Evidence-gated scoring:** without a verifiable source URL, a company cannot exceed the
-> capped tier. **Concurrency:** in provided mode, research batches run in parallel waves
-> (`research_concurrency`, default 3).
+> capped tier. **Concurrency:** research jobs run in parallel waves
+> (`research_concurrency`, default 3) for provided-mode batches **and** discover-mode
+> country × product × vertical keys. Raising this speeds multi-country Datech lists
+> but can trip LLM/web-search rate limits.
 
 ---
 
