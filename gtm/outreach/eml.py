@@ -35,6 +35,8 @@ def _plain_to_html(body: str) -> str:
     return (
         '<html><body style="margin:0; padding:24px; background:#f4f5f7; '
         f'font-family:{_BODY_FONT}; font-size:11pt; color:#1a1a1a;">'
+        # Editable line above the card so Outlook's auto-signature lands above it.
+        f'<p style="margin:0 0 16px 0; font-family:{_BODY_FONT};">&nbsp;</p>'
         '<div style="max-width:640px; margin:0 auto; background:#ffffff; '
         'border:1px solid #e1e4e8; border-radius:8px; overflow:hidden;">'
         '<div style="height:6px; background:#005758;"></div>'
@@ -77,6 +79,8 @@ def _branded_html(body: str, logo_cid: str | None = None) -> str:
     return (
         '<html><body style="margin:0; padding:24px; background:#f4f5f7; '
         f'font-family:{_BODY_FONT}; font-size:11pt; color:#1a1a1a;">'
+        # Editable line above the card so Outlook's auto-signature lands above it.
+        f'<p style="margin:0 0 16px 0; font-family:{_BODY_FONT};">&nbsp;</p>'
         '<div style="max-width:640px; margin:0 auto; background:#ffffff; '
         'border:1px solid #e1e4e8; border-radius:8px; overflow:hidden;">'
         f'{banner}'
