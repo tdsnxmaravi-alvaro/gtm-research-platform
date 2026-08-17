@@ -119,6 +119,87 @@ class ResearchTaskTests(APITestCase):
         self.assertEqual(run.result_count, 1)
 
 
+class PipelineDispatchTests(APITestCase):
+    """#26: Celery .delay() in production; thread/eager locally; one in-flight run."""
+
+    def test_run_pipeline_is_a_celery_task(self):
+        from api.tasks import run_pipeline
+        self.assertTrue(hasattr(run_pipeline, "delay"),
+                        "run_pipeline must be a Celery shared_task")
+
+    def test_start_dispatches_via_delay_when_not_testing(self):
+        from api.tasks import run_pipeline
+        campaign = Campaign.objects.create(name="t-delay", config=VALID_CONFIG)
+        with override_settings(TESTING=False, RUN_STAGES_IN_THREAD=False):
+            with patch.object(run_pipeline, "delay") as delay:
+                resp = self.client.post(f"/api/campaigns/{campaign.id}/start/")
+        self.assertEqual(resp.status_code, 202, resp.content)
+        delay.assert_called_once_with(campaign.id)
+
+    def test_start_uses_thread_when_configured(self):
+        campaign = Campaign.objects.create(name="t-thread", config=VALID_CONFIG)
+        with override_settings(TESTING=False, RUN_STAGES_IN_THREAD=True):
+            with patch("threading.Thread") as thread_cls:
+                thread_cls.return_value.start = lambda: None
+                resp = self.client.post(f"/api/campaigns/{campaign.id}/start/")
+        self.assertEqual(resp.status_code, 202, resp.content)
+        thread_cls.assert_called_once()
+        target = thread_cls.call_args.kwargs.get("target")
+        if target is None and thread_cls.call_args.args:
+            target = thread_cls.call_args.args[0]
+        from api.tasks import run_pipeline
+        self.assertIs(target, run_pipeline)
+        self.assertTrue(thread_cls.call_args.kwargs.get("daemon"))
+
+    def test_start_rejects_in_flight_run(self):
+        campaign = Campaign.objects.create(name="t-busy", config=VALID_CONFIG)
+        Run.objects.create(campaign=campaign, stage="research", status="running")
+        resp = self.client.post(f"/api/campaigns/{campaign.id}/start/")
+        self.assertEqual(resp.status_code, 409, resp.content)
+        self.assertIn("progress", resp.json().get("error", "").lower()
+                      + resp.json().get("detail", "").lower())
+
+    def test_relaunch_rejects_in_flight_run(self):
+        campaign = Campaign.objects.create(name="t-busy-rl", config=VALID_CONFIG)
+        Run.objects.create(campaign=campaign, stage="enrich", status="pending")
+        resp = self.client.post(f"/api/campaigns/{campaign.id}/relaunch/")
+        self.assertEqual(resp.status_code, 409, resp.content)
+
+    def test_run_pipeline_stage_order_when_enrich_and_outreach(self):
+        from api.tasks import run_pipeline
+        cfg = dict(VALID_CONFIG)
+        cfg["name"] = "t-order"
+        cfg["enrichment"] = {"provider": "lara", "want": "emails"}
+        cfg["outreach"] = {"enabled": True, "min_tier": "C", "language": "en"}
+        campaign = Campaign.objects.create(name="t-order", config=cfg)
+        seen: list[str] = []
+
+        def _fake_stage(run_id, cfg_dict, stage, name, fresh=False):
+            seen.append(stage)
+            Run.objects.filter(pk=run_id).update(status="done")
+
+        with patch("api.tasks.run_stage", side_effect=_fake_stage):
+            run_pipeline(campaign.id)
+        self.assertEqual(seen, ["research", "consolidate", "enrich", "outreach"])
+
+    def test_run_pipeline_skips_enrich_and_outreach_when_disabled(self):
+        from api.tasks import run_pipeline
+        cfg = dict(VALID_CONFIG)
+        cfg["name"] = "t-skip"
+        cfg["enrichment"] = {"want": "none"}
+        cfg["outreach"] = {"enabled": False}
+        campaign = Campaign.objects.create(name="t-skip", config=cfg)
+        seen: list[str] = []
+
+        def _fake_stage(run_id, cfg_dict, stage, name, fresh=False):
+            seen.append(stage)
+            Run.objects.filter(pk=run_id).update(status="done")
+
+        with patch("api.tasks.run_stage", side_effect=_fake_stage):
+            run_pipeline(campaign.id)
+        self.assertEqual(seen, ["research", "consolidate"])
+
+
 APOLLO_CONFIG = {
     "name": "t-relaunch",
     "target_type": "resellers",

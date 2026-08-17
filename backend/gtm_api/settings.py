@@ -107,4 +107,10 @@ CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", "7200"))
 # request returns immediately and progress (%) is pollable. Disabled under the
 # test runner so tasks execute synchronously (eager) and assertions are stable.
 TESTING = "test" in sys.argv
-RUN_STAGES_IN_THREAD = CELERY_TASK_ALWAYS_EAGER and not TESTING
+# Docker compose leaves this unset (false) so the worker receives .delay() jobs.
+# Local README sets CELERY_TASK_ALWAYS_EAGER=true, which still means a thread
+# (not a blocked HTTP request) unless RUN_STAGES_IN_THREAD is set explicitly.
+if os.getenv("RUN_STAGES_IN_THREAD") is not None:
+    RUN_STAGES_IN_THREAD = os.getenv("RUN_STAGES_IN_THREAD", "").lower() in ("true", "1", "yes")
+else:
+    RUN_STAGES_IN_THREAD = CELERY_TASK_ALWAYS_EAGER and not TESTING

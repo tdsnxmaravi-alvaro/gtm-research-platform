@@ -17,14 +17,33 @@ ALLOWED_IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp")
 
 
 def _run_bg(fn, *args, **kwargs) -> None:
-    """Run a pipeline/stage in a background thread so the HTTP request returns
-    immediately (the frontend polls for progress). Runs synchronously under the
-    test runner so assertions stay deterministic."""
+    """Dispatch a pipeline/stage job.
+
+    * TESTING: run synchronously so assertions stay deterministic.
+    * RUN_STAGES_IN_THREAD: daemon thread (local dev without Redis).
+    * otherwise: Celery ``.delay()`` so the Docker ``worker`` service actually runs.
+    """
     if getattr(settings, "TESTING", False):
         fn(*args, **kwargs)
-    else:
+        return
+    if getattr(settings, "RUN_STAGES_IN_THREAD", False):
         import threading
         threading.Thread(target=fn, args=args, kwargs=kwargs, daemon=True).start()
+        return
+    fn.delay(*args, **kwargs)
+
+
+_IN_FLIGHT = ("pending", "running")
+
+
+def _busy_response(campaign):
+    """409 when this campaign already has a pending/running stage."""
+    if campaign.runs.filter(status__in=_IN_FLIGHT).exists():
+        return Response(
+            {"error": "A run is already in progress for this campaign."},
+            status=status.HTTP_409_CONFLICT,
+        )
+    return None
 
 
 def _out_dir(name: str) -> Path:
@@ -339,10 +358,12 @@ class CampaignViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST)
         return Response(report)
 
-    def _start(self, campaign, stage) -> Run:
+    def _start(self, campaign, stage) -> Run | Response:
+        busy = _busy_response(campaign)
+        if busy is not None:
+            return busy
         run = Run.objects.create(campaign=campaign, stage=stage, status="pending")
         clear_cancel(campaign.name)
-        # Background thread (or synchronous under tests) — no broker required.
         _run_bg(run_stage, run.id, campaign.config, stage, campaign.name)
         return run
 
@@ -351,6 +372,9 @@ class CampaignViewSet(viewsets.ModelViewSet):
         """Run the whole pipeline (research -> consolidate -> enrich -> outreach)
         phase by phase, stopping on error or when stopped. Resumable."""
         campaign = self.get_object()
+        busy = _busy_response(campaign)
+        if busy is not None:
+            return busy
         _run_bg(run_pipeline, campaign.id)
         return Response({"started": True}, status=status.HTTP_202_ACCEPTED)
 
@@ -418,6 +442,9 @@ class CampaignViewSet(viewsets.ModelViewSet):
         rebuilt). Shared caches are kept so Apollo is never re-charged for a company
         already enriched. Guarded by the client-side confirmation modal."""
         campaign = self.get_object()
+        busy = _busy_response(campaign)
+        if busy is not None:
+            return busy
         _run_bg(run_pipeline, campaign.id, fresh=True)
         return Response({"relaunched": True}, status=status.HTTP_202_ACCEPTED)
 
@@ -507,21 +534,29 @@ class CampaignViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def research(self, request, pk=None):
         run = self._start(self.get_object(), "research")
+        if isinstance(run, Response):
+            return run
         return Response(RunSerializer(run).data, status=status.HTTP_202_ACCEPTED)
 
     @action(detail=True, methods=["post"])
     def enrich(self, request, pk=None):
         run = self._start(self.get_object(), "enrich")
+        if isinstance(run, Response):
+            return run
         return Response(RunSerializer(run).data, status=status.HTTP_202_ACCEPTED)
 
     @action(detail=True, methods=["post"])
     def consolidate(self, request, pk=None):
         run = self._start(self.get_object(), "consolidate")
+        if isinstance(run, Response):
+            return run
         return Response(RunSerializer(run).data, status=status.HTTP_202_ACCEPTED)
 
     @action(detail=True, methods=["post"])
     def outreach(self, request, pk=None):
         run = self._start(self.get_object(), "outreach")
+        if isinstance(run, Response):
+            return run
         return Response(RunSerializer(run).data, status=status.HTTP_202_ACCEPTED)
 
     @action(detail=True, methods=["get"])

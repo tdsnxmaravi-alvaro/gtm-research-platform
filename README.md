@@ -118,8 +118,8 @@ installing the package as editable.
 
 HTTP wrapper over the `gtm` engine. Config comes from environment variables;
 SQLite locally, Postgres via `DATABASE_URL`. Pipeline stages run in a **background
-thread** in local dev (`CELERY_TASK_ALWAYS_EAGER=true`). Celery + Redis is wired
-in Docker for a worker-style deploy.
+thread** in local dev (`CELERY_TASK_ALWAYS_EAGER=true` or `RUN_STAGES_IN_THREAD=true`).
+Docker Compose uses Celery `.delay()` so the `worker` service runs the pipeline.
 
 ## Running the servers
 

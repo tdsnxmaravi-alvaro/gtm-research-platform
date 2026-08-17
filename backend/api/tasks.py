@@ -223,6 +223,7 @@ def run_stage(run_id: int, cfg_dict: dict, stage: str, name: str,
 # --------------------------------------------------------------------------- #
 # Full pipeline — run the stages in order, stopping on error or cancel.
 # --------------------------------------------------------------------------- #
+@shared_task
 def run_pipeline(campaign_id: int, fresh: bool = False) -> None:
     """Run research -> (enrich) -> consolidate -> (outreach) sequentially.
 

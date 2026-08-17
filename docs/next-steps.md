@@ -185,7 +185,7 @@ Full CSV rewrite per company is O(n²) I/O. Acceptable for small lists; painful 
 
 ### P2 — Local pipeline / API behavior
 
-#### [#26](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/26) — Dispatch pipeline through Celery `.delay()` (threads are not the worker)
+#### [#26](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/26) — Dispatch pipeline through Celery `.delay()` (threads are not the worker) — **done**
 
 **Labels:** `bug`  
 **Files:** `backend/api/views.py` `_run_bg`, `backend/api/tasks.py` `run_pipeline`, `backend/gtm_api/settings.py`
@@ -282,12 +282,11 @@ Do **not** start these until a maintainer asks. They are the 2026-08 security re
 Do **not** start with P4 unless the deployment target changes.
 
 1. **#5** (existing) — decide A vs B for ensemble web-search; implement; close #5.  
-2. **#26** Celery dispatch if anyone runs Docker `worker` or gunicorn.  
-3. **#28** then **#27** frontend leaks / sender / sandbox.  
-4. **#29** discover concurrency if multi-country discover is used.  
-5. **#30** tests, **#31** tooling, **#32** vendor data extraction.
+2. **#28** then **#27** frontend leaks / sender / sandbox.  
+3. **#29** discover concurrency if multi-country discover is used.  
+4. **#30** tests, **#31** tooling, **#32** vendor data extraction.
 
-**Done in this pass:** #22 formula injection, #23 eml headers, #24 Datech index, #25 CSV checkpoints.
+**Done:** #22–#26.
 
 ---
 
@@ -307,8 +306,8 @@ Do **not** start with P4 unless the deployment target changes.
 ## 8. Quick map: closed vs create vs skip
 
 ```text
-GitHub CLOSED:  #1–#4, #6–#21, #22–#25 (P1), #39–#44 (da85348 reliability)
-GitHub OPEN:    #5, #26–#32 (do these); #33–#38 (P4, wait)
+GitHub CLOSED:  #1–#4, #6–#21, #22–#26, #39–#44
+GitHub OPEN:    #5, #27–#32 (do these); #33–#38 (P4, wait)
 SKIP:           re-doing enrichment/wizard phases; duplicating #5/#22–#44; implementing P4 unasked
 ```
 
