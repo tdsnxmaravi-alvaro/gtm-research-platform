@@ -12,6 +12,7 @@ import re
 import ast
 
 from ..config.schema import CampaignConfig, language_for_country
+from ..config.org import channel_name, org_name
 
 
 def _first_name(full: str) -> str:
@@ -41,14 +42,15 @@ def render_template(config: CampaignConfig, row: dict) -> tuple[str, str]:
     fit = _short(row.get("fit_summary", ""))
     vp = _short(config.products[0].value_prop if config.products else "", 200)
     sig_name = (config.outreach.sender_name or "").strip()
-    signoff_lines = [sig_name, "TD SYNNEX"] if sig_name else ["TD SYNNEX"]
+    org = org_name(config)
+    signoff_lines = [sig_name, org] if sig_name else [org]
 
     if lang.startswith("es"):
         greet = f"Hola {first}:" if first else "Hola:"
         subject = config.outreach.subject or f"{company} × {product}: una oportunidad para tu portfolio"
         parts = [
             greet,
-            f"Te escribo desde TD SYNNEX sobre {product}. {vp}".strip(),
+            f"Te escribo desde {org} sobre {product}. {vp}".strip(),
             f"Según nuestro análisis, {company} encaja bien para incorporarlo a su portfolio: {fit}".strip(),
         ]
         if rec:
@@ -60,7 +62,7 @@ def render_template(config: CampaignConfig, row: dict) -> tuple[str, str]:
         subject = config.outreach.subject or f"{company} × {product}: uma oportunidade para o seu portfólio"
         parts = [
             greet,
-            f"Escrevo da TD SYNNEX sobre {product}. {vp}".strip(),
+            f"Escrevo da {org} sobre {product}. {vp}".strip(),
             f"Segundo a nossa análise, a {company} encaixa bem para o incorporar ao seu portfólio: {fit}".strip(),
         ]
         if rec:
@@ -72,7 +74,7 @@ def render_template(config: CampaignConfig, row: dict) -> tuple[str, str]:
         subject = config.outreach.subject or f"{company} × {product}: a fit worth a conversation"
         parts = [
             greet,
-            f"I'm reaching out from TD SYNNEX about {product}. {vp}".strip(),
+            f"I'm reaching out from {org} about {product}. {vp}".strip(),
             f"Based on our research, {company} looks like a strong fit to add it to your portfolio: {fit}".strip(),
         ]
         if rec:
@@ -160,30 +162,32 @@ def _template_followup(config: CampaignConfig, row: dict) -> str:
     company = row.get("company", "")
     product = row.get("product") or (config.products[0].name if config.products else "our solution")
     sig_name = (config.outreach.sender_name or "").strip()
+    org = org_name(config)
+    channel = channel_name(config)
     if lang.startswith("es"):
         greet = f"Hola {first}:" if first else "Hola:"
         lines = [greet,
                  f"Retomo mi mensaje anterior sobre {product} para {company}.",
                  "Sigue en pie una breve llamada para verlo con calma; "
                  "si lo lleva otra persona, con gusto me pones en contacto.",
-                 "\n".join(["Un saludo,", sig_name, "TD SYNNEX"] if sig_name
-                           else ["Un saludo,", "El equipo Datech de TD SYNNEX"])]
+                 "\n".join(["Un saludo,", sig_name, org] if sig_name
+                           else ["Un saludo,", f"El equipo {channel} de {org}"])]
     elif lang.startswith("pt"):
         greet = f"Olá {first}," if first else "Olá,"
         lines = [greet,
                  f"Retomando a minha mensagem anterior sobre {product} para a {company}.",
                  "Continua de pé uma breve chamada para o vermos com calma; "
                  "se for outra pessoa a tratar disto, agradeço que me encaminhe.",
-                 "\n".join(["Cumprimentos,", sig_name, "TD SYNNEX"] if sig_name
-                           else ["Cumprimentos,", "A equipa Datech da TD SYNNEX"])]
+                 "\n".join(["Cumprimentos,", sig_name, org] if sig_name
+                           else ["Cumprimentos,", f"A equipa {channel} da {org}"])]
     else:
         greet = f"Hi {first}," if first else "Hi,"
         lines = [greet,
                  f"Circling back on my earlier note about {product} for {company}.",
                  "A short call still stands whenever it suits you; if someone else owns "
                  "this, please point me their way.",
-                 "\n".join(["Best regards,", sig_name, "TD SYNNEX"] if sig_name
-                           else ["Best regards,", "The TD SYNNEX Datech Team"])]
+                 "\n".join(["Best regards,", sig_name, org] if sig_name
+                           else ["Best regards,", f"The {org} {channel} Team"])]
     return "\n\n".join(lines)
 
 
@@ -197,9 +201,12 @@ def _template_talking_points(config: CampaignConfig, row: dict) -> str:
     product = row.get("product") or (config.products[0].name if config.products else "our solution")
     fit = _short(row.get("fit_summary", ""), 160)
     rec = row.get("recommended_products", "")
+    org = org_name(config)
+    channel = channel_name(config)
+    brand = f"{org} {channel}"
     if lang.startswith("es"):
         pts = [
-            f"Apertura: {first or 'Hola'}, te llamo de TD SYNNEX Datech; sumamos partners de {product} "
+            f"Apertura: {first or 'Hola'}, te llamo de {brand}; sumamos partners de {product} "
             f"donde ya encaja el flujo de trabajo del cliente.",
             f"Encaje: por qué {company} encaja — {fit}." if fit else f"Encaje: {company} encaja bien.",
             f"Historia de ingresos: {product} añade una línea de software (licencias + migración, "
@@ -208,7 +215,7 @@ def _template_talking_points(config: CampaignConfig, row: dict) -> str:
         ]
     elif lang.startswith("pt"):
         pts = [
-            f"Abertura: {first or 'Olá'}, ligo da TD SYNNEX Datech; estamos a somar parceiros de {product} "
+            f"Abertura: {first or 'Olá'}, ligo da {brand}; estamos a somar parceiros de {product} "
             "onde o fluxo de trabalho do cliente já encaixa.",
             f"Encaixe: porque é que a {company} encaixa — {fit}." if fit else f"Encaixe: a {company} encaixa bem.",
             f"História de receita: {product} acrescenta uma linha de software (licenças + migração, "
@@ -217,7 +224,7 @@ def _template_talking_points(config: CampaignConfig, row: dict) -> str:
         ]
     else:
         pts = [
-            f"Opener: {first or 'Hi'}, calling from TD SYNNEX Datech — we're adding {product} reseller "
+            f"Opener: {first or 'Hi'}, calling from {brand} — we're adding {product} reseller "
             "partners where that workflow is already part of the customer conversation.",
             f"Fit: why {company} fits — {fit}." if fit else f"Fit: {company} looks like a strong fit.",
             f"Revenue story: {product} adds a software line (licensing plus migration, training and "
@@ -262,7 +269,7 @@ def _agent_outreach(prov, config: CampaignConfig, row: dict,
         f"Contact: {row.get('contact_name','')} ({row.get('title','')}). "
         f"Why they fit: {row.get('fit_summary','')}. "
         f"Recommended products: {row.get('recommended_products','')}. "
-        f"Sender: {config.outreach.sender_name or 'TD SYNNEX'}.\n\n"
+        f"Sender: {config.outreach.sender_name or org_name(config)}.\n\n"
         "Also write a short follow-up email: 'followup_subject' as 'Re: <the subject>' and a "
         "2-4 line 'followup_body' that politely circles back and restates the single value point. "
         + tp_line +

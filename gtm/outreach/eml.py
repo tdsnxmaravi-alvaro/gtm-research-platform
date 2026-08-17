@@ -14,6 +14,8 @@ from email.message import EmailMessage
 from email.utils import formatdate, make_msgid, formataddr
 from pathlib import Path
 
+from ..config.org import org_name
+
 # Corporate body-copy font (TD SYNNEX brand: Georgia Pro serif for body copy).
 _BODY_FONT = "Georgia, 'Georgia Pro', serif"
 
@@ -38,7 +40,7 @@ def _plain_to_html(body: str) -> str:
         '<div style="height:6px; background:#005758;"></div>'
         f'<div style="padding:28px 32px; line-height:1.5;">{inner}</div>'
         '<div style="padding:14px 32px; border-top:1px solid #eee; '
-        'background:#fafbfc; font-size:9pt; color:#8a8f98;">TD SYNNEX</div>'
+        f'background:#fafbfc; font-size:9pt; color:#8a8f98;">{org_name()}</div>'
         '</div></body></html>'
     )
 

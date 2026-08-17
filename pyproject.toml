@@ -27,6 +27,9 @@ gtm = "gtm.cli:main"
 [tool.setuptools.packages.find]
 include = ["gtm*"]
 
+[tool.setuptools.package-data]
+gtm = ["prompts/data/*", "prompts/*.json"]
+
 [tool.pytest.ini_options]
 # Ensure the repo root is importable when running `pytest` directly (CI),
 # not only via `python -m pytest`.

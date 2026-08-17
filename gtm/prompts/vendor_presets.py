@@ -1,194 +1,22 @@
 """Ready-made per-vendor qualification presets.
 
-Each vendor carries a value proposition, target-specific fit criteria and two
-vendor-specific scoring dimensions (~40 pts) that sit on top of the reusable
-universal dimensions (60 pts) from ``gtm.scoring.library``. Country is NOT baked
-in here — it stays a campaign variable and is injected by the prompt builder.
-
-The Trimble preset mirrors ``campaigns/trimble-iberia.yaml``; BricsCAD generalises
-the legacy per-vertical BricsCAD framework; the rest follow the same shape and are
-first drafts meant to be refined.
+Data lives in ``gtm/prompts/data/vendor_presets.yaml`` so onboarding a vendor is
+a data change, not a code change. Each vendor carries a value proposition,
+target-specific fit criteria and two vendor-specific scoring dimensions (~40 pts)
+on top of the reusable universal dimensions (60 pts) from ``gtm.scoring.library``.
+Country is not baked in — it stays a campaign variable injected by the prompt builder.
 """
 
 from __future__ import annotations
 
 import copy
+from pathlib import Path
 
-# --------------------------------------------------------------------------- #
-# Vendor descriptors. `sectors` + `domain` drive the generated specific
-# dimensions so the two-dimension rubric stays consistent across vendors.
-# --------------------------------------------------------------------------- #
-VENDOR_PRESETS: dict[str, dict] = {
-    "Trimble": {
-        "product_name": "Trimble AEC & design software portfolio",
-        "domain": "design / CAD / BIM / civil software",
-        "sectors": "architecture, engineering, construction, surveying, manufacturing",
-        "value_prop": (
-            "Trimble's channel software for design and the built environment, sold through "
-            "TD SYNNEX / Datech: Tekla Structures, Tekla Structural Designer and Tekla Tedds "
-            "(structural BIM, analysis, steel & concrete detailing); SketchUp (3D modeling); "
-            "Trimble Connect (common data environment / cloud collaboration); Viewpoint and "
-            "ProjectSight (construction & project management); and Quadri & Novapoint (civil "
-            "infrastructure design). We recruit TD SYNNEX resellers who could ADD this design "
-            "software to their portfolio — they need not sell design software today; the "
-            "question is capability, services and customer base to do so successfully."
-        ),
-        "reseller_fit": [
-            "Is a software-selling VAR (licensing, renewals, services), not a pure hardware / box-mover",
-            "Serves design-intensive sectors: architecture, engineering, construction, "
-            "manufacturing, industrial or creative/media",
-            "Shows adjacency to design/CAD/BIM/engineering/creative software (Autodesk, Bentley, "
-            "Nemetschek, PTC, Dassault, Adobe) — a strong plus, not a gate",
-            "Provides value-added services a design line requires: training, technical support, "
-            "implementation, certified staff",
-            "Has established commercial presence and delivery capability in the target country",
-            "Bonus: existing surveying / geospatial / civil-field footprint (Trimble Field Systems adjacency)",
-        ],
-        "account_fit": [
-            "Runs active AEC / engineering / construction or civil-infrastructure projects that need BIM, 3D or a CDE",
-            "Demand triggers: new project wins, hiring of designers/engineers/BIM staff, expansion, M&A",
-            "Uses or is actively replacing competing CAD/BIM tools (Autodesk, Bentley, Nemetschek)",
-            "Structural, civil or construction workflows that fit Tekla / Trimble Connect / Viewpoint",
-        ],
-    },
-    "Bricsys": {
-        "product_name": "BricsCAD",
-        "domain": "DWG-native CAD (2D drafting, 3D, BIM, mechanical)",
-        "sectors": "architecture, engineering, construction, manufacturing, industrial",
-        "value_prop": (
-            "BricsCAD (Bricsys, a Hexagon company) is a DWG-native CAD platform with full .dwg "
-            "compatibility and familiar commands, offered in editions: BricsCAD Lite (2D drafting), "
-            "Pro (2D + 3D modeling, LISP/BLADE automation and APIs), Mechanical (3D parts & assemblies), "
-            "BIM (DWG-based building information modeling) and Ultimate (all combined) — plus Bricsys 24/7 "
-            "for document/project collaboration. It runs on Windows, macOS and Linux, offers a "
-            "perpetual-license option versus subscription-only AutoCAD, and delivers lower total cost — a "
-            "credible AutoCAD alternative resellers can add without disrupting customers' CAD workflows."
-        ),
-        "reseller_fit": [
-            "Sells CAD / design / engineering software with services (licensing + renewals + implementation), not hardware only",
-            "Existing AutoCAD / Autodesk (or other CAD) footprint — a strong migration & cross-sell opportunity",
-            "Serves BricsCAD's DWG trades: AEC, mechanical, plant, metal fabrication, architecture, civil/survey, underground & electrical engineering",
-            "Develops CAD add-on applications / extensions (LISP / BRX / API) — the app-developer channel",
-            "Provides training, deployment, LISP/API customization and technical support for CAD",
-            "Can position perpetual-licensing / cost-savings and BIM or mechanical modules, not just 2D drafting",
-        ],
-        "account_fit": [
-            "Aggressively hiring CAD/BIM/drafting/engineering roles (needs more design seats) — a top trigger",
-            "Recent M&A, restructuring or cost-cutting forcing an IT/CAD license audit (network vs named-user AutoCAD) — a top trigger",
-            "Manufacturing or infrastructure output (new products, facilities, contracts awarded) requiring heavy 2D/3D design",
-            "Relies on DWG/CAD and faces AutoCAD subscription-cost pressure or legacy-DWG standardization needs",
-            "Note: digital-twin / AI signals count only when tied to real DWG/CAD seat demand",
-        ],
-    },
-    "DraftSight": {
-        "product_name": "DraftSight",
-        "domain": "professional 2D/3D DWG CAD software",
-        "sectors": "engineering, manufacturing, construction, AEC, facilities",
-        "value_prop": (
-            "DraftSight (Dassault Systèmes) is professional 2D drafting and 3D design on the native DWG "
-            "format, in editions DraftSight Standard, Professional, Premium and Enterprise / Enterprise Plus "
-            "(with network/flexible licensing and deployment tools), plus DraftSight Mechanical. It offers "
-            "APIs and scripting (LISP, C++, .NET), perpetual and subscription options, and a cost-effective, "
-            "familiar alternative to AutoCAD LT / AutoCAD for professional CAD users — easy for resellers to "
-            "position into engineering, manufacturing and construction accounts."
-        ),
-        "reseller_fit": [
-            "Sells CAD / design / engineering software with services, not a pure box-mover",
-            "Serves engineering, manufacturing, construction or AEC customers who work in DWG",
-            "CAD / AutoCAD-adjacent footprint (drafting, design tools, migrations) — a plus",
-            "Can manage volume/network (Enterprise) licensing, deployment and standardization for larger accounts",
-            "Offers training, deployment and support for professional CAD",
-            "Established commercial presence in the target country",
-        ],
-        "account_fit": [
-            "Uses professional 2D/3D CAD for drafting/design and is cost-sensitive on AutoCAD licensing",
-            "Demand triggers: CAD renewals, new design headcount, drawing-standardization or fleet-deployment initiatives",
-            "Runs engineering / manufacturing documentation workflows on DWG",
-        ],
-    },
-    "Novade": {
-        "product_name": "Novade",
-        "domain": "construction & facilities field-operations SaaS",
-        "sectors": "construction contractors, subcontractors, developers, facilities and infrastructure operators",
-        "value_prop": (
-            "Novade is a mobile-first cloud platform that digitizes construction and facilities site "
-            "operations — Novade Quality (inspections, snagging/defects, ITPs), Safety (permits, "
-            "toolbox, incidents), Progress / Site Diary (daily reports, labour & plant tracking), "
-            "Maintenance and Activity/Workflow apps, with Novade Analytics dashboards and a lighter "
-            "Novade Lite for SMEs. It replaces paper and WhatsApp on site and opens a recurring SaaS "
-            "revenue line for resellers serving contractors and AEC/FM firms."
-        ),
-        "reseller_fit": [
-            "Sells SaaS / cloud software with onboarding, configuration and customer success (recurring-revenue capable)",
-            "Serves construction contractors, subcontractors, developers, facilities or infrastructure operators",
-            "Adjacency to construction tech, field/mobile apps, BIM or project-management software — a plus",
-            "Provides implementation, training, integration and ongoing customer-success services",
-            "Established presence and delivery capability in the target country",
-        ],
-        "account_fit": [
-            "Is a contractor / AEC / FM firm running active site operations still on paper, spreadsheets or WhatsApp",
-            "Demand triggers: new project wins, safety/quality compliance pressure, ISO audits, digitization mandates",
-            "Has field teams that would adopt mobile inspections, permits, defects/snagging or site-diary workflows",
-        ],
-    },
-    "Newforma": {
-        "product_name": "Newforma",
-        "domain": "AEC project information management (PIM) software",
-        "sectors": "architecture and engineering firms, general contractors, owners/operators",
-        "value_prop": (
-            "Newforma is project information management for AEC — Newforma Konekt (cloud information "
-            "management and BIM issue/model coordination, the 'golden thread'), Newforma Project Center "
-            "(email, documents, RFIs, submittals, transmittals and markups with Outlook/Revit/Bentley "
-            "connectors) and Newforma ConstructEx (cloud construction administration & document control). "
-            "It helps architecture, engineering and construction teams find project information fast, "
-            "control RFIs/submittals and reduce liability — a sticky software line for resellers who serve design firms."
-        ),
-        "reseller_fit": [
-            "Sells software and services to AEC firms (architects, engineers, general contractors, owners)",
-            "Has a customer base of design/engineering firms or construction companies",
-            "Adjacency to AEC/BIM/CAD (Revit, Bentley), document management or Outlook/M365 workflows — a plus",
-            "Provides implementation, data migration, training and support for professional software",
-            "Can sell both cloud (Konekt/ConstructEx) and hybrid/on-prem (Project Center)",
-            "Established commercial presence in the target country",
-        ],
-        "account_fit": [
-            "Runs active building/construction programs: permits, RFIs/submittals, drawings, capital programs — the primary trigger",
-            "Involved in JVs, mega-projects or design-build with multi-company document/handover complexity",
-            "M&A integration or facility expansion creating legacy-data, as-built or regulated-handover complexity",
-            "Architecture/engineering firm with high email + document volume across many concurrent projects",
-            "Note: pure IT/marketing/AI moves or office relocations count only when tied to real construction/AEC document activity",
-        ],
-    },
-    "Unity": {
-        "product_name": "Unity",
-        "domain": "real-time 3D (RT3D) / visualization / digital-twin / AR-VR software",
-        "sectors": "manufacturing, automotive, AEC visualization, media & entertainment, training/simulation",
-        "value_prop": (
-            "Unity is a real-time 3D (RT3D) platform. For non-game use, Unity Industry is the "
-            "primary SKU (Unity 6 engine, Unity Studio no-code authoring, Asset Manager) for digital "
-            "twins, product & AEC visualization, HMI, AR/VR, simulation and immersive training; "
-            "the Asset Transformer Toolkit (formerly Pixyz) preps CAD/BIM/3D data for real-time; "
-            "and Parsec (by Unity) is a separate add-on for remote GPU sharing across distributed "
-            "teams. Resellers attach licensing plus 3D/development and integration services across "
-            "manufacturing, automotive, AEC and media accounts."
-        ),
-        "reseller_fit": [
-            "Sells software and/or 3D / application-development / integration services (not hardware only)",
-            "Serves customers needing real-time 3D: digital twins, product/AEC visualization, AR/VR, HMI, simulation or training",
-            "Adjacency to 3D / CAD / creative / real-time / game-engine tooling or CAD data prep (Asset Transformer / Pixyz) — a plus",
-            "Provides development, integration, training and support capability (RT3D is services-led)",
-            "Can engage industrial / enterprise accounts (Unity Industry) beyond individual creators",
-            "Established commercial presence in the target country",
-        ],
-        "account_fit": [
-            "Active XR/VR/AR, digital-twin (with a 3D/visual layer), HMI or immersive-training program — a top trigger",
-            "Complex physical products needing 3D configurators / design visualization (auto, aerospace, machinery, medical devices); active product launches",
-            "Hiring 3D artists / XR / Unity / visualization engineers — a high-value trigger",
-            "Heavy CAD/BIM environment (CATIA, NX, SolidWorks, Revit) + Industry 4.0 / smart-factory initiative; distributed teams needing remote GPU (Parsec)",
-            "Note: 'digital twin', 'simulation' or 'AI' count only when tied to real-time 3D / visual / XR content",
-        ],
-    },
-}
+import yaml
+
+VENDOR_PRESETS: dict[str, dict] = yaml.safe_load(
+    (Path(__file__).parent / "data" / "vendor_presets.yaml").read_text(encoding="utf-8")
+) or {}
 
 # Scoring defaults shared by the presets (Trimble-style).
 _TIER_THRESHOLDS = {"A": 80, "B": 65, "C": 50, "D": 0}

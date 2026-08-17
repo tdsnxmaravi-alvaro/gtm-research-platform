@@ -1,0 +1,31 @@
+Trimble:
+  Autodesk:
+  - Gold
+  - Platinum
+  - Premier
+  Bentley:
+  - SELECT
+  Nemetschek:
+  - Platinum
+Bricsys:
+  Autodesk:
+  - Gold
+  - Platinum
+  - Premier
+DraftSight:
+  Autodesk:
+  - Gold
+  - Platinum
+Newforma:
+  Bentley ProjectWise:
+  - exclusive
+  Oracle Aconex:
+  - exclusive
+Novade:
+  Fieldwire:
+  - exclusive
+  Dalux:
+  - exclusive
+Unity:
+  Epic Unreal Engine:
+  - exclusive

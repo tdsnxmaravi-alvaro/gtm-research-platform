@@ -70,7 +70,7 @@ DISCOVERY RULES (in addition to the evidence rules above):
 # Templates keyed by CampaignConfig.prompt_template_key()
 # --------------------------------------------------------------------------- #
 RESELLER_PROVIDED_FIT = """\
-You are a senior channel-development research analyst for TD SYNNEX.
+You are a senior channel-development research analyst for {org}.
 Qualify whether each company below is a strong RESELLER partner for {product_name} —
 i.e., could they SELL/service this product to their customers?
 Work in each company's OWN country: the country is given per company in the list below
@@ -93,7 +93,7 @@ COMPANIES TO QUALIFY:
 {output_schema}"""
 
 ACCOUNT_PROVIDED_FIT = """\
-You are a senior demand-generation research analyst for TD SYNNEX.
+You are a senior demand-generation research analyst for {org}.
 Qualify whether each ACCOUNT / end-user company below is a strong prospect to BUY/USE
 {product_name} — based on active demand signals, not channel capability.
 Work in each company's OWN country: the country is given per company in the list below
@@ -117,7 +117,7 @@ ACCOUNTS TO QUALIFY:
 {output_schema}"""
 
 RESELLER_DISCOVER_BROAD = """\
-You are a senior channel-strategy analyst for TD SYNNEX.
+You are a senior channel-strategy analyst for {org}.
 Find independent RESELLERS operating in {country} that could add {product_name} to their
 portfolio — companies that sell/service related software to end customers and fit to SELL this product.
 
@@ -136,7 +136,7 @@ SCORING:
 {output_schema}"""
 
 RESELLER_DISCOVER_VERTICAL = """\
-You are a senior channel-strategy analyst for TD SYNNEX running a {vendor} channel-expansion
+You are a senior channel-strategy analyst for {org} running a {vendor} channel-expansion
 project. Your task is to identify EVERY independent reseller in the {vertical_name} vertical
 operating in {country} that could ADD {product_name} to their portfolio (fit to SELL this
 product to their customers) and is NOT a subsidiary of a software vendor.
@@ -165,7 +165,7 @@ SCORING:
 {output_schema}"""
 
 ACCOUNT_DISCOVER_BROAD = """\
-You are a senior demand-generation analyst for TD SYNNEX.
+You are a senior demand-generation analyst for {org}.
 Find end-user companies (ACCOUNTS) in {country} with active demand signals that make them
 strong prospects to BUY/USE {product_name}.
 

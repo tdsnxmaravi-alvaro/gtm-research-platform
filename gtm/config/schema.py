@@ -251,6 +251,10 @@ class CampaignConfig(BaseModel):
     # empty, the single `country` is used. `country` also stays the language anchor.
     countries: list[str] = Field(default_factory=list)
     language: str | None = None           # default derived from country
+    # Display names in research prompts and outreach copy. Empty = GTM_ORG_NAME /
+    # GTM_CHANNEL_NAME env, then TD SYNNEX / Datech.
+    org_name: str = ""
+    channel_name: str = ""
 
     products: list[Product] = Field(min_length=1)
     verticals: list[Vertical] = Field(default_factory=list)

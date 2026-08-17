@@ -8,6 +8,7 @@ mode, pass the company/companies to qualify via `company_input`.
 from __future__ import annotations
 
 from ..config.schema import CampaignConfig, Product, Vertical
+from ..config.org import org_name
 from . import templates
 from .vertical_presets import exclusions_for
 
@@ -142,5 +143,6 @@ def build_prompt(
         "vendor_landscape": _vendor_landscape_block(vertical),
         "exclusion_rules": _exclusion_block(config),
         "company_input": company_input if company_input is not None else COMPANIES_TOKEN,
+        "org": org_name(config),
     }
     return template.format(**ctx)
