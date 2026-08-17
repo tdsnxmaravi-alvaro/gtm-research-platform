@@ -190,7 +190,9 @@ def test_remaining_credits_parser():
 
 def test_preflight_uses_credit_usage_stats():
     from gtm.enrichment.apollo.client import ApolloClient
-    wrap = lambda d: {"credit_usage_stats": d}
+
+    def wrap(d):
+        return {"credit_usage_stats": d}
     # Shared pool (lead_credit) at 0 -> block (exhausted).
     c = ApolloClient(api_key="k")
     c.get_credit_usage = lambda: (200, wrap({"lead_credit": {"left_over": 0}}))

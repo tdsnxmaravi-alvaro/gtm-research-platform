@@ -1,7 +1,5 @@
 """Tests for Phase 1: prompt builder, ingest parser, scoring URL gate."""
 
-import json
-
 from gtm.config import CampaignConfig
 from gtm.prompts import build_prompt, format_companies
 from gtm.ingest import parse_results, normalize_result, load_provided_list
@@ -388,7 +386,8 @@ def test_run_batch_records_per_provider_counts(tmp_path, monkeypatch):
                 class R:
                     text = '{"results":[' + res + ']}'
                 return R()
-        p = P(); p.name = name
+        p = P()
+        p.name = name
         return p
 
     monkeypatch.setattr("gtm.research.runner.time.sleep", lambda *_: None)

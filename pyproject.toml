@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "ruff>=0.9"]
 
 [project.scripts]
 gtm = "gtm.cli:main"
@@ -32,3 +32,11 @@ include = ["gtm*"]
 # not only via `python -m pytest`.
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+src = ["gtm", "tests", "backend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]

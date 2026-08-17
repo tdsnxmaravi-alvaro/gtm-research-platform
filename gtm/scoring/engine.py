@@ -98,7 +98,7 @@ def _excluded_partner(config: CampaignConfig, result: dict) -> str:
         if levels == ["exclusive"]:
             cues = ("exclusive", "exclusively", "locked", "only reseller", "sole reseller")
         else:
-            cues = tuple(l.lower() for l in levels)
+            cues = tuple(level.lower() for level in levels)
         if any(c in hay for c in cues):
             return competitor
     return ""

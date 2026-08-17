@@ -109,6 +109,7 @@ python -m venv .venv
 pip install -e ".[dev]"
 copy .env.example .env   # then fill in keys
 pytest -q
+ruff check gtm tests backend
 ```
 
 `requirements.txt` is the same core set (including `extract-msg`) if you are not
