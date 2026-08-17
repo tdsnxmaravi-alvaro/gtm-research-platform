@@ -140,6 +140,39 @@ def test_inspect_missing_website(tmp_path):
     assert any("website" in w.lower() for w in rep["warnings"])
 
 
+def test_normalize_country_expands_codes():
+    from gtm.config import normalize_country
+
+    assert normalize_country("DE") == "Germany"
+    assert normalize_country("de") == "Germany"
+    assert normalize_country("ESP") == "Spain"
+    assert normalize_country("US") == "United States"
+    assert normalize_country("UK") == "United Kingdom"  # common non-ISO alias
+    # Full names and multi-country strings pass through unchanged.
+    assert normalize_country("Germany") == "Germany"
+    assert normalize_country("Spain and Portugal") == "Spain and Portugal"
+    assert normalize_country("") == ""
+
+
+def test_load_provided_list_normalizes_country_codes(tmp_path):
+    p = tmp_path / "list.csv"
+    p.write_text("Company Name,Website,Country\nAcme,https://a.de,DE\n",
+                 encoding="utf-8")
+    rows = load_provided_list(p)
+    assert rows[0]["country"] == "Germany"
+
+
+def test_inspect_warns_on_country_codes(tmp_path):
+    from gtm.ingest import inspect_provided_list
+
+    p = tmp_path / "list.csv"
+    p.write_text("Company Name,Website,Country\nAcme,https://a.de,DE\n",
+                 encoding="utf-8")
+    rep = inspect_provided_list(p)
+    assert any("code" in w.lower() and "Germany" in w for w in rep["warnings"])
+
+
+
 def test_schema_ai_excludes_pii_samples():
     from gtm.ingest.schema_ai import _safe_samples
 

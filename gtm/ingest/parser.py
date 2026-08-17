@@ -14,6 +14,7 @@ import json
 import re
 from pathlib import Path
 
+from ..config.countries import looks_like_country_code, normalize_country
 from ..io import csv_safe
 
 RESULT_COLUMNS = [
@@ -197,7 +198,10 @@ def load_provided_list(path: str | Path,
         for k, v in raw.items():
             low = (k or "").strip().lower()
             key = overrides.get(low) or _HEADER_MAP.get(low) or _guess_canonical(k) or low
-            row[key] = ("" if v is None else str(v)).strip()
+            val = ("" if v is None else str(v)).strip()
+            if key == "country" and val:
+                val = normalize_country(val)
+            row[key] = val
         if row.get("company"):
             rows.append(row)
     return rows
@@ -323,6 +327,16 @@ def inspect_provided_list(path: str | Path, use_ai: bool = False,
         )
     if duplicates:
         warnings.append(f"{duplicates} duplicate company name(s) detected.")
+    code_sample = next(
+        ((str(v).strip(), normalize_country(v)) for r in raw for k, v in r.items()
+         if _canonical(k) == "country" and looks_like_country_code(v)),
+        None,
+    )
+    if code_sample:
+        warnings.append(
+            f"Country column uses codes (e.g. '{code_sample[0]}' \u2192 "
+            f"'{code_sample[1]}'); values were normalized to full names."
+        )
     if isinstance(ai_mapping, dict):
         for w in ai_mapping.get("warnings", []) or []:
             warnings.append(f"AI: {w}")

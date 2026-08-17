@@ -17,6 +17,7 @@ from .schema import (
     apollo_locations_for,
     language_for_country,
 )
+from .countries import normalize_country, looks_like_country_code, ISO_COUNTRIES
 from .loader import load_campaign
 
 __all__ = [
@@ -35,5 +36,8 @@ __all__ = [
     "Outreach",
     "apollo_locations_for",
     "language_for_country",
+    "normalize_country",
+    "looks_like_country_code",
+    "ISO_COUNTRIES",
     "load_campaign",
 ]
