@@ -33,7 +33,7 @@ def _plain_to_html(body: str) -> str:
         for p in paras if p.strip()
     )
     return (
-        '<html><body style="margin:0; padding:24px; background:#f4f5f7; '
+        '<html><body style="margin:0; padding:0 24px 24px; background:#f4f5f7; '
         f'font-family:{_BODY_FONT}; font-size:11pt; color:#1a1a1a;">'
         '<div style="max-width:640px; margin:0 auto; background:#ffffff; '
         'border:1px solid #e1e4e8; border-radius:8px; overflow:hidden;">'
@@ -75,7 +75,7 @@ def _branded_html(body: str, logo_cid: str | None = None) -> str:
         else '<div style="height:6px; background:#005758;"></div>'
     )
     return (
-        '<html><body style="margin:0; padding:24px; background:#f4f5f7; '
+        '<html><body style="margin:0; padding:0 24px 24px; background:#f4f5f7; '
         f'font-family:{_BODY_FONT}; font-size:11pt; color:#1a1a1a;">'
         '<div style="max-width:640px; margin:0 auto; background:#ffffff; '
         'border:1px solid #e1e4e8; border-radius:8px; overflow:hidden;">'

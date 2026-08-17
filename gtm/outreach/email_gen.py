@@ -41,9 +41,7 @@ def render_template(config: CampaignConfig, row: dict) -> tuple[str, str]:
     rec = row.get("recommended_products", "")
     fit = _short(row.get("fit_summary", ""))
     vp = _short(config.products[0].value_prop if config.products else "", 200)
-    sig_name = (config.outreach.sender_name or "").strip()
     org = org_name(config)
-    signoff_lines = [sig_name, org] if sig_name else [org]
 
     if lang.startswith("es"):
         greet = f"Hola {first}:" if first else "Hola:"
@@ -56,7 +54,7 @@ def render_template(config: CampaignConfig, row: dict) -> tuple[str, str]:
         if rec:
             parts.append(f"Te recomendaríamos empezar por: {rec}.")
         parts.append("¿Tendrías disponibilidad para una breve llamada y explorarlo?")
-        parts.append("\n".join(["Un saludo,", *signoff_lines]))
+        parts.append("Un saludo,")
     elif lang.startswith("pt"):
         greet = f"Olá {first}," if first else "Olá,"
         subject = config.outreach.subject or f"{company} × {product}: uma oportunidade para o seu portfólio"
@@ -68,7 +66,7 @@ def render_template(config: CampaignConfig, row: dict) -> tuple[str, str]:
         if rec:
             parts.append(f"Recomendaríamos começar por: {rec}.")
         parts.append("Teria disponibilidade para uma breve chamada para explorá-lo?")
-        parts.append("\n".join(["Cumprimentos,", *signoff_lines]))
+        parts.append("Cumprimentos,")
     else:
         greet = f"Hi {first}," if first else "Hi,"
         subject = config.outreach.subject or f"{company} × {product}: a fit worth a conversation"
@@ -80,7 +78,7 @@ def render_template(config: CampaignConfig, row: dict) -> tuple[str, str]:
         if rec:
             parts.append(f"We'd suggest starting with: {rec}.")
         parts.append("Would you be open to a short call to explore it?")
-        parts.append("\n".join(["Best regards,", *signoff_lines]))
+        parts.append("Best regards,")
 
     return subject, "\n\n".join(parts)
 
@@ -106,6 +104,50 @@ def _clean_body(body: str) -> str:
             continue  # drop consecutive duplicate lines
         out.append(line)
     return "\n".join(out).strip()
+
+
+_CLOSINGS = {"en": "Best regards,", "es": "Un saludo,", "pt": "Cumprimentos,"}
+
+# Lowercased sign-off openers (any language) used to spot a trailing closing line.
+_SIGNOFF_OPENERS = (
+    "best regards", "best", "regards", "kind regards", "warm regards", "warm wishes",
+    "sincerely", "many thanks", "thanks", "thank you", "cheers", "warmly", "cordially",
+    "un saludo", "saludos", "un cordial saludo", "cordialmente", "atentamente",
+    "cumprimentos", "melhores cumprimentos", "atenciosamente", "obrigado", "obrigada",
+)
+
+
+def _lang_base(config: CampaignConfig, row: dict) -> str:
+    lang = (config.outreach.language or language_for_country(row.get("country"))
+            or config.language or "en").lower()
+    return "es" if lang.startswith("es") else "pt" if lang.startswith("pt") else "en"
+
+
+def _apply_signoff(body: str, lang_base: str, config: CampaignConfig) -> str:
+    """Drop any trailing closing / name / company lines and append one canonical
+    sign-off, so template and agent copy always end the same way. The sender's
+    identity comes from the Outlook signature, not the body."""
+    org = org_name(config).strip().lower()
+    channel = channel_name(config).strip().lower()
+    sender = (config.outreach.sender_name or "").strip().lower()
+    drop_exact = {t for t in (
+        org, channel, sender, f"{org} team", f"the {org} team",
+        f"{org} {channel} team", f"the {org} {channel} team",
+        f"el equipo {channel} de {org}", f"a equipa {channel} da {org}",
+    ) if t}
+    lines = body.rstrip().split("\n")
+    while lines:
+        low = lines[-1].strip().lower().rstrip(".,")
+        if not low:
+            lines.pop()
+            continue
+        is_signoff = len(low.split()) <= 3 and any(
+            low == op or low.startswith(op + " ") for op in _SIGNOFF_OPENERS)
+        if is_signoff or low in drop_exact:
+            lines.pop()
+            continue
+        break
+    return "\n".join(lines).rstrip() + "\n\n" + _CLOSINGS.get(lang_base, "Best regards,")
 
 
 def generate_email(config: CampaignConfig, row: dict, use_agent: bool = False) -> tuple[str, str]:
@@ -139,11 +181,12 @@ def generate_outreach(config: CampaignConfig, row: dict, use_agent: bool = False
     talking_points = ""
     if want_talking_points:
         talking_points = pkg.get("talking_points") or _template_talking_points(config, row)
+    lang_base = _lang_base(config, row)
     return {
         "subject": subject,
-        "body": _clean_body(body),
+        "body": _apply_signoff(_clean_body(body), lang_base, config),
         "followup_subject": followup_subject,
-        "followup_body": _clean_body(followup_body),
+        "followup_body": _apply_signoff(_clean_body(followup_body), lang_base, config),
         "talking_points": _clean_body(talking_points),
     }
 
@@ -161,33 +204,27 @@ def _template_followup(config: CampaignConfig, row: dict) -> str:
     first = _first_name(row.get("contact_name", ""))
     company = row.get("company", "")
     product = row.get("product") or (config.products[0].name if config.products else "our solution")
-    sig_name = (config.outreach.sender_name or "").strip()
-    org = org_name(config)
-    channel = channel_name(config)
     if lang.startswith("es"):
         greet = f"Hola {first}:" if first else "Hola:"
         lines = [greet,
                  f"Retomo mi mensaje anterior sobre {product} para {company}.",
                  "Sigue en pie una breve llamada para verlo con calma; "
                  "si lo lleva otra persona, con gusto me pones en contacto.",
-                 "\n".join(["Un saludo,", sig_name, org] if sig_name
-                           else ["Un saludo,", f"El equipo {channel} de {org}"])]
+                 "Un saludo,"]
     elif lang.startswith("pt"):
         greet = f"Olá {first}," if first else "Olá,"
         lines = [greet,
                  f"Retomando a minha mensagem anterior sobre {product} para a {company}.",
                  "Continua de pé uma breve chamada para o vermos com calma; "
                  "se for outra pessoa a tratar disto, agradeço que me encaminhe.",
-                 "\n".join(["Cumprimentos,", sig_name, org] if sig_name
-                           else ["Cumprimentos,", f"A equipa {channel} da {org}"])]
+                 "Cumprimentos,"]
     else:
         greet = f"Hi {first}," if first else "Hi,"
         lines = [greet,
                  f"Circling back on my earlier note about {product} for {company}.",
                  "A short call still stands whenever it suits you; if someone else owns "
                  "this, please point me their way.",
-                 "\n".join(["Best regards,", sig_name, org] if sig_name
-                           else ["Best regards,", f"The {org} {channel} Team"])]
+                 "Best regards,"]
     return "\n\n".join(lines)
 
 
@@ -273,6 +310,8 @@ def _agent_outreach(prov, config: CampaignConfig, row: dict,
         "Also write a short follow-up email: 'followup_subject' as 'Re: <the subject>' and a "
         "2-4 line 'followup_body' that politely circles back and restates the single value point. "
         + tp_line +
+        "Do NOT add any sign-off, closing, or signature (no 'Best regards', no sender "
+        "name, no company name); end each body with its last sentence. "
         f'Return ONLY JSON: {schema} with \\n line breaks inside each body.'
     )
     try:

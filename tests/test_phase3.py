@@ -127,7 +127,23 @@ def test_render_template_es():
     assert "Acme SA" in subj
     assert body.startswith("Hola Ana")
     assert "Trimble" in body
-    assert "Ana BDR" in body  # sender in signature
+    assert body.rstrip().endswith("Un saludo,")  # consistent closing, no name/org
+    assert "Ana BDR" not in body  # identity comes from the Outlook signature
+
+
+def test_signoff_normalized_across_variants():
+    from gtm.outreach.email_gen import _apply_signoff
+
+    c = CampaignConfig(name="x", target_type="resellers", mode="provided", country="",
+                       vendor="Trimble", products=[{"name": "Trimble", "value_prop": "AEC"}],
+                       provided_list_path="x.csv", outreach={"enabled": True})
+    variants = [
+        "Hi Rohit,\n\nGreat fit.\n\nBest,\nTD SYNNEX team\nTD SYNNEX",
+        "Hi Rohit,\n\nGreat fit.\n\nTD SYNNEX",
+        "Hi Rohit,\n\nGreat fit.\n\nBest,\nTD SYNNEX",
+    ]
+    for v in variants:
+        assert _apply_signoff(v, "en", c).endswith("Great fit.\n\nBest regards,")
 
 
 def test_write_eml_strips_crlf_from_subject(tmp_path):
