@@ -43,7 +43,10 @@ def _plain_to_html(body: str) -> str:
         f'<div style="padding:28px 32px; line-height:1.5;">{inner}</div>'
         '<div style="padding:14px 32px; border-top:1px solid #eee; '
         f'background:#fafbfc; font-size:9pt; color:#8a8f98;">{org_name()}</div>'
-        '</div></body></html>'
+        '</div>'
+        # Editable line below the card so Enter at the bottom extends outside the box.
+        f'<p style="margin:16px 0 0 0; font-family:{_BODY_FONT};">&nbsp;</p>'
+        '</body></html>'
     )
 
 
@@ -85,7 +88,10 @@ def _branded_html(body: str, logo_cid: str | None = None) -> str:
         'border:1px solid #e1e4e8; border-radius:8px; overflow:hidden;">'
         f'{banner}'
         f'<div style="padding:28px 32px; line-height:1.5;">{inner}</div>'
-        '</div></body></html>'
+        '</div>'
+        # Editable line below the card so Enter at the bottom extends outside the box.
+        f'<p style="margin:16px 0 0 0; font-family:{_BODY_FONT};">&nbsp;</p>'
+        '</body></html>'
     )
 
 
@@ -98,9 +104,7 @@ def _body_to_html_paragraphs(body: str) -> str:
         f'<p style="margin:0 0 12px 0; font-family:{_BODY_FONT};">{esc(p.strip())}</p>'
         for p in body.strip().split("\n\n") if p.strip()
     )
-    # Trailing editable line so the cursor rests at the END of the message (and any
-    # Outlook auto-signature lands below the body, not above it).
-    return paras + f'\n<p style="margin:0; font-family:{_BODY_FONT};">&nbsp;</p>'
+    return paras
 
 
 def load_eml_template(path: str | Path) -> tuple[str | None, list[dict]]:

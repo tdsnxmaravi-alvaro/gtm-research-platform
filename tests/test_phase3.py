@@ -150,9 +150,11 @@ def test_branded_frame_has_editable_line_above_card():
     from gtm.outreach.eml import _branded_html, _plain_to_html
 
     for html in (_branded_html("Hi,\n\nBody."), _plain_to_html("Hi,\n\nBody.")):
-        # The editable spacer paragraph sits before the branded card so Outlook's
-        # auto-signature lands above the box, not inside it.
-        assert html.index("&nbsp;</p>") < html.index("max-width:640px")
+        # Editable spacer paragraphs sit above AND below the branded card so
+        # Outlook's signature lands above it and Enter at the bottom extends
+        # outside the box, not inside the card.
+        card = html.index("max-width:640px")
+        assert html.index("&nbsp;</p>") < card < html.rindex("&nbsp;</p>")
 
 
 def test_write_eml_strips_crlf_from_subject(tmp_path):
