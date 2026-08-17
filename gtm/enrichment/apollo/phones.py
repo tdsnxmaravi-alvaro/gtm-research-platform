@@ -20,6 +20,7 @@ from pathlib import Path
 
 from .client import ApolloClient
 from ..models import EnrichedContact
+from ...io import file_lock
 
 
 # One lock PER store file, shared across all PhoneRevealStore instances in this
@@ -89,41 +90,41 @@ class PhoneRevealStore:
                 pass
 
     def save(self) -> None:
-        # Serialize all writers to this file (runner + webhook receiver) so the
-        # atomic replace never collides on Windows.
+        # Serialize writers in-process AND across processes (runner vs webhook).
         with _lock_for(self.path):
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            # Merge with whatever is on disk before writing, so a concurrent writer
-            # (e.g. the webhook receiver persisting a delivered number) is never lost.
-            self.data = _merge_stores(self._read_disk(), self.data)
-            payload = json.dumps(self.data, indent=2, ensure_ascii=False)
-            tmp = self.path.with_name(f"{self.path.name}.{time.time_ns()}.tmp")
-            try:
-                tmp.write_text(payload, encoding="utf-8")
-            except OSError:
-                return  # can't even stage a temp file; keep in-memory state
-            # os.replace can transiently fail on Windows if another process/AV holds
-            # the target; retry with backoff before a best-effort direct write.
-            last_exc: Exception | None = None
-            for attempt in range(10):
+            with file_lock(self.path):
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                # Merge with whatever is on disk before writing, so a concurrent writer
+                # (e.g. the webhook receiver persisting a delivered number) is never lost.
+                self.data = _merge_stores(self._read_disk(), self.data)
+                payload = json.dumps(self.data, indent=2, ensure_ascii=False)
+                tmp = self.path.with_name(f"{self.path.name}.{time.time_ns()}.tmp")
                 try:
-                    tmp.replace(self.path)
-                    return
-                except PermissionError as exc:
-                    last_exc = exc
-                    time.sleep(0.1 * (attempt + 1))
-            # Fallback: write in place (also guarded — never crash the caller).
-            try:
-                self.path.write_text(payload, encoding="utf-8")
-            except OSError:
-                print(f"  !! could not persist {self.path.name} "
-                      f"({last_exc}); keeping in-memory state")
-            finally:
-                if tmp.exists():
+                    tmp.write_text(payload, encoding="utf-8")
+                except OSError:
+                    return  # can't even stage a temp file; keep in-memory state
+                # os.replace can transiently fail on Windows if another process/AV holds
+                # the target; retry with backoff before a best-effort direct write.
+                last_exc: Exception | None = None
+                for attempt in range(10):
                     try:
-                        tmp.unlink()
-                    except OSError:
-                        pass
+                        tmp.replace(self.path)
+                        return
+                    except PermissionError as exc:
+                        last_exc = exc
+                        time.sleep(0.1 * (attempt + 1))
+                # Fallback: write in place (also guarded — never crash the caller).
+                try:
+                    self.path.write_text(payload, encoding="utf-8")
+                except OSError:
+                    print(f"  !! could not persist {self.path.name} "
+                          f"({last_exc}); keeping in-memory state")
+                finally:
+                    if tmp.exists():
+                        try:
+                            tmp.unlink()
+                        except OSError:
+                            pass
 
     def _read_disk(self) -> dict:
         if not self.path.exists():
@@ -186,6 +187,11 @@ def fire_reveals(
             # after credits are topped up. Stop this pass (resumable).
             print("  !! Apollo credit/auth error on phone reveal — stopping (resumable).")
             break
+        if status == 429 or status >= 500:
+            # Transient: do NOT mark attempted (would skip forever / re-charge risk
+            # is accepted vs losing the reveal). Stop this pass and resume later.
+            print(f"  !! retryable HTTP {status} on phone reveal — stopping (resumable).")
+            break
         store.data[c.apollo_id] = {
             "status": "pending" if status == 200 else "error",
             "request_id": request_id,
@@ -199,8 +205,6 @@ def fire_reveals(
         store.save()
         if status == 200:
             fired += 1
-        if status == 429:  # rate limited — resumable, stop this pass
-            break
         time.sleep(delay)
     store.save()
     return fired

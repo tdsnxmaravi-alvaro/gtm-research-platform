@@ -22,6 +22,7 @@ or by polling.
 from __future__ import annotations
 
 import json
+import logging
 import threading
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -31,6 +32,7 @@ from .phones import PhoneRevealStore
 
 # Serialize read-modify-write across the ThreadingHTTPServer worker threads.
 _STORE_LOCK = threading.Lock()
+log = logging.getLogger(__name__)
 
 
 def _phone_numbers(record: dict) -> list[str]:
@@ -129,8 +131,8 @@ def make_handler(store: PhoneRevealStore, webhook_path: str):
             with _STORE_LOCK:
                 results = apply_callback(store, payload)
             for r in results:
-                mark = "OK " if r["phones"] else "-- "
-                print(f"  {mark}id={r['person_id']} | {', '.join(r['phones']) or 'no number'}")
+                n = len(r.get("phones") or [])
+                log.info("callback person_id=%s phones=%s", r["person_id"], n)
             self._send(200, {"received": True, "records": results})
 
         def log_message(self, *_):  # silence default logging

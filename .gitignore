@@ -27,6 +27,7 @@ campaigns/*/results.csv
 campaigns/*/contacts.csv
 campaigns/*/master.csv
 campaigns/*/eml/
+campaigns/_uploads/
 logs/
 *.xlsx
 *.eml

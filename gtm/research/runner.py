@@ -22,6 +22,7 @@ from ..prompts import build_prompt, format_companies
 from ..ingest import parse_results, load_provided_list, write_rows_csv
 from ..scoring import score_results
 from ..providers import build_provider
+from ..io import atomic_write_json
 from .cache import ResearchCache, _domain_or_name
 
 OUT_COLS = [
@@ -95,10 +96,8 @@ def _load_state(path: Path) -> set:
 
 
 def _save_state(path: Path, done: set) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"done": sorted(done),
-                                "updated": datetime.now().isoformat()},
-                               indent=2, ensure_ascii=False), encoding="utf-8")
+    atomic_write_json(path, {"done": sorted(done),
+                             "updated": datetime.now().isoformat()})
 
 
 def _log(logs: Path, tag: str, prompt: str, response: str) -> None:

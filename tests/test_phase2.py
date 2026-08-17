@@ -3,6 +3,8 @@
 No network: Apollo/LARA calls are replaced with in-memory stubs.
 """
 
+import json
+
 from gtm.config import CampaignConfig
 from gtm.config.schema import apollo_locations_for
 from gtm.enrichment import (
@@ -214,6 +216,21 @@ def test_preflight_uses_credit_usage_stats():
     ok, _ = c4.preflight()
     assert ok is True
 
+    # Unknown HTTP: fail-closed unless APOLLO_PREFLIGHT_STRICT=false.
+    c5 = ApolloClient(api_key="k")
+    c5.get_credit_usage = lambda: (500, {})
+    ok, msg = c5.preflight()
+    assert ok is False and "refusing" in msg
+
+
+def test_preflight_strict_override(monkeypatch):
+    from gtm.enrichment.apollo.client import ApolloClient
+    monkeypatch.setenv("APOLLO_PREFLIGHT_STRICT", "false")
+    c = ApolloClient(api_key="k")
+    c.get_credit_usage = lambda: (500, {})
+    ok, msg = c.preflight()
+    assert ok is True and "proceeding" in msg
+
 
 def test_credit_summary_estimates_emails_and_phones():
     from gtm.enrichment.apollo.client import ApolloClient
@@ -363,3 +380,58 @@ def test_webhook_no_number(tmp_path):
     store = PhoneRevealStore(tmp_path / "ph.json")
     apply_callback(store, {"people": [{"id": "p2", "phone_numbers": []}]})
     assert store.status_for("p2") == "no_number"
+
+
+def test_fire_reveals_retryable_http_not_attempted(tmp_path, monkeypatch):
+    monkeypatch.setattr("gtm.enrichment.apollo.phones.time.sleep", lambda *_: None)
+
+    class _Transient:
+        def fire_phone_reveal(self, pid):
+            return 503, ""
+
+    contacts = [EnrichedContact(company="A", apollo_id="p1")]
+    store = PhoneRevealStore(tmp_path / "ph.json")
+    assert fire_reveals(_Transient(), contacts, store) == 0
+    assert not store.is_attempted("p1")
+
+
+def test_run_enrichment_persists_contacts_when_exhausted(tmp_path, monkeypatch):
+    """Billed contacts must hit disk even if Apollo flags exhausted mid-company."""
+    billed = [EnrichedContact(company="Acme", domain="acme.com",
+                              email="a@acme.com", source="apollo")]
+
+    class _Client:
+        exhausted = False
+        credits_used = 1
+        usage = {}
+
+        def preflight(self):
+            return True, "ok"
+
+    client = _Client()
+
+    def _enrich(_c, _row, max_contacts=3, delay=0.5):
+        client.exhausted = True
+        return billed
+
+    monkeypatch.setattr("gtm.enrichment.runner.enrich_company", _enrich)
+    monkeypatch.setattr("gtm.enrichment.runner.ApolloClient", lambda **_kw: client)
+
+    out = tmp_path / "camp"
+    out.mkdir()
+    rows = [
+        {"company": "Acme", "website": "https://acme.com", "final_tier": "A", "score": "90"},
+        {"company": "Beta", "website": "https://beta.com", "final_tier": "A", "score": "88"},
+    ]
+    c = _cfg(enrichment={"provider": "apollo", "want": "emails", "max_contacts": 3})
+    got = run_enrichment(c, rows=rows, out_dir=out, use_cache=True, resume=False, delay=0)
+    assert len(got) == 1
+    assert got[0].email == "a@acme.com"
+    csv_text = (out / "contacts.csv").read_text(encoding="utf-8")
+    assert "a@acme.com" in csv_text
+    state = json.loads((out / "enrich_state.json").read_text(encoding="utf-8"))
+    assert "Acme" in state["done"]
+    assert "Beta" not in state["done"]
+    from gtm.enrichment.cache import ContactCache
+    cached = ContactCache(path=out.parent / ".gtm_cache" / "contacts.json").get("acme.com")
+    assert cached and cached[0].email == "a@acme.com"

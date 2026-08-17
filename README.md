@@ -50,8 +50,8 @@ gtm/                     # core Python package (CLI-runnable)
   research/              # research runner (discover / provided, resumable)
   enrichment/            # contact resolution: Apollo + LARA agent paths
 campaigns/               # per-campaign yaml configs (+ runtime data, gitignored)
-backend/                 # Django + DRF API (added after the core is validated)
-frontend/                # React + Vite web app / wizard (later phase)
+backend/                 # Django + DRF API
+frontend/                # React + Vite wizard (campaigns, settings, progress)
 ```
 
 ## CLI
@@ -100,24 +100,30 @@ Without `--webhook`, enrichment recovers numbers by polling `webhook_result`
 
 ## Setup
 
+Python 3.12+ (CI runs 3.13 and 3.14). Prefer the editable install so `extract-msg`
+(Outlook `.oft` templates) is included:
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -e ".[dev]"
 copy .env.example .env   # then fill in keys
 pytest -q
 ```
 
+`requirements.txt` is the same core set (including `extract-msg`) if you are not
+installing the package as editable.
+
 ## Backend API (Django + DRF)
 
-Thin HTTP wrapper over the `gtm` engine. Cloud-agnostic (12-factor): all config
-comes from environment variables; SQLite locally, Postgres in the cloud via
-`DATABASE_URL`; async pipeline stages via Celery + Redis (or run inline locally).
+HTTP wrapper over the `gtm` engine. Config comes from environment variables;
+SQLite locally, Postgres via `DATABASE_URL`. Pipeline stages run in a **background
+thread** in local dev (`CELERY_TASK_ALWAYS_EAGER=true`). Celery + Redis is wired
+in Docker for a worker-style deploy.
 
 ## Running the servers
 
-The app is **two servers**: the **Django API** (backend) and the **Vite/React web
-app** (frontend). Run both.
+The app is **two servers**: the Django API and the Vite/React web app. Run both.
 
 ### Development (local, no Docker)
 
@@ -125,10 +131,10 @@ Backend — from the repo root:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-pip install -e .                          # the gtm engine (+ extract-msg for templates)
+pip install -e ".[dev]"
 pip install -r backend/requirements.txt
-$env:CELERY_TASK_ALWAYS_EAGER = "true"    # run stages in a background thread — no Redis needed
-$env:GTM_DATA_ROOT = "$PWD\campaigns"     # where campaign results/state/caches are written
+$env:CELERY_TASK_ALWAYS_EAGER = "true"    # background thread — no Redis needed
+$env:GTM_DATA_ROOT = "$PWD\campaigns"     # campaign results/state/caches
 python backend\manage.py migrate
 python backend\manage.py runserver 127.0.0.1:8000
 ```
@@ -147,76 +153,44 @@ offline fallbacks.
 
 > Restart `runserver` after editing Python so the new logic is loaded.
 
-### Production
+There is **no application login** in this codebase (intended for local / trusted
+network use). Do not expose the API to the public internet as-is.
 
-Run a real **Celery worker + Redis + Postgres**, serve the **built frontend** as
-static assets, and run Django under a WSGI server. The committed
-`docker-compose.yml` wires it all together:
+Endpoints (`/api/`): `campaigns` (CRUD), `campaigns/{id}/validate`,
+`.../start`, `.../research`, `.../enrich`, `.../consolidate`, `.../outreach`,
+`.../results`, `.../contacts`, and `runs/{id}` for status.
+
+### Docker / production-shaped stack
 
 ```powershell
-copy .env.example .env      # fill DATABASE_URL, CELERY_BROKER_URL, DJANGO_*, provider keys...
+copy .env.example .env
 docker compose up -d --build
 ```
 
 That starts `web` (Django/gunicorn), `worker` (Celery), `redis` and `postgres`,
-mounting host `campaigns/` as `GTM_DATA_ROOT`. The manual (no-Docker) equivalent:
+mounting host `campaigns/` as `GTM_DATA_ROOT`. Set `DJANGO_SECRET_KEY` and
+`DJANGO_ALLOWED_HOSTS` in `.env` before using this outside a laptop.
 
-```powershell
-# API (WSGI)
-pip install -e . -r backend/requirements.txt gunicorn
-python backend\manage.py migrate
-python backend\manage.py collectstatic --noinput
-gunicorn gtm_api.wsgi --chdir backend --bind 0.0.0.0:8000
-# Worker (separate process) — needs CELERY_BROKER_URL pointing at Redis
-celery -A gtm_api --workdir backend worker -l info
-# Frontend — build once, serve frontend/dist behind your web server / CDN
-cd frontend; npm ci; npm run build
-```
+## Outreach templates
 
-Key production env vars: `DATABASE_URL`, `CELERY_BROKER_URL`, `GTM_DATA_ROOT`,
-`DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, plus provider
-keys. Leave `CELERY_TASK_ALWAYS_EAGER` **unset/false** in production so stages run
-on the worker (not in the request).
+Branded Outlook `.oft` files are **optional**. Point `GTM_TEMPLATES_DIR` at a
+folder of vendor templates (Bricsys, Dassault/DraftSight, Novade, Newforma,
+Unity, Trimble). If none are present, outreach falls back to the built-in HTML
+frame (and the OFT unit test skips).
 
-## Outreach templates (`templates/`)
-
-**Do not delete `templates/`.** It holds the per-vendor Outlook `.oft` branded
-email templates (Bricsys, Dassault → DraftSight, Novade, Newforma, Unity, Trimble).
-When a campaign's vendor matches one, its template is **auto-selected** for the
-`.eml` drafts — the logo and BDR signature are preserved and the generated body is
-injected. The folder is **required at runtime and committed to the repo**.
-
-Override per campaign by uploading a **custom header/logo** in the wizard (or your
-own `.eml`); custom always wins over the vendor default. Point at a different
-folder with `GTM_TEMPLATES_DIR`.
-via env vars, SQLite locally / Postgres via `DATABASE_URL` in the cloud.
-
-```powershell
-pip install -e .                       # install the engine
-pip install -r backend/requirements.txt
-cd backend
-python manage.py migrate
-python manage.py runserver
-```
-
-Endpoints (`/api/`): `campaigns` (CRUD), `campaigns/{id}/validate`,
-`.../research`, `.../enrich`, `.../consolidate`, `.../outreach` (async, return a
-`Run`), `.../results`, `.../contacts`, and `runs/{id}` for status.
-
-**Deploy anywhere** with the root `Dockerfile` (gunicorn): Azure Container Apps /
-App Service, AWS ECS/Fargate / App Runner, GCP Cloud Run. Managed Postgres
-(Azure DB for PostgreSQL, AWS RDS) via `DATABASE_URL`.
+Override per campaign by uploading a **custom header/logo** in the wizard (or
+your own `.eml`); custom always wins over a vendor default.
 
 ## Status
 
 | Phase | Scope | Status |
 |---|---|---|
-| 0 | Scaffold + config schema + provider interface | ✅ Done |
-| 1 | Prompts + ingest + deterministic anchored scoring + research runner + CLI | ✅ Done |
-| 2 | Enrichment (Apollo emails/phones + LARA web-search agent) | ✅ Done |
-| 3 | Consolidate master list + outreach (`.eml`) | ✅ Done |
-| 4 | Django + DRF API | 🚧 In progress (API scaffold + Docker done) |
-| 5 | React wizard UI | 🚧 In progress (Vite + React scaffold) |
+| 0 | Scaffold + config schema + provider interface | Done |
+| 1 | Prompts + ingest + deterministic scoring + research runner + CLI | Done |
+| 2 | Enrichment (Apollo emails/phones + LARA web-search agent) | Done |
+| 3 | Consolidate master list + outreach (`.eml`) | Done |
+| 4 | Django + DRF API | Done (local; no auth) |
+| 5 | React wizard UI | Done (local wizard + campaign list) |
 
 Roadmap is tracked in [GitHub Issues](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues).
 CI runs the test suite on every push/PR (badge above).

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 import time
 from datetime import datetime
 from pathlib import Path
@@ -23,12 +24,15 @@ from ..config.schema import (
     CampaignConfig, EnrichProvider, EnrichWant, apollo_locations_for,
 )
 from ..ingest import write_rows_csv
+from ..io import atomic_write_json
 from .models import EnrichedContact, CONTACT_COLS
 from .apollo import (
     ApolloClient, enrich_company,
     PhoneRevealStore, fire_reveals, poll_reveals, merge_phones,
 )
 from .lara_agent import build_lara_enrichment_provider, enrich_company_lara
+
+log = logging.getLogger(__name__)
 
 
 def _load_rows(results_path: Path) -> list[dict]:
@@ -48,10 +52,8 @@ def _load_done(path: Path) -> set:
 
 
 def _save_done(path: Path, done: set) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"done": sorted(done),
-                                "updated": datetime.now().isoformat()},
-                               indent=2, ensure_ascii=False), encoding="utf-8")
+    atomic_write_json(path, {"done": sorted(done),
+                             "updated": datetime.now().isoformat()})
 
 
 def run_enrichment(
@@ -79,7 +81,7 @@ def run_enrichment(
     """
     enr = config.enrichment
     if enr.want == EnrichWant.none:
-        print("Enrichment want=none — nothing to do.")
+        log.info("Enrichment want=none — nothing to do.")
         return []
 
     out = Path(out_dir or (Path("campaigns") / config.name))
@@ -88,7 +90,7 @@ def run_enrichment(
         # enrich companies worth contacting; fall back to raw results.
         rows = _load_rows(out / "master.csv") or _load_rows(out / "results.csv")
     if not rows:
-        print("No qualified rows to enrich (run research + consolidate first).")
+        log.info("No qualified rows to enrich (run research + consolidate first).")
         return []
 
     contacts_path = out / "contacts.csv"
@@ -158,8 +160,9 @@ def run_enrichment(
     pending = [r for r in rows if (r.get("company") or "").strip() and _eligible(r)]
     if limit:
         pending = pending[:limit]
-    print(f"Enrich: {len(rows)} companies | tier>={(min_tier or config.outreach.min_tier)} "
-          f"| pending {len(pending)} | provider={cur_provider} | want={enr.want.value}")
+    log.info("Enrich: %s companies | tier>=%s | pending %s | provider=%s | want=%s",
+             len(rows), min_tier or config.outreach.min_tier, len(pending),
+             cur_provider, enr.want.value)
 
     # Build the provider once (lazily — skip if everything is cached).
     apollo_client = None
@@ -180,17 +183,17 @@ def run_enrichment(
     if enr.provider == EnrichProvider.apollo and pending:
         _ensure_provider()
         ok, msg = apollo_client.preflight()
-        print(f"Apollo preflight: {msg}")
+        log.info("Apollo preflight: %s", msg)
         if not ok:
-            (out / "enrich_credits.json").write_text(json.dumps(
-                {"apollo_credits": 0, "exhausted": True, "preflight": msg,
-                 "updated": datetime.now().isoformat()},
-                ensure_ascii=False, indent=2), encoding="utf-8")
+            atomic_write_json(out / "enrich_credits.json", {
+                "apollo_credits": 0, "exhausted": True, "preflight": msg,
+                "updated": datetime.now().isoformat(),
+            })
             return all_contacts
 
     for _i, r in enumerate(pending, 1):
         if should_cancel and should_cancel():
-            print("  canceled — stopping enrichment (state saved)")
+            log.info("canceled — stopping enrichment (state saved)")
             break
         if progress_cb:
             progress_cb(_i, len(pending))
@@ -208,7 +211,7 @@ def run_enrichment(
             write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
                            columns=CONTACT_COLS)
             cache_hits += 1
-            print(f"  {company}: {len(cached)} contacts (cache)")
+            log.info("%s: %s contacts (cache)", company, len(cached))
             continue
 
         # Fetch with the current provider (a fresh company, or an upgrade attempt).
@@ -223,35 +226,45 @@ def run_enrichment(
                                           max_contacts=enr.max_contacts,
                                           language=config.language or "en")
         except Exception as exc:  # noqa: BLE001 - log & continue
-            print(f"  !! enrich error for {company}: {exc}")
+            log.warning("enrich error for %s: %s", company, exc)
             continue
 
-        # Out of Apollo credits: STOP without marking this company done, so a later
-        # Start resumes and re-enriches it once credits are topped up (otherwise the
-        # remaining companies would be silently marked done with no contacts).
-        if (enr.provider == EnrichProvider.apollo and apollo_client is not None
-                and apollo_client.exhausted):
-            print(f"  !! Apollo out of credits — stopping before '{company}'. "
-                  f"Top up, then Start again to resume (nothing lost).")
-            break
+        exhausted = (enr.provider == EnrichProvider.apollo and apollo_client is not None
+                     and apollo_client.exhausted)
 
+        # Persist billed contacts BEFORE stopping on credit exhaustion, otherwise
+        # resume re-enriches the same people and double-charges.
         all_contacts = _drop_company(all_contacts, company)
         if got:
             all_contacts.extend(got)
             if domain:
                 cache.put(domain, got)
-            print(f"  {company}: +{len(got)} contacts"
-                  + (f" (upgraded from {cached_src})" if cached is not None else ""))
+            log.info("%s: +%s contacts%s", company, len(got),
+                     f" (upgraded from {cached_src})" if cached is not None else "")
+            done.add(company)
+            _save_done(state_path, done)
+            write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
+                           columns=CONTACT_COLS)
         elif cached is not None:
-            # Upgrade attempt found nothing — keep the existing (lower-priority)
-            # contacts rather than losing them.
             all_contacts.extend(cached)
-            print(f"  {company}: kept {len(cached)} {cached_src} contacts "
-                  f"(no {cur_provider} contacts found)")
-        done.add(company)
-        _save_done(state_path, done)
-        write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
-                       columns=CONTACT_COLS)
+            log.info("%s: kept %s %s contacts (no %s contacts found)",
+                     company, len(cached), cached_src, cur_provider)
+            done.add(company)
+            _save_done(state_path, done)
+            write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
+                           columns=CONTACT_COLS)
+        elif not exhausted:
+            # Genuine empty result (no people found) — do not retry forever.
+            done.add(company)
+            _save_done(state_path, done)
+            write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
+                           columns=CONTACT_COLS)
+
+        if exhausted:
+            log.warning("Apollo out of credits after %r — %s contacts saved. "
+                        "Top up and Start again to resume.",
+                        company, len(got) if got else 0)
+            break
 
     # Phone reveals (Apollo only, when requested). Ensure the Apollo client exists
     # even when nothing was pending (e.g. resuming phone reveals for contacts whose
@@ -263,29 +276,30 @@ def run_enrichment(
             and all_contacts and not apollo_client.exhausted):
         store = PhoneRevealStore(out / "phone_reveals.json")
         fired = fire_reveals(apollo_client, all_contacts, store, max_reveals=max_reveals)
-        print(f"Phone reveals fired: {fired} (numbers arrive async ~40 min).")
+        log.info("Phone reveals fired: %s (numbers arrive async ~40 min).", fired)
         start = time.time()
         if use_webhook:
             # A separate `gtm webhook` process owns store writes; we only read
             # here to avoid a cross-process read-modify-write race.
-            print("Waiting for webhook callbacks (run `gtm webhook` + cloudflared).")
+            log.info("Waiting for webhook callbacks (run `gtm webhook` + cloudflared).")
             while True:
                 store.reload()
-                pending = store.pending_count()
-                done = len(store.data) - pending
-                print(f"  monitor: {done} resolved, {pending} pending")
-                if pending == 0 or not poll_wait or (time.time() - start) >= poll_wait:
+                n_pending = store.pending_count()
+                n_resolved = len(store.data) - n_pending
+                log.info("monitor: %s resolved, %s pending", n_resolved, n_pending)
+                if n_pending == 0 or not poll_wait or (time.time() - start) >= poll_wait:
                     break
                 time.sleep(poll_interval)
         else:
             while True:
                 resolved, no_num, still = poll_reveals(apollo_client, store)
-                print(f"  poll: +{resolved} resolved, +{no_num} no_number, {still} pending")
+                log.info("poll: +%s resolved, +%s no_number, %s pending",
+                         resolved, no_num, still)
                 if still == 0 or not poll_wait or (time.time() - start) >= poll_wait:
                     break
                 time.sleep(poll_interval)
         merged = merge_phones(all_contacts, store)
-        print(f"Merged {merged} phone numbers.")
+        log.info("Merged %s phone numbers.", merged)
         write_rows_csv([c.to_row() for c in all_contacts], contacts_path,
                        columns=CONTACT_COLS)
 
@@ -294,17 +308,15 @@ def run_enrichment(
     credits = apollo_client.credits_used if apollo_client is not None else 0
     usage = apollo_client.usage if apollo_client is not None else {}
     try:
-        (out / "enrich_credits.json").write_text(
-            json.dumps({"apollo_credits": credits, "usage": usage,
-                        "cache_hits": cache_hits,
-                        "exhausted": bool(apollo_client is not None
-                                          and apollo_client.exhausted),
-                        "updated": datetime.now().isoformat()},
-                       ensure_ascii=False, indent=2),
-            encoding="utf-8")
+        atomic_write_json(out / "enrich_credits.json", {
+            "apollo_credits": credits, "usage": usage,
+            "cache_hits": cache_hits,
+            "exhausted": bool(apollo_client is not None and apollo_client.exhausted),
+            "updated": datetime.now().isoformat(),
+        })
     except OSError:
         pass
 
-    print(f"Done. {len(all_contacts)} contacts -> {contacts_path}"
-          + (f" ({cache_hits} companies from cache)" if cache_hits else ""))
+    log.info("Done. %s contacts -> %s%s", len(all_contacts), contacts_path,
+             f" ({cache_hits} companies from cache)" if cache_hits else "")
     return all_contacts

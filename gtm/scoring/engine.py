@@ -11,6 +11,8 @@ Two paths:
 
 from __future__ import annotations
 
+import re
+
 from ..config.schema import CampaignConfig, Mode
 
 
@@ -65,6 +67,16 @@ def _is_captive(result: dict) -> bool:
     return str(result.get("independence") or "").strip().lower() in ("subsidiary", "acquired")
 
 
+def _negated_competitor(hay: str, competitor: str) -> bool:
+    """True when the competitor is mentioned in a negation (do not treat as locked)."""
+    c = re.escape(competitor.lower())
+    return bool(re.search(
+        rf"\b(?:not|no|never|without)\b(?:\s+\w+){{0,5}}\s+{c}"
+        rf"|{c}\s+(?:\w+\s+){{0,3}}(?:not|never)\b",
+        hay,
+    ))
+
+
 def _excluded_partner(config: CampaignConfig, result: dict) -> str:
     """Return the competitor name if the reseller looks locked to an excluded competitor.
 
@@ -80,6 +92,8 @@ def _excluded_partner(config: CampaignConfig, result: dict) -> str:
                    ("software_resold", "notes", "fit_summary")).lower()
     for competitor, levels in ex.items():
         if competitor.lower() not in hay:
+            continue
+        if _negated_competitor(hay, competitor):
             continue
         if levels == ["exclusive"]:
             cues = ("exclusive", "exclusively", "locked", "only reseller", "sole reseller")

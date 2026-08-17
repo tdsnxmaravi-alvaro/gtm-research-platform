@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .models import EnrichedContact, CONTACT_COLS
+from ..io import atomic_write_json, file_lock
 
 DEFAULT_CACHE = Path(".gtm_cache") / "contacts.json"
 
@@ -49,11 +50,18 @@ class ContactCache:
         key = _norm_domain(domain)
         if not key:
             return
-        self.data[key] = {
+        rec = {
             "cached_at": datetime.now(timezone.utc).isoformat(),
             "contacts": [c.to_row() for c in contacts],
         }
-        self._save()
+        with file_lock(self.path):
+            if self.path.exists():
+                try:
+                    self.data = json.loads(self.path.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    pass
+            self.data[key] = rec
+            atomic_write_json(self.path, self.data)
 
     def known_emails(self) -> set:
         """All emails already seen (any domain) — useful to avoid duplicates."""
@@ -64,9 +72,3 @@ class ContactCache:
                 if e:
                     out.add(e)
         return out
-
-    def _save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(self.data, indent=2, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(self.path)

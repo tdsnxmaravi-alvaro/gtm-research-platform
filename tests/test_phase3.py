@@ -160,3 +160,37 @@ def test_write_eml_with_logo_uses_frame_and_inline_banner(tmp_path):
     assert "border:1px solid #e1e4e8" in html  # branded frame
     assert len(imgs) == 1
     assert imgs[0]["Content-ID"].strip("<>") in html  # banner cid matches
+
+
+def test_run_outreach_writes_eml(tmp_path, monkeypatch):
+    from pathlib import Path
+    from gtm.outreach.runner import run_outreach
+
+    out = tmp_path / "camp"
+    out.mkdir()
+    (out / "master.csv").write_text(
+        "company,tier,score,contact_name,title,email,direct_phone\n"
+        "Acme SA,A,90,Ana Ruiz,CEO,ana@a.es,\n",
+        encoding="utf-8-sig")
+
+    monkeypatch.setattr(
+        "gtm.outreach.runner.generate_outreach",
+        lambda *_a, **_k: {
+            "subject": "Hi", "body": "Hello",
+            "followup_subject": "", "followup_body": "", "talking_points": "",
+        },
+    )
+
+    def _write(path, **_kw):
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("From: x\nTo: y\nSubject: Hi\n\nHello\n", encoding="utf-8")
+        return path
+
+    monkeypatch.setattr("gtm.outreach.runner.write_eml", _write)
+    monkeypatch.setattr("gtm.consolidate.master.write_outreach_sheet", lambda *_a, **_k: None)
+
+    drafts = run_outreach(_cfg(), out_dir=out, use_agent=False)
+    assert len(drafts) == 1
+    assert drafts[0]["email"] == "ana@a.es"
+    assert Path(drafts[0]["eml"]).exists()

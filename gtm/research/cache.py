@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ..enrichment.domains import extract_domain
+from ..io import atomic_write_json, file_lock
 
 DEFAULT_CACHE = Path(".gtm_cache") / "research.json"
 
@@ -50,9 +51,13 @@ class ResearchCache:
             return
         self.data[key] = {"cached_at": datetime.now(timezone.utc).isoformat(),
                           "row": dict(row)}
-        self._save()
-
-    def _save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(self.data, ensure_ascii=False, indent=2),
-                             encoding="utf-8")
+        with file_lock(self.path):
+            if self.path.exists():
+                try:
+                    disk = json.loads(self.path.read_text(encoding="utf-8"))
+                    if isinstance(disk, dict):
+                        disk.update(self.data)
+                        self.data = disk
+                except (json.JSONDecodeError, OSError):
+                    pass
+            atomic_write_json(self.path, self.data)

@@ -5,6 +5,7 @@ requests>=2.31
 python-dotenv>=1.0
 openpyxl>=3.1
 truststore>=0.9
+extract-msg>=0.48
 
 # Dev / test
 pytest>=8.0

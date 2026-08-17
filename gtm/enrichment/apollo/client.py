@@ -12,6 +12,8 @@ from __future__ import annotations
 import os
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 _SEARCH_URL = "https://api.apollo.io/api/v1/mixed_people/api_search"
 _ORG_SEARCH_URL = "https://api.apollo.io/api/v1/mixed_companies/search"
@@ -158,6 +160,24 @@ class ApolloClient:
         self.exhausted = False  # set when Apollo signals out-of-credits (402/403)
         if not self.api_key:
             raise ValueError("APOLLO_API_KEY not set (env or constructor).")
+        self._http = self._make_session()
+
+    @staticmethod
+    def _make_session() -> requests.Session:
+        session = requests.Session()
+        retry = Retry(
+            total=3,
+            connect=3,
+            read=3,
+            backoff_factor=0.5,
+            status_forcelist=(429, 502, 503, 504),
+            allowed_methods=frozenset({"GET", "POST"}),
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        return session
 
     def _note_status(self, status: int) -> None:
         """Flag credit/auth exhaustion so callers can stop resumably (not burn the
@@ -183,8 +203,8 @@ class ApolloClient:
     def get_api_profile(self) -> tuple[int, dict]:
         """GET /users/api_profile — used to verify the key + read the credit balance."""
         try:
-            resp = requests.get(_PROFILE_URL, headers={"X-Api-Key": self.api_key},
-                                timeout=self.timeout)
+            resp = self._http.get(_PROFILE_URL, headers={"X-Api-Key": self.api_key},
+                                  timeout=self.timeout)
         except requests.RequestException:
             return 0, {}
         self._note_status(resp.status_code)
@@ -200,8 +220,8 @@ class ApolloClient:
         tries GET then POST since Apollo's method varies)."""
         for method in ("GET", "POST"):
             try:
-                resp = requests.request(method, _CREDIT_USAGE_URL,
-                                        headers=self._headers, timeout=self.timeout)
+                resp = self._http.request(method, _CREDIT_USAGE_URL,
+                                          headers=self._headers, timeout=self.timeout)
             except requests.RequestException:
                 return 0, {}
             if resp.status_code in (404, 405):
@@ -221,14 +241,23 @@ class ApolloClient:
         Most Apollo plans are UNIFIED: one shared credit pool (reported as
         `lead_credit`) funds emails (1 credit), phone reveals (~8), and enrich — the
         per-type buckets like `direct_dial_credit` are misleading on such plans, so we
-        do NOT gate phones on them. Blocks only when the key is rejected or the shared
-        pool is 0. Phone spend beyond the pool is still caught in-flight (402/403).
+        do NOT gate phones on them. Blocks when the key is rejected, the shared pool
+        is 0, or (by default) the usage endpoint cannot be reached. Set
+        APOLLO_PREFLIGHT_STRICT=false to proceed when the balance cannot be verified.
         """
+        strict = os.getenv("APOLLO_PREFLIGHT_STRICT", "true").lower() not in (
+            "0", "false", "no",
+        )
         status, usage = self.get_credit_usage()
         if status in (401, 403):
             return False, (f"Apollo key rejected (HTTP {status}) — check APOLLO_API_KEY "
                            f"and the usage_stats scope.")
         if status != 200:
+            if strict:
+                return False, (
+                    f"Could not verify credits (HTTP {status}); refusing to spend. "
+                    "Set APOLLO_PREFLIGHT_STRICT=false to proceed anyway."
+                )
             return True, f"Could not verify credits (HTTP {status}); proceeding."
         pool = _credit_balances(usage).get("lead_credit")
         if pool is not None and pool <= 0:
@@ -271,8 +300,8 @@ class ApolloClient:
         }
         if self.locations:
             payload["organization_locations"] = self.locations
-        resp = requests.post(_SEARCH_URL, headers=self._headers,
-                             json=payload, timeout=self.timeout)
+        resp = self._http.post(_SEARCH_URL, headers=self._headers,
+                               json=payload, timeout=self.timeout)
         if resp.status_code != 200:
             self._note_status(resp.status_code)
             return [], 0
@@ -286,8 +315,8 @@ class ApolloClient:
         if self.locations:
             payload["organization_locations"] = self.locations
         try:
-            resp = requests.post(_ORG_SEARCH_URL, headers=self._headers,
-                                 json=payload, timeout=self.timeout)
+            resp = self._http.post(_ORG_SEARCH_URL, headers=self._headers,
+                                   json=payload, timeout=self.timeout)
             if resp.status_code != 200:
                 self._note_status(resp.status_code)
                 return None
@@ -310,8 +339,8 @@ class ApolloClient:
         """Enrich a person by Apollo ID (reveals work/personal emails)."""
         payload = {"id": person_id, "reveal_personal_emails": True}
         try:
-            resp = requests.post(_MATCH_URL, headers=self._headers,
-                                 json=payload, timeout=self.timeout)
+            resp = self._http.post(_MATCH_URL, headers=self._headers,
+                                   json=payload, timeout=self.timeout)
         except requests.RequestException:
             return None
         if resp.status_code != 200:
@@ -337,8 +366,8 @@ class ApolloClient:
             "reveal_phone_number": True,
             "webhook_url": self.webhook_url,
         }
-        resp = requests.post(_MATCH_URL, headers=self._headers,
-                             json=payload, timeout=self.timeout)
+        resp = self._http.post(_MATCH_URL, headers=self._headers,
+                               json=payload, timeout=self.timeout)
         if resp.status_code == 200:
             self.credits_used += 8  # phone reveal = ~8 credits
             self._capture_usage(resp)
@@ -359,8 +388,8 @@ class ApolloClient:
         404 -> not ready yet.
         """
         url = _WEBHOOK_RESULT_URL.format(request_id=request_id)
-        resp = requests.get(url, headers={"X-Api-Key": self.api_key},
-                            timeout=self.timeout)
+        resp = self._http.get(url, headers={"X-Api-Key": self.api_key},
+                              timeout=self.timeout)
         if resp.status_code != 200:
             return resp.status_code, []
         return 200, _phones_from_payload(resp.json())
