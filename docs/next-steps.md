@@ -28,9 +28,9 @@ Pipeline (always this order in the API): **research → consolidate → enrich �
 
 | If you are… | Do this |
 |-------------|--------|
-| Creating GitHub issues | Skip §3–§5 (already on GitHub: #5 and #30–#38 open; #22–#29 and #39–#44 closed). |
+| Creating GitHub issues | Skip §3–§5 (already on GitHub: #5 and #31–#38 open; #22–#30 and #39–#44 closed). |
 | Implementing | Prefer §6 ordered backlog. Do not re-implement §4. Do not start #33–#38 (P4) unless a maintainer asks. |
-| An LLM | Treat file paths as source of truth. `git log -1 da85348` is the reliability patch. **#22–#29** are done. Open work is **#5** plus **#30–#32**; **#33–#38** wait. |
+| An LLM | Treat file paths as source of truth. `git log -1 da85348` is the reliability patch. **#22–#30** are done. Open work is **#5** plus **#31–#32**; **#33–#38** wait. |
 
 **Labels to use on new issues:** `bug`, `enhancement`, `documentation`. Language: **English** for titles, bodies, commits, and code comments.
 
@@ -43,7 +43,7 @@ Pipeline (always this order in the API): **research → consolidate → enrich �
 | # | Title | Notes |
 |---|--------|--------|
 | [#5](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/5) | Multi-LLM ensemble research with Azure AI Foundry models | **Still open.** Partial code exists (`research_providers`, `gtm/providers/azure_foundry.py`, averaging in `gtm/research/runner.py`). The **design blocker remains**: Foundry chat models often have **no web search**, so they invent scores and get capped by the URL evidence gate. Issue body recommends (A) Foundry agents with grounding, or (B) LARA gathers evidence then a panel of models scores that evidence. Do not close until one of those is done and documented. |
-| [#30](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/30)–[#32](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/32) | P3 backlog | Created 2026-08-17. Details in §5. |
+| [#31](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/31)–[#32](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/32) | P3 backlog | Created 2026-08-17. Details in §5. |
 | [#33](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/33)–[#38](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/38) | P4 later / security | Created 2026-08-17. **Do not start** until a maintainer asks. |
 
 ### 3.2 Closed (historical — treat as done unless you find a regression)
@@ -73,7 +73,7 @@ These are **closed on GitHub**. They describe the original build-out. Closing th
 | [#20](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/20) | Provider CRUD in Settings | `ProviderSetting` + `Settings.jsx` |
 | [#21](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/21) | Auto-manage Apollo webhook tunnel | `backend/api/phone_delivery.py` + cloudflared |
 
-Reliability work from August 2026 is commit `da85348` and closed issues **#39–#44**. P1 (**#22–#25**) is implemented. **#26–#29** are done. Active backlog is **#5** plus **#30–#38**.
+Reliability work from August 2026 is commit `da85348` and closed issues **#39–#44**. P1 (**#22–#25**) is implemented. **#26–#30** are done. Active backlog is **#5** plus **#31–#38**.
 
 ---
 
@@ -231,7 +231,7 @@ Provided mode uses `ThreadPoolExecutor` waves (`research_concurrency`). Discover
 
 ### P3 — Tests, tooling, maintainability
 
-#### [#30](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/30) — Tests for untested orchestration
+#### [#30](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/30) — Tests for untested orchestration — **done**
 
 **Labels:** `enhancement`  
 **Files:** `gtm/cli.py` (beyond validate/estimate), `backend/api/views.py` (upload, download, enrich/outreach actions), `backend/api/tasks.py` `run_stage` / `run_pipeline` (not only mocked)
@@ -282,9 +282,9 @@ Do **not** start these until a maintainer asks. They are the 2026-08 security re
 Do **not** start with P4 unless the deployment target changes.
 
 1. **#5** (existing) — decide A vs B for ensemble web-search; implement; close #5.  
-2. **#30** tests, **#31** tooling, **#32** vendor data extraction.
+2. **#31** tooling, **#32** vendor data extraction.
 
-**Done:** #22–#29.
+**Done:** #22–#30.
 
 ---
 
@@ -304,8 +304,8 @@ Do **not** start with P4 unless the deployment target changes.
 ## 8. Quick map: closed vs create vs skip
 
 ```text
-GitHub CLOSED:  #1–#4, #6–#21, #22–#29, #39–#44
-GitHub OPEN:    #5, #30–#32 (do these); #33–#38 (P4, wait)
+GitHub CLOSED:  #1–#4, #6–#21, #22–#30, #39–#44
+GitHub OPEN:    #5, #31–#32 (do these); #33–#38 (P4, wait)
 SKIP:           re-doing enrichment/wizard phases; duplicating #5/#22–#44; implementing P4 unasked
 ```
 

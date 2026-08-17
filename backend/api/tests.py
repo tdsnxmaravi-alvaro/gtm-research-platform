@@ -351,6 +351,148 @@ class ApolloCreditsEndpointTests(APITestCase):
         self.assertFalse(resp.json()["configured"])
 
 
+class OrchestrationCoverageTests(APITestCase):
+    """#30: upload size/ext, download allowlist, start creates a Run, pipeline order."""
+
+    def _tmp_root(self):
+        import tempfile
+        from pathlib import Path
+        return Path(tempfile.mkdtemp())
+
+    def test_upload_list_rejects_missing_file(self):
+        resp = self.client.post("/api/campaigns/upload_list/")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_upload_list_rejects_disallowed_extension(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        f = SimpleUploadedFile("payload.exe", b"MZ", content_type="application/octet-stream")
+        resp = self.client.post("/api/campaigns/upload_list/", {"file": f})
+        self.assertEqual(resp.status_code, 400, resp.content)
+        self.assertIn("csv", resp.json().get("error", "").lower())
+
+    def test_upload_list_rejects_oversize(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        f = SimpleUploadedFile(
+            "big.csv",
+            b"company,website\nAcme,https://acme.com\n",
+            content_type="text/csv",
+        )
+        with patch("api.views.MAX_UPLOAD_BYTES", 10):
+            resp = self.client.post("/api/campaigns/upload_list/", {"file": f})
+        self.assertEqual(resp.status_code, 400, resp.content)
+        self.assertIn("limit", resp.json().get("error", "").lower())
+
+    def test_upload_list_accepts_csv(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from pathlib import Path
+        root = self._tmp_root()
+        f = SimpleUploadedFile(
+            "resellers.csv",
+            b"company,website,country\nAcme,https://acme.com,Spain\n",
+            content_type="text/csv",
+        )
+        with override_settings(GTM_DATA_ROOT=root):
+            with patch("gtm.ingest.schema_ai.ai_available", return_value=False):
+                resp = self.client.post("/api/campaigns/upload_list/", {"file": f})
+        self.assertEqual(resp.status_code, 200, resp.content)
+        data = resp.json()
+        self.assertTrue(data.get("path"))
+        self.assertTrue(Path(data["path"]).is_file())
+        self.assertGreaterEqual(data.get("with_company", 0), 1)
+
+    def test_download_rejects_unknown_artifact(self):
+        campaign = Campaign.objects.create(name="t-dl", config=VALID_CONFIG)
+        resp = self.client.get(
+            f"/api/campaigns/{campaign.id}/download/?artifact=../../../etc/passwd")
+        self.assertEqual(resp.status_code, 400, resp.content)
+
+    def test_download_404_when_missing(self):
+        campaign = Campaign.objects.create(name="t-dl-miss", config=VALID_CONFIG)
+        resp = self.client.get(
+            f"/api/campaigns/{campaign.id}/download/?artifact=master.csv")
+        self.assertEqual(resp.status_code, 404, resp.content)
+
+    def test_download_serves_allowlisted_artifact(self):
+        root = self._tmp_root()
+        campaign = Campaign.objects.create(name="t-dl-ok", config=VALID_CONFIG)
+        out = root / campaign.name
+        out.mkdir(parents=True)
+        (out / "master.csv").write_text("company\nAcme\n", encoding="utf-8")
+        with override_settings(GTM_DATA_ROOT=root):
+            resp = self.client.get(
+                f"/api/campaigns/{campaign.id}/download/?artifact=master.csv")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(b"Acme", b"".join(resp.streaming_content))
+        resp.close()
+
+    def test_start_creates_a_run(self):
+        campaign = Campaign.objects.create(name="t-start-run", config=VALID_CONFIG)
+
+        def _fake_stage(run_id, cfg_dict, stage, name, fresh=False):
+            Run.objects.filter(pk=run_id).update(status="done")
+
+        with patch("api.tasks.run_stage", side_effect=_fake_stage):
+            resp = self.client.post(f"/api/campaigns/{campaign.id}/start/")
+        self.assertEqual(resp.status_code, 202, resp.content)
+        self.assertTrue(Run.objects.filter(campaign=campaign).exists())
+        stages = list(
+            Run.objects.filter(campaign=campaign).order_by("id").values_list("stage", flat=True)
+        )
+        self.assertEqual(stages[0], "research")
+        self.assertIn("consolidate", stages)
+
+    def test_enrich_and_outreach_actions_create_runs(self):
+        campaign = Campaign.objects.create(name="t-actions", config=VALID_CONFIG)
+        with patch("gtm.enrichment.run_enrichment", return_value=[]):
+            with patch("gtm.consolidate.build_master", return_value=[]):
+                resp = self.client.post(f"/api/campaigns/{campaign.id}/enrich/")
+        self.assertEqual(resp.status_code, 202, resp.content)
+        self.assertTrue(Run.objects.filter(campaign=campaign, stage="enrich").exists())
+
+        with patch("gtm.outreach.run_outreach", return_value=[]):
+            with patch("gtm.outreach.email_gen._lara_agent", return_value=None):
+                resp = self.client.post(f"/api/campaigns/{campaign.id}/outreach/")
+        self.assertEqual(resp.status_code, 202, resp.content)
+        self.assertTrue(Run.objects.filter(campaign=campaign, stage="outreach").exists())
+
+    def test_run_pipeline_invokes_engine_in_stage_order(self):
+        from api.tasks import run_pipeline
+        cfg = dict(VALID_CONFIG)
+        cfg["name"] = "t-engine-order"
+        cfg["enrichment"] = {"provider": "lara", "want": "emails"}
+        cfg["outreach"] = {"enabled": True, "min_tier": "C", "language": "en"}
+        campaign = Campaign.objects.create(name="t-engine-order", config=cfg)
+        seen: list[str] = []
+
+        def track(label, ret):
+            def _fn(*_a, **_k):
+                seen.append(label)
+                return ret
+            return _fn
+
+        with (
+            patch("gtm.research.run_campaign",
+                  side_effect=track("research", [{"company": "Acme"}])),
+            patch("gtm.consolidate.build_master",
+                  side_effect=track("consolidate", [{"company": "Acme"}])),
+            patch("gtm.enrichment.run_enrichment",
+                  side_effect=track("enrich", [])),
+            patch("gtm.outreach.run_outreach",
+                  side_effect=track("outreach", [])),
+            patch("gtm.outreach.email_gen._lara_agent", return_value=None),
+        ):
+            run_pipeline(campaign.id)
+
+        first = []
+        for label in seen:
+            if label not in first:
+                first.append(label)
+        self.assertEqual(first, ["research", "consolidate", "enrich", "outreach"])
+        self.assertTrue(Run.objects.filter(campaign=campaign, stage="research",
+                                           status="done").exists())
+
+
+
 
 
 
