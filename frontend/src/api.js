@@ -31,10 +31,18 @@ export const api = {
   vendorVerticals: (vendor) =>
     req(`/campaigns/vendor_verticals/?vendor=${encodeURIComponent(vendor)}`),
   datechCountries: () => req("/campaigns/datech_countries/"),
-  outreachPreview: (config) =>
-    req("/campaigns/outreach_preview/", { method: "POST", body: JSON.stringify({ config }) }),
-  remapList: (path, mapping) =>
-    req("/campaigns/remap_list/", { method: "POST", body: JSON.stringify({ path, mapping }) }),
+  outreachPreview: (config, { signal } = {}) =>
+    req("/campaigns/outreach_preview/", {
+      method: "POST",
+      body: JSON.stringify({ config }),
+      signal,
+    }),
+  remapList: (path, mapping, { signal } = {}) =>
+    req("/campaigns/remap_list/", {
+      method: "POST",
+      body: JSON.stringify({ path, mapping }),
+      signal,
+    }),
   uploadList: (file) => {
     const fd = new FormData();
     fd.append("file", file);

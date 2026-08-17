@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { api } from "./api.js";
 
 const STEPS = ["Target", "Setup", "Prompt", "Enrich", "Outreach", "Review"];
@@ -73,6 +73,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
   const [provCatalog, setProvCatalog] = useState([]);
   const [previewVertical, setPreviewVertical] = useState("");
   const [emailPreview, setEmailPreview] = useState({ html: "", source: "", loading: false });
+  const remapAbort = useRef(null);
   const [f, setF] = useState(() =>
     initialConfig
       ? hydrate(initialConfig)
@@ -175,12 +176,22 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
     // Re-inspect the list with the manual picks so the company/website counts
     // and warnings update live (the auto/AI mapping may have missed the columns).
     if (f.provided_list_path) {
+      remapAbort.current?.abort();
+      const ac = new AbortController();
+      remapAbort.current = ac;
       setRemapping(true);
       api
-        .remapList(f.provided_list_path, colMap)
-        .then((rep) => setListReport(rep))
-        .catch((err) => setUploadErr(String(err.message || err)))
-        .finally(() => setRemapping(false));
+        .remapList(f.provided_list_path, colMap, { signal: ac.signal })
+        .then((rep) => {
+          if (!ac.signal.aborted) setListReport(rep);
+        })
+        .catch((err) => {
+          if (err.name === "AbortError") return;
+          setUploadErr(String(err.message || err));
+        })
+        .finally(() => {
+          if (!ac.signal.aborted) setRemapping(false);
+        });
     }
   };
 
@@ -461,12 +472,23 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
   // Live email preview (real vendor template + sample body in the chosen language).
   useEffect(() => {
     if (STEPS[step] !== "Outreach" || !f.outreach_enabled) return;
+    const ac = new AbortController();
     setEmailPreview((p) => ({ ...p, loading: true }));
-    api.outreachPreview(buildConfig())
-      .then((r) => setEmailPreview({ html: r.html || "", source: r.source || "", loading: false }))
-      .catch(() => setEmailPreview({ html: "", source: "", loading: false }));
+    api.outreachPreview(buildConfig(), { signal: ac.signal })
+      .then((r) => {
+        if (!ac.signal.aborted) {
+          setEmailPreview({ html: r.html || "", source: r.source || "", loading: false });
+        }
+      })
+      .catch((err) => {
+        if (err.name === "AbortError") return;
+        setEmailPreview({ html: "", source: "", loading: false });
+      });
+    return () => ac.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, f.vendor, f.outreach_language, f.logo_path]);
+  }, [step, f.vendor, f.outreach_language, f.logo_path, f.sender_name, f.sender_email]);
+
+  useEffect(() => () => remapAbort.current?.abort(), []);
 
   // Load discover verticals (grouped by tier) when the vendor is set in discover
   // mode; default-check Core+Secondary the first time (Defer stays unchecked).
@@ -860,6 +882,12 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
                 </select>
                 <small className="hint">Auto uses each company's country; pick one to force it for all drafts.</small>
               </label>
+              <label>Sender name
+                <input value={f.sender_name} onChange={set("sender_name")} placeholder="Ana BDR" />
+              </label>
+              <label>Sender email
+                <input type="email" value={f.sender_email} onChange={set("sender_email")} placeholder="ana@tdsynnex.com" />
+              </label>
               <div className="field">
                 <span className="lbl">Custom header / logo (optional)</span>
                 <input type="file" accept=".png,.jpg,.jpeg,.gif,.webp" onChange={onLogoUpload} />
@@ -871,7 +899,7 @@ export default function Wizard({ onCreated, initialConfig = null, campaignId = n
                 {emailPreview.loading ? (
                   <div className="estimate">Rendering preview…</div>
                 ) : emailPreview.html ? (
-                  <iframe className="mailpreview" title="email preview" srcDoc={emailPreview.html} />
+                  <iframe className="mailpreview" title="email preview" srcDoc={emailPreview.html} sandbox="" />
                 ) : (
                   <small className="hint">Preview unavailable — complete the earlier steps.</small>
                 )}

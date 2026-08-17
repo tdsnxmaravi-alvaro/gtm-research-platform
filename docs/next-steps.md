@@ -28,9 +28,9 @@ Pipeline (always this order in the API): **research → consolidate → enrich �
 
 | If you are… | Do this |
 |-------------|--------|
-| Creating GitHub issues | Skip §3–§5 (already on GitHub: #5 and #26–#38 open; #22–#25 and #39–#44 closed). |
+| Creating GitHub issues | Skip §3–§5 (already on GitHub: #5 and #28–#38 open; #22–#27 and #39–#44 closed). |
 | Implementing | Prefer §6 ordered backlog. Do not re-implement §4. Do not start #33–#38 (P4) unless a maintainer asks. |
-| An LLM | Treat file paths as source of truth. `git log -1 da85348` is the reliability patch. **#22–#25** are done. Open work is **#5** plus **#26–#32**; **#33–#38** wait. |
+| An LLM | Treat file paths as source of truth. `git log -1 da85348` is the reliability patch. **#22–#27** are done. Open work is **#5** plus **#28–#32**; **#33–#38** wait. |
 
 **Labels to use on new issues:** `bug`, `enhancement`, `documentation`. Language: **English** for titles, bodies, commits, and code comments.
 
@@ -43,7 +43,7 @@ Pipeline (always this order in the API): **research → consolidate → enrich �
 | # | Title | Notes |
 |---|--------|--------|
 | [#5](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/5) | Multi-LLM ensemble research with Azure AI Foundry models | **Still open.** Partial code exists (`research_providers`, `gtm/providers/azure_foundry.py`, averaging in `gtm/research/runner.py`). The **design blocker remains**: Foundry chat models often have **no web search**, so they invent scores and get capped by the URL evidence gate. Issue body recommends (A) Foundry agents with grounding, or (B) LARA gathers evidence then a panel of models scores that evidence. Do not close until one of those is done and documented. |
-| [#26](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/26)–[#32](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/32) | P2–P3 backlog | Created 2026-08-17. Details in §5. |
+| [#28](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/28)–[#32](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/32) | P2–P3 backlog | Created 2026-08-17. Details in §5. |
 | [#33](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/33)–[#38](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/38) | P4 later / security | Created 2026-08-17. **Do not start** until a maintainer asks. |
 
 ### 3.2 Closed (historical — treat as done unless you find a regression)
@@ -59,7 +59,7 @@ These are **closed on GitHub**. They describe the original build-out. Closing th
 | [#6](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/6) | Outreach GUI visual template builder | Branded `.eml` / `.oft` path exists; **not** a full visual template editor |
 | [#7](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/7) | Wizard: field validation + step gating | Wizard `stepError` / `next` |
 | [#8](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/8) | Wizard: vendor as controlled dropdown | Vendor presets in wizard |
-| [#9](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/9) | Wizard: field UX (outreach, tiers, sender, providers) | **Gap:** `sender_name` / `sender_email` are in config/hydrate/Review but **no Outreach-step inputs** |
+| [#9](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/9) | Wizard: field UX (outreach, tiers, sender, providers) | Sender inputs are on the Outreach step (#27) |
 | [#10](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/10) | Wizard: friendly Review step | Review step in `Wizard.jsx` |
 | [#11](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/11) | Ingest: Excel upload + column mapping | `upload_list` / `remap_list` + `gtm/ingest/` |
 | [#12](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/12) | Wizard: prompt builder | `preview_prompt` + prompt step |
@@ -73,7 +73,7 @@ These are **closed on GitHub**. They describe the original build-out. Closing th
 | [#20](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/20) | Provider CRUD in Settings | `ProviderSetting` + `Settings.jsx` |
 | [#21](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/21) | Auto-manage Apollo webhook tunnel | `backend/api/phone_delivery.py` + cloudflared |
 
-Reliability work from August 2026 is commit `da85348` and closed issues **#39–#44**. P1 (**#22–#25**) is implemented. Active backlog is **#26–#38**.
+Reliability work from August 2026 is commit `da85348` and closed issues **#39–#44**. P1 (**#22–#25**) is implemented. **#26–#27** are done. Active backlog is **#5** plus **#28–#38**.
 
 ---
 
@@ -196,7 +196,7 @@ Full CSV rewrite per company is O(n²) I/O. Acceptable for small lists; painful 
 
 ---
 
-#### [#27](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/27) — Wizard sender fields + email preview sandbox
+#### [#27](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/27) — Wizard sender fields + email preview sandbox — **done**
 
 **Labels:** `bug`  
 **Files:** `frontend/src/Wizard.jsx` (Outreach step, `srcDoc` iframe ~line 874)
@@ -282,11 +282,11 @@ Do **not** start these until a maintainer asks. They are the 2026-08 security re
 Do **not** start with P4 unless the deployment target changes.
 
 1. **#5** (existing) — decide A vs B for ensemble web-search; implement; close #5.  
-2. **#28** then **#27** frontend leaks / sender / sandbox.  
+2. **#28** frontend polling leaks.  
 3. **#29** discover concurrency if multi-country discover is used.  
 4. **#30** tests, **#31** tooling, **#32** vendor data extraction.
 
-**Done:** #22–#26.
+**Done:** #22–#27.
 
 ---
 
@@ -306,8 +306,8 @@ Do **not** start with P4 unless the deployment target changes.
 ## 8. Quick map: closed vs create vs skip
 
 ```text
-GitHub CLOSED:  #1–#4, #6–#21, #22–#26, #39–#44
-GitHub OPEN:    #5, #27–#32 (do these); #33–#38 (P4, wait)
+GitHub CLOSED:  #1–#4, #6–#21, #22–#27, #39–#44
+GitHub OPEN:    #5, #28–#32 (do these); #33–#38 (P4, wait)
 SKIP:           re-doing enrichment/wizard phases; duplicating #5/#22–#44; implementing P4 unasked
 ```
 
