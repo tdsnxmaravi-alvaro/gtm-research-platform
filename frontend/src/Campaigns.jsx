@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
 
 const STAGES = ["research", "consolidate", "enrich", "outreach"];
@@ -37,10 +37,26 @@ export default function Campaigns({ onEdit }) {
   const [confirmRelaunch, setConfirmRelaunch] = useState(null); // campaign pending relaunch
   const [relaunchInfo, setRelaunchInfo] = useState(null); // summary for the modal
   const [error, setError] = useState("");
+  const pollTimers = useRef({});
+  const alive = useRef(true);
+
+  function clearPoll(id) {
+    const t = pollTimers.current[id];
+    if (t != null) {
+      clearInterval(t);
+      delete pollTimers.current[id];
+    }
+  }
+
+  function setPoll(id, tick) {
+    clearPoll(id);
+    pollTimers.current[id] = setInterval(tick, 2000);
+  }
 
   async function refreshStages(id) {
     try {
       const data = await api.campaignRuns(id);
+      if (!alive.current) return;
       setStageRuns((s) => ({ ...s, [id]: data }));
     } catch {
       /* ignore */
@@ -50,24 +66,32 @@ export default function Campaigns({ onEdit }) {
   async function load() {
     try {
       const data = await api.listCampaigns();
+      if (!alive.current) return;
       const list = data.results || data;
       setCampaigns(list);
       // Fetch the latest run for each campaign so the card shows the last summary.
       list.forEach(async (c) => {
         try {
           const run = await api.campaignStatus(c.id);
+          if (!alive.current) return;
           if (run && run.id) setRuns((r) => ({ ...r, [c.id]: run }));
         } catch {
           /* ignore */
         }
-        refreshStages(c.id);
+        if (alive.current) refreshStages(c.id);
       });
     } catch (e) {
-      setError(String(e.message || e));
+      if (alive.current) setError(String(e.message || e));
     }
   }
   useEffect(() => {
+    alive.current = true;
     load();
+    return () => {
+      alive.current = false;
+      Object.values(pollTimers.current).forEach(clearInterval);
+      pollTimers.current = {};
+    };
   }, []);
 
   function lastStage(config) {
@@ -78,19 +102,20 @@ export default function Campaigns({ onEdit }) {
 
   function pollPipeline(id, config) {
     const last = lastStage(config);
-    const t = setInterval(async () => {
+    setPoll(id, async () => {
       try {
         const run = await api.campaignStatus(id);
+        if (!alive.current) return;
         setRuns((r) => ({ ...r, [id]: run }));
         refreshStages(id);
         const terminal =
           ["error", "canceled", "paused"].includes(run.status) ||
           (run.stage === last && run.status === "done");
-        if (terminal) clearInterval(t);
+        if (terminal) clearPoll(id);
       } catch {
-        clearInterval(t);
+        clearPoll(id);
       }
-    }, 2000);
+    });
   }
 
   async function start(id, config) {
@@ -131,16 +156,17 @@ export default function Campaigns({ onEdit }) {
   }
 
   function poll(runId, campaignId) {
-    const t = setInterval(async () => {
+    setPoll(campaignId, async () => {
       try {
         const run = await api.getRun(runId);
+        if (!alive.current) return;
         setRuns((r) => ({ ...r, [campaignId]: run }));
         refreshStages(campaignId);
-        if (TERMINAL.includes(run.status)) clearInterval(t);
+        if (TERMINAL.includes(run.status)) clearPoll(campaignId);
       } catch {
-        clearInterval(t);
+        clearPoll(campaignId);
       }
-    }, 2000);
+    });
   }
 
   async function toggleResults(id) {

@@ -28,9 +28,9 @@ Pipeline (always this order in the API): **research → consolidate → enrich �
 
 | If you are… | Do this |
 |-------------|--------|
-| Creating GitHub issues | Skip §3–§5 (already on GitHub: #5 and #28–#38 open; #22–#27 and #39–#44 closed). |
+| Creating GitHub issues | Skip §3–§5 (already on GitHub: #5 and #29–#38 open; #22–#28 and #39–#44 closed). |
 | Implementing | Prefer §6 ordered backlog. Do not re-implement §4. Do not start #33–#38 (P4) unless a maintainer asks. |
-| An LLM | Treat file paths as source of truth. `git log -1 da85348` is the reliability patch. **#22–#27** are done. Open work is **#5** plus **#28–#32**; **#33–#38** wait. |
+| An LLM | Treat file paths as source of truth. `git log -1 da85348` is the reliability patch. **#22–#28** are done. Open work is **#5** plus **#29–#32**; **#33–#38** wait. |
 
 **Labels to use on new issues:** `bug`, `enhancement`, `documentation`. Language: **English** for titles, bodies, commits, and code comments.
 
@@ -43,7 +43,7 @@ Pipeline (always this order in the API): **research → consolidate → enrich �
 | # | Title | Notes |
 |---|--------|--------|
 | [#5](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/5) | Multi-LLM ensemble research with Azure AI Foundry models | **Still open.** Partial code exists (`research_providers`, `gtm/providers/azure_foundry.py`, averaging in `gtm/research/runner.py`). The **design blocker remains**: Foundry chat models often have **no web search**, so they invent scores and get capped by the URL evidence gate. Issue body recommends (A) Foundry agents with grounding, or (B) LARA gathers evidence then a panel of models scores that evidence. Do not close until one of those is done and documented. |
-| [#28](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/28)–[#32](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/32) | P2–P3 backlog | Created 2026-08-17. Details in §5. |
+| [#29](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/29)–[#32](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/32) | P2–P3 backlog | Created 2026-08-17. Details in §5. |
 | [#33](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/33)–[#38](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/38) | P4 later / security | Created 2026-08-17. **Do not start** until a maintainer asks. |
 
 ### 3.2 Closed (historical — treat as done unless you find a regression)
@@ -73,7 +73,7 @@ These are **closed on GitHub**. They describe the original build-out. Closing th
 | [#20](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/20) | Provider CRUD in Settings | `ProviderSetting` + `Settings.jsx` |
 | [#21](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/21) | Auto-manage Apollo webhook tunnel | `backend/api/phone_delivery.py` + cloudflared |
 
-Reliability work from August 2026 is commit `da85348` and closed issues **#39–#44**. P1 (**#22–#25**) is implemented. **#26–#27** are done. Active backlog is **#5** plus **#28–#38**.
+Reliability work from August 2026 is commit `da85348` and closed issues **#39–#44**. P1 (**#22–#25**) is implemented. **#26–#28** are done. Active backlog is **#5** plus **#29–#38**.
 
 ---
 
@@ -207,7 +207,7 @@ Full CSV rewrite per company is O(n²) I/O. Acceptable for small lists; painful 
 
 ---
 
-#### [#28](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/28) — Campaigns.jsx polling leaks
+#### [#28](https://github.com/tdsnxmaravi-alvaro/gtm-research-platform/issues/28) — Campaigns.jsx polling leaks — **done**
 
 **Labels:** `bug`  
 **Files:** `frontend/src/Campaigns.jsx` `poll` / `pollPipeline`
@@ -282,11 +282,10 @@ Do **not** start these until a maintainer asks. They are the 2026-08 security re
 Do **not** start with P4 unless the deployment target changes.
 
 1. **#5** (existing) — decide A vs B for ensemble web-search; implement; close #5.  
-2. **#28** frontend polling leaks.  
-3. **#29** discover concurrency if multi-country discover is used.  
-4. **#30** tests, **#31** tooling, **#32** vendor data extraction.
+2. **#29** discover concurrency if multi-country discover is used.  
+3. **#30** tests, **#31** tooling, **#32** vendor data extraction.
 
-**Done:** #22–#27.
+**Done:** #22–#28.
 
 ---
 
@@ -306,8 +305,8 @@ Do **not** start with P4 unless the deployment target changes.
 ## 8. Quick map: closed vs create vs skip
 
 ```text
-GitHub CLOSED:  #1–#4, #6–#21, #22–#27, #39–#44
-GitHub OPEN:    #5, #28–#32 (do these); #33–#38 (P4, wait)
+GitHub CLOSED:  #1–#4, #6–#21, #22–#28, #39–#44
+GitHub OPEN:    #5, #29–#32 (do these); #33–#38 (P4, wait)
 SKIP:           re-doing enrichment/wizard phases; duplicating #5/#22–#44; implementing P4 unasked
 ```
 
