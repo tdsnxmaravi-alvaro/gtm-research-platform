@@ -76,6 +76,22 @@ research passes to cut variance (~1/√N):
 python -m gtm run campaigns/spain-bricscad.yaml --limit 20 --passes 3
 ```
 
+**Exclusions & tier caps.** After scoring, hard gates cap or drop resellers we
+should not contact — applied in **both discover and provided** mode:
+
+- **Evidence URL gate:** no verified source URL → tier capped (default `C`).
+- **Captive:** a reseller flagged `Subsidiary`/`Acquired` is not an independent
+  channel → capped (default `C`).
+- **Competitor-locked:** a reseller tied to an excluded competitor at a locked
+  level (e.g. an **Autodesk Gold/Platinum/Premium** partner for a Bricsys/Trimble
+  campaign) → capped (default `D`) and, by default, **skipped in enrichment/outreach
+  entirely** (`enrichment.skip_competitor_locked`), so we never contact a partner
+  locked to the competitor even if its capped tier still passes `min_tier`.
+
+Excluded competitors and their locked-tier keywords live per vendor in
+`gtm/prompts/data/vendor_exclusions.yaml`. Existing Datech partners are likewise
+skipped in enrichment by default (`enrichment.skip_datech_matches`).
+
 Enrichment is driven by the config's `enrichment` block: `provider` (`apollo` |
 `lara`) and `want` (`none` | `emails` | `emails+phones`). The Apollo path adds
 async phone reveals (resumable, no double-charge); the LARA path resolves

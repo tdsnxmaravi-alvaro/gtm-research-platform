@@ -191,6 +191,9 @@ class Enrichment(BaseModel):
     # Skip contact enrichment for companies already in the Datech channel (they're
     # existing partners) to save Apollo credits; validate later if worth enriching.
     skip_datech_matches: bool = True
+    # Never enrich/contact a reseller locked to an excluded competitor (e.g. an
+    # Autodesk Gold/Platinum partner) even if its capped tier still passes min_tier.
+    skip_competitor_locked: bool = True
     # Credit-estimate inputs (Apollo). Observed ~8 credits per phone reveal.
     credits_per_email: int = 1
     credits_per_phone: int = 8

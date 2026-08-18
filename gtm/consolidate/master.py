@@ -21,6 +21,7 @@ MASTER_COLS = [
     "contact_name", "title", "email", "email_status",
     "direct_phone", "corporate_phone", "linkedin",
     "vendor", "recommended_products", "fit_summary", "evidence_urls",
+    "tier_cap_reason",
 ]
 
 # "Master Outreach" sheet — one row per company (header, source key).

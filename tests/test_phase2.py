@@ -439,6 +439,41 @@ def test_run_enrichment_persists_contacts_when_exhausted(tmp_path, monkeypatch):
     assert cached and cached[0].email == "a@acme.com"
 
 
+def test_run_enrichment_skips_competitor_locked(tmp_path, monkeypatch):
+    """A reseller flagged competitor-locked by the gate is never enriched/contacted."""
+    calls = []
+
+    class _Client:
+        exhausted = False
+        credits_used = 0
+        usage = {}
+
+        def preflight(self):
+            return True, "ok"
+
+    def _enrich(_c, row, max_contacts=3, delay=0.5):
+        calls.append(row["company"])
+        dom = extract_domain(row["website"])
+        return [EnrichedContact(company=row["company"], domain=dom,
+                                email=f"x@{dom}", source="apollo")]
+
+    monkeypatch.setattr("gtm.enrichment.runner.enrich_company", _enrich)
+    monkeypatch.setattr("gtm.enrichment.runner.ApolloClient", lambda **_kw: _Client())
+
+    out = tmp_path / "camp"
+    out.mkdir()
+    rows = [
+        {"company": "Locked GmbH", "website": "https://locked.com", "final_tier": "A",
+         "score": "95", "tier_cap_reason": "Autodesk-locked partner -> capped at D"},
+        {"company": "Free GmbH", "website": "https://free.com", "final_tier": "A", "score": "90"},
+    ]
+    c = _cfg(enrichment={"provider": "apollo", "want": "emails", "max_contacts": 3})
+    got = run_enrichment(c, rows=rows, out_dir=out, use_cache=False, resume=False, delay=0)
+    assert calls == ["Free GmbH"]  # competitor-locked one skipped despite tier A
+    assert all(g.company == "Free GmbH" for g in got)
+
+
+
 def test_run_enrichment_checkpoint_flushes_complete_csv(tmp_path, monkeypatch):
     """Cache-hit path may skip intermediate CSV rewrites; the file is complete at end."""
     monkeypatch.setenv("GTM_CSV_CHECKPOINT_EVERY", "50")

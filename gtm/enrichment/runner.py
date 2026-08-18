@@ -143,6 +143,11 @@ def run_enrichment(
         # Skip existing Datech partners to save Apollo credits (opt-out via config).
         if getattr(enr, "skip_datech_matches", True) and (r.get("datech_match") or "").strip():
             return False
+        # Never contact a reseller locked to an excluded competitor (e.g. Autodesk
+        # Gold/Platinum), flagged by the scoring gate, even if its capped tier passes.
+        if getattr(enr, "skip_competitor_locked", True) \
+                and "locked partner" in (r.get("tier_cap_reason") or "").lower():
+            return False
         company = r.get("company")
         if company not in done:
             return True
