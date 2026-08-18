@@ -268,13 +268,13 @@ def test_score_results_batch():
 
 
 def test_discover_gate_ignores_negated_competitor():
-    from gtm.scoring.engine import apply_discover_gates
+    from gtm.scoring.engine import apply_exclusion_gates
     c = CampaignConfig(
         name="t", target_type="resellers", mode="discover", country="Spain",
         vendor="Trimble",
         products=[{"name": "Trimble", "value_prop": "vp", "fit_criteria": ["x"]}],
     )
-    r = apply_discover_gates(c, {
+    r = apply_exclusion_gates(c, {
         "tier": "A", "final_tier": "A", "score": 90, "has_verified_url": True,
         "notes": "not an Autodesk Gold partner; independent VAR",
         "software_resold": "", "fit_summary": "",
@@ -282,7 +282,7 @@ def test_discover_gate_ignores_negated_competitor():
     assert r["final_tier"] == "A"
     assert not r.get("tier_capped")
 
-    locked = apply_discover_gates(c, {
+    locked = apply_exclusion_gates(c, {
         "tier": "A", "final_tier": "A", "score": 90, "has_verified_url": True,
         "notes": "Autodesk Gold partner",
         "software_resold": "", "fit_summary": "",

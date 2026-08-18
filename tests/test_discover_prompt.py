@@ -47,7 +47,7 @@ def test_discover_vertical_prompt_is_exhaustive():
     # vendor landscape (example software brands) present
     assert any(sw.split()[0] in p for sw in v["example_software"])
     # exclusions rendered with competitor + level
-    assert "Autodesk Gold/Platinum/Premier partners" in p
+    assert "Autodesk Gold/Platinum/Premier/Premium partners" in p
     # discovery rules + two-part task + independence emphasis
     assert "PART 1" in p and "PART 2" in p and "Independence FIRST" in p
     # strict JSON output schema
@@ -60,7 +60,7 @@ def test_draftsight_prompt_excludes_autodesk_not_dassault():
                       products=[{"name": "DraftSight", "value_prop": "2D CAD"}],
                       verticals=[v])
     p = build_prompt(c, c.products[0], vertical=c.verticals[0])
-    assert "Autodesk Gold/Platinum partners" in p
+    assert "Autodesk Gold/Platinum/Premium partners" in p
     assert "locked to Dassault" not in p and "SOLIDWORKS-locked" not in p
 
 
@@ -102,13 +102,13 @@ def test_exclusive_lock_detected():
     assert out[0]["final_tier"] == "D"
 
 
-def test_gates_do_not_apply_in_provided_mode():
+def test_gates_apply_in_provided_mode():
     c = CampaignConfig(name="prov", target_type="resellers", mode="provided",
                        country="USA", vendor="Trimble", provided_list_path="x.csv",
                        products=[{"name": "Trimble", "value_prop": "vp"}])
     out = score_results(c, [_row(independence="Subsidiary",
                                  software_resold="Autodesk Gold Partner")])
-    assert out[0]["final_tier"] == "A"  # discover gates skipped
+    assert out[0]["final_tier"] == "D"  # exclusion gates now apply in provided too
 
 
 # --- multi-country discover (Phase D) ------------------------------------ #

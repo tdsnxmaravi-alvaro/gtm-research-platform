@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 
-from ..config.schema import CampaignConfig, Mode
+from ..config.schema import CampaignConfig
 
 
 def tier_order(config: CampaignConfig) -> list[str]:
@@ -104,8 +104,8 @@ def _excluded_partner(config: CampaignConfig, result: dict) -> str:
     return ""
 
 
-def apply_discover_gates(config: CampaignConfig, result: dict) -> dict:
-    """Cap final_tier for non-independent or competitor-locked resellers (discover)."""
+def apply_exclusion_gates(config: CampaignConfig, result: dict) -> dict:
+    """Cap final_tier for non-independent or competitor-locked resellers (all modes)."""
     order = tier_order(config)
     final = (result.get("final_tier") or result.get("tier")
              or tier_from_score(config, result.get("score")))
@@ -134,11 +134,11 @@ def apply_discover_gates(config: CampaignConfig, result: dict) -> dict:
 
 
 def score_results(config: CampaignConfig, results: list[dict]) -> list[dict]:
-    """Apply the LLM-evidence scoring (URL gate), plus discover gates in discover mode."""
+    """Apply the LLM-evidence scoring (URL gate) plus exclusion gates (captive /
+    competitor-locked) in every mode — we never want to contact a reseller locked
+    to an excluded competitor, whether the list was discovered or provided."""
     out = [apply_url_gate(config, r) for r in results]
-    if config.mode == Mode.discover:
-        out = [apply_discover_gates(config, r) for r in out]
-    return out
+    return [apply_exclusion_gates(config, r) for r in out]
 
 
 def deterministic_score(config: CampaignConfig, row: dict):

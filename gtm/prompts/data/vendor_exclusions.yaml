@@ -3,6 +3,7 @@ Trimble:
   - Gold
   - Platinum
   - Premier
+  - Premium
   Bentley:
   - SELECT
   Nemetschek:
@@ -12,10 +13,12 @@ Bricsys:
   - Gold
   - Platinum
   - Premier
+  - Premium
 DraftSight:
   Autodesk:
   - Gold
   - Platinum
+  - Premium
 Newforma:
   Bentley ProjectWise:
   - exclusive
